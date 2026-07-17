@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: trilha-aprovacao
+  datasource:
+    url: ${URL_BANCO:jdbc:postgresql://localhost:${PORTA_POSTGRESQL:5432}/${NOME_BANCO:trilha_aprovacao}}
+    username: ${USUARIO_BANCO:trilha_aprovacao}
+    password: ${SENHA_BANCO:altere_esta_senha_local}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: ${PORTA_BACKEND:8080}
