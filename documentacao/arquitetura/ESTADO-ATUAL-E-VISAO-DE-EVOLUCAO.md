@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-As Sprints 0 a 5 estao concluidas. A aplicacao usa PostgreSQL com migrations
+As Sprints 0 a 6 estao concluidas. A aplicacao usa PostgreSQL com migrations
 Flyway e validacao do esquema, autenticacao por sessao com CSRF e dados
 isolados pelo usuario autenticado.
 
@@ -22,12 +22,18 @@ preserva a redacao recebida e impede pais de outra materia, outro edital e
 ciclos. MapeamentoDeItemDoEdital liga manualmente o item a um TopicoDaMateria
 compativel e confirmado. Excluir esse mapeamento remove somente o vinculo.
 
-Ainda nao estao implementados materiais, coberturas, registros de estudo,
-dashboard consolidado, OpenAPI e CI. Esses itens pertencem as Sprints 6 a 8.
+MaterialDeEstudo forma a biblioteca pessoal de aulas, PDFs e outras fontes.
+CoberturaDeTopicoPorMaterial associa cada material aos topicos que ele atende.
+RegistroDeEstudo pertence ao topico e aceita material somente quando existe a
+cobertura. Correcao encerra o registro original e cria um registro ativo ligado
+a ele; cancelamento altera a situacao sem exclusao fisica.
+
+Ainda nao estao implementados dashboard consolidado, OpenAPI e CI. Esses itens
+pertencem as Sprints 7 e 8.
 
 ## Base alvo
 
-A evolucao continua a partir dos materiais e registros de estudo da Sprint 6.
+A evolucao continua a partir do dashboard objetivo da Sprint 7.
 Cada etapa deve reutilizar o catalogo, a estrutura de concursos e os mapeamentos
 existentes sem copiar materias, topicos ou historico.
 

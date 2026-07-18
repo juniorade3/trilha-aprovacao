@@ -50,12 +50,13 @@ export function listarMaterias(
   incluirArquivadas: boolean,
   pagina: number,
   sinal?: AbortSignal,
+  tamanho = 12,
 ) {
   const parametros = new URLSearchParams({
     pesquisa,
     incluirArquivadas: String(incluirArquivadas),
     pagina: String(pagina),
-    tamanho: '12',
+    tamanho: String(tamanho),
   })
   return requisitar<RespostaPaginada<Materia>>(`/v1/materias?${parametros}`, {
     signal: sinal,

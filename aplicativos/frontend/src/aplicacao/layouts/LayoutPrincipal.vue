@@ -36,6 +36,12 @@ async function sair() {
           <RouterLink class="nav-link text-white" to="/materias">
             Materias
           </RouterLink>
+          <RouterLink class="nav-link text-white" to="/materiais">
+            Materiais
+          </RouterLink>
+          <RouterLink class="nav-link text-white" to="/estudos">
+            Estudos
+          </RouterLink>
           <span class="text-white-50 d-none d-md-inline">
             {{ sessao.usuario?.nome }}
           </span>

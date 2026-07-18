@@ -15,6 +15,8 @@ import ConcursoNovoPagina from '@/modulos/concursos/ConcursoNovoPagina.vue'
 import ConcursosPagina from '@/modulos/concursos/ConcursosPagina.vue'
 import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
 import MateriaDetalhePagina from '@/modulos/materias/MateriaDetalhePagina.vue'
+import MateriaisDeEstudoPagina from '@/modulos/estudos/MateriaisDeEstudoPagina.vue'
+import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -58,6 +60,12 @@ const roteador = createRouter({
           component: ConcursoDetalhePagina,
         },
         { path: 'materias', name: 'materias', component: MateriasPagina },
+        {
+          path: 'materiais',
+          name: 'materiais-de-estudo',
+          component: MateriaisDeEstudoPagina,
+        },
+        { path: 'estudos', name: 'estudos', component: EstudosPagina },
         {
           path: 'materias/:identificador',
           name: 'materia-detalhe',

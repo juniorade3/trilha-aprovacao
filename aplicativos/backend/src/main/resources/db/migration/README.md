@@ -1,3 +1,12 @@
 # Migrations Flyway
 
-As migrations versionadas do dominio serao introduzidas com as capacidades que criam suas tabelas. O Sprint 2 inicia por Usuario; nao ha tabela artificial de demonstracao nesta fundacao.
+As migrations versionadas acompanham as capacidades de dominio:
+
+- V1: usuarios;
+- V2: materias e topicos pessoais;
+- V3: estrutura de concursos;
+- V4: conteudo programatico e mapeamentos;
+- V5: materiais, coberturas de topicos e registros de estudo.
+
+O esquema e validado pelo Hibernate com `ddl-auto=validate`; nao ha criacao
+automatica de tabelas nem dados artificiais de demonstracao.

@@ -8,6 +8,8 @@ import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.RepositorioJpaDeTopicos;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.TopicoPersistido;
 import br.com.trilhaaprovacao.conteudoprogramatico.infraestrutura.RepositorioDeMapeamentosDeItens;
+import br.com.trilhaaprovacao.estudos.infraestrutura.RepositorioDeCoberturasDeTopicos;
+import br.com.trilhaaprovacao.estudos.infraestrutura.RepositorioDeRegistrosDeEstudo;
 import java.util.HashSet;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -20,12 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class ServicoDeTopicos {
     private final RepositorioJpaDeTopicos topicos;
     private final RepositorioDeMapeamentosDeItens mapeamentos;
+    private final RepositorioDeCoberturasDeTopicos coberturas;
+    private final RepositorioDeRegistrosDeEstudo registros;
     private final ServicoDeMaterias materias;
 
     public ServicoDeTopicos(RepositorioJpaDeTopicos topicos,
-            RepositorioDeMapeamentosDeItens mapeamentos, ServicoDeMaterias materias) {
+            RepositorioDeMapeamentosDeItens mapeamentos,
+            RepositorioDeCoberturasDeTopicos coberturas,
+            RepositorioDeRegistrosDeEstudo registros,
+            ServicoDeMaterias materias) {
         this.topicos = topicos;
         this.mapeamentos = mapeamentos;
+        this.coberturas = coberturas;
+        this.registros = registros;
         this.materias = materias;
     }
 
@@ -101,6 +110,11 @@ public class ServicoDeTopicos {
         if (mapeamentos.existsByIdentificadorDoTopicoDaMateria(identificador)) {
             throw new ConflitoDeDominio("TOPICO_POSSUI_MAPEAMENTOS",
                     "Remova os mapeamentos antes de excluir o topico.");
+        }
+        if (coberturas.existsByIdentificadorDoTopico(identificador)
+                || registros.existsByIdentificadorDoTopico(identificador)) {
+            throw new ConflitoDeDominio("TOPICO_POSSUI_HISTORICO_DE_ESTUDO",
+                    "Arquive o topico, pois ele possui materiais ou estudos vinculados.");
         }
         topicos.delete(persistido);
     }
