@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+set -eu
+
+VERSAO_MAVEN=3.9.11
+DIRETORIO_BASE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DIRETORIO_MAVEN="$DIRETORIO_BASE/.mvn/apache-maven-$VERSAO_MAVEN"
+ARQUIVO_MAVEN="$DIRETORIO_BASE/.mvn/apache-maven-$VERSAO_MAVEN-bin.zip"
+URL_MAVEN="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$VERSAO_MAVEN/apache-maven-$VERSAO_MAVEN-bin.zip"
+
+if [ ! -x "$DIRETORIO_MAVEN/bin/mvn" ]; then
+  mkdir -p "$DIRETORIO_BASE/.mvn"
+  if [ ! -f "$ARQUIVO_MAVEN" ]; then
+    curl --fail --location --silent --show-error "$URL_MAVEN" --output "$ARQUIVO_MAVEN"
+  fi
+  rm -rf "$DIRETORIO_MAVEN"
+  (cd "$DIRETORIO_BASE/.mvn" && jar xf "$ARQUIVO_MAVEN")
+  chmod +x "$DIRETORIO_MAVEN/bin/mvn"
+fi
+
+exec "$DIRETORIO_MAVEN/bin/mvn" "$@"

@@ -1,0 +1,42 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "verificar-tipos": "vue-tsc -b --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "verificar-formatacao": "prettier --check .",
+    "formatar": "prettier --write ."
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
+    "pinia": "^3.0.4",
+    "sass": "^1.93.2",
+    "vue": "^3.5.22",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.6.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.6",
+    "@vue/tsconfig": "^0.8.1",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.5.0",
+    "globals": "^16.3.0",
+    "jiti": "^2.7.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.44.1",
+    "vite": "~8.1.0",
+    "vitest": "^4.0.0",
+    "vue-tsc": "^3.1.0"
+  }
+}

@@ -1,0 +1,15 @@
+:root {
+  --cor-primaria: #12355b;
+  --cor-destaque: #0e8f87;
+  --cor-fundo: #f5f8fb;
+}
+
+body {
+  background-color: var(--cor-fundo);
+  color: #1d2a39;
+}
+
+:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}

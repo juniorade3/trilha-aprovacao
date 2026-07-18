@@ -1,0 +1,16 @@
+.env
+.env.*.local
+!.env.example
+
+node_modules/
+dist/
+coverage/
+.vite/
+target/
+*.class
+*.log
+**/.mvn/apache-maven-*/
+**/.mvn/*.zip
+dados-postgresql/
+volumes/
+screenshots/

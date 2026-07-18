@@ -1,8 +1,13 @@
 # Plano de execucao
 
-Este repositorio possui uma implementacao parcial anterior. A reconstrucao descrita em `RECONSTRUCAO-COMPLETA-TRILHA-APROVACAO.md` deve ser tratada como um projeto novo: antes do Sprint 0, a equipe deve validar o diretorio de destino definido pelo usuario e interromper o trabalho se ele nao estiver vazio.
+As Sprints 0, 1 e 2 da reconstrucao descrita em
+`RECONSTRUCAO-COMPLETA-TRILHA-APROVACAO.md` estao concluidas. O projeto foi
+incorporado ao repositorio original em `~/Projetos/trilha-aprovacao`, preservando
+o historico das implementacoes.
 
-O planejamento detalhado esta em `documentacao/planejamento/PLANO-DE-EXECUCAO.md`. Cada sprint so pode iniciar depois que os criterios de saida do anterior forem atendidos e registrados.
+O planejamento detalhado esta em `documentacao/planejamento/PLANO-DE-EXECUCAO.md`.
+Cada sprint so pode iniciar depois que os criterios de saida do anterior forem
+atendidos e registrados. A proxima etapa autorizavel e a Sprint 3.
 
 Ordem obrigatoria:
 
