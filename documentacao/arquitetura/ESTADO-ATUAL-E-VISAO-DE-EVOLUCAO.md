@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-As Sprints 0 a 3 estao concluidas. A aplicacao usa PostgreSQL com migrations
+As Sprints 0 a 4 estao concluidas. A aplicacao usa PostgreSQL com migrations
 Flyway e validacao do esquema, autenticacao por sessao com CSRF e dados
 isolados pelo usuario autenticado.
 
@@ -11,14 +11,21 @@ pesquisaveis e arquivaveis. Topicos formam uma arvore ordenada, com nome unico
 entre irmaos, pai da mesma materia e prevencao de ciclos. O frontend oferece
 lista, detalhe, formularios e estados de carregamento, vazio e erro.
 
-Ainda nao estao implementados concursos, editais, cargos, provas, conteudo
-programatico, materiais, registros de estudo, dashboard consolidado, OpenAPI e
-CI. Esses itens pertencem as Sprints 4 a 8.
+A estrutura de concursos implementa Concurso, Edital, CargoDoConcurso, Prova,
+GrupoDeConteudo e MateriaDaProva. O cadastro e gradual, permite um concurso
+ativo por usuario, um edital principal e um cargo selecionado por concurso e
+reutiliza Materia por referencia. Concursos arquivados bloqueiam alteracoes de
+conteudo, e exclusoes fisicas com dependencias sao recusadas.
+
+Ainda nao estao implementados itens de conteudo programatico, mapeamentos,
+materiais, registros de estudo, dashboard consolidado, OpenAPI e CI. Esses itens
+pertencem as Sprints 5 a 8.
 
 ## Base alvo
 
-A evolucao continua a partir da estrutura de concursos da Sprint 4. Cada etapa
-deve reutilizar o catalogo existente sem copiar materias, topicos ou historico.
+A evolucao continua a partir do conteudo programatico e dos mapeamentos da
+Sprint 5. Cada etapa deve reutilizar o catalogo e a estrutura de concursos
+existentes sem copiar materias, topicos ou historico.
 
 ## Evolucao posterior
 

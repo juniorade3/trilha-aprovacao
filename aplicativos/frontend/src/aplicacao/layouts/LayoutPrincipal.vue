@@ -24,9 +24,14 @@ async function sair() {
         <RouterLink class="navbar-brand fw-semibold" to="/dashboard">
           Trilha da Aprovacao
         </RouterLink>
-        <div class="d-flex align-items-center gap-2 gap-md-3">
+        <div
+          class="d-flex flex-wrap justify-content-end align-items-center gap-2 gap-md-3"
+        >
           <RouterLink class="nav-link text-white" to="/dashboard">
             Inicio
+          </RouterLink>
+          <RouterLink class="nav-link text-white" to="/concursos">
+            Concursos
           </RouterLink>
           <RouterLink class="nav-link text-white" to="/materias">
             Materias

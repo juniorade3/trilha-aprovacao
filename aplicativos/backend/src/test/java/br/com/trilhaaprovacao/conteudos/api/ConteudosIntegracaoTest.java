@@ -58,7 +58,11 @@ class ConteudosIntegracaoTest {
 
     @BeforeEach
     void limparBanco() {
-        banco.execute("TRUNCATE TABLE topicos_da_materia, materias, usuarios");
+        banco.execute("""
+                TRUNCATE TABLE materias_da_prova, grupos_de_conteudo, provas,
+                    cargos_do_concurso, editais, concursos, topicos_da_materia,
+                    materias, usuarios
+                """);
     }
 
     @Test

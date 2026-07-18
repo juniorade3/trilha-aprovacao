@@ -69,6 +69,28 @@ Para cada sprint, registrar no PR ou no log de execucao: commit local, comandos 
 - dados sinteticos removidos ao final e processos temporarios encerrados;
 - divergencias conhecidas da Sprint 3: nenhuma.
 
+### Sprint 4 — executada em 18/07/2026
+
+- `make verificar`: aprovado;
+- backend: 23 testes aprovados, incluindo dominio, regras de exclusividade,
+  concorrencia otimista, seguranca e API sobre PostgreSQL real com
+  Testcontainers;
+- frontend: 22 testes aprovados, verificacao de tipos, lint, build e formatacao;
+- `npm audit`: nenhuma vulnerabilidade encontrada;
+- migration `V3__cria_estrutura_de_concursos.sql`: aplicada do esquema v2 ao v3
+  e validada pelo Hibernate com `ddl-auto=validate`;
+- fluxo HTTP real: health `UP`, arvore completa de Concurso, Edital, Cargo,
+  Prova, Grupo de Conteudo e MateriaDaProva, com troca de concurso ativo, edital
+  principal e cargo selecionado;
+- isolamento A-versus-B: leitura de concurso e vinculacao de materia retornaram
+  `404`;
+- concurso arquivado: tentativa de criar conteudo retornou `422`;
+- frontend real: Vite respondeu a rota `/concursos` e encaminhou `/api` ao
+  backend;
+- dados sinteticos removidos ao final, migration atual confirmada como v3,
+  processos temporarios encerrados e portas liberadas;
+- divergencias conhecidas da Sprint 4: nenhuma.
+
 ## Relatorio de encerramento
 
 Usar exatamente as secoes exigidas no item 36 da especificacao-fonte. Resultados nao executados devem constar como `nao executado`, `parcial` ou `bloqueado`; nunca como aprovados por inferencia.

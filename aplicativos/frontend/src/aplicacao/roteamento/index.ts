@@ -10,6 +10,9 @@ import LayoutPrincipal from '@/aplicacao/layouts/LayoutPrincipal.vue'
 import InicioPagina from '@/modulos/inicio/InicioPagina.vue'
 import LoginPagina from '@/modulos/autenticacao/LoginPagina.vue'
 import CadastroPagina from '@/modulos/autenticacao/CadastroPagina.vue'
+import ConcursoDetalhePagina from '@/modulos/concursos/ConcursoDetalhePagina.vue'
+import ConcursoNovoPagina from '@/modulos/concursos/ConcursoNovoPagina.vue'
+import ConcursosPagina from '@/modulos/concursos/ConcursosPagina.vue'
 import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
 import MateriaDetalhePagina from '@/modulos/materias/MateriaDetalhePagina.vue'
 
@@ -43,6 +46,17 @@ const roteador = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', name: 'dashboard', component: InicioPagina },
+        { path: 'concursos', name: 'concursos', component: ConcursosPagina },
+        {
+          path: 'concursos/novo',
+          name: 'concurso-novo',
+          component: ConcursoNovoPagina,
+        },
+        {
+          path: 'concursos/:identificador',
+          name: 'concurso-detalhe',
+          component: ConcursoDetalhePagina,
+        },
         { path: 'materias', name: 'materias', component: MateriasPagina },
         {
           path: 'materias/:identificador',
