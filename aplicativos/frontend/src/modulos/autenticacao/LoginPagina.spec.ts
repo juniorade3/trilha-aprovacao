@@ -43,6 +43,22 @@ describe('LoginPagina', () => {
     expect(senha.attributes('type')).toBe('text')
   })
 
+  it('explica quando a sessao expirou sem perder o redirecionamento', async () => {
+    const roteador = criarRoteador()
+    await roteador.push(
+      '/login?sessao=expirada&redirecionar=/materiais/material-1',
+    )
+    await roteador.isReady()
+    const pagina = mount(LoginPagina, {
+      global: { plugins: [createPinia(), roteador] },
+    })
+
+    expect(pagina.text()).toContain('Sua sessão expirou')
+    expect(roteador.currentRoute.value.query.redirecionar).toBe(
+      '/materiais/material-1',
+    )
+  })
+
   it('autentica, restaura a sessao e respeita o redirecionamento', async () => {
     requisitar
       .mockResolvedValueOnce({ autenticada: true })

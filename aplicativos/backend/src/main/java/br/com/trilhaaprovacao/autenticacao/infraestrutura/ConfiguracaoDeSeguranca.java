@@ -53,7 +53,15 @@ public class ConfiguracaoDeSeguranca {
                 .securityContext(configuracao -> configuracao.securityContextRepository(repositorioDeContexto).requireExplicitSave(true))
                 .sessionManagement(configuracao -> configuracao.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(autorizacao -> autorizacao
-                        .requestMatchers("/actuator/health", "/api/v1/autenticacao/csrf", "/api/v1/autenticacao/cadastro", "/api/v1/autenticacao/login").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/api/v1/autenticacao/csrf",
+                                "/api/v1/autenticacao/cadastro",
+                                "/api/v1/autenticacao/login",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(configuracao -> configuracao.disable())
                 .formLogin(configuracao -> configuracao.disable())

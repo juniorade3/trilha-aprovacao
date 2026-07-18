@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ErroDaApi, requisitar } from './clienteHttp'
+import { criarRequisicaoCancelavel, ErroDaApi, requisitar } from './clienteHttp'
 
 describe('clienteHttp', () => {
   beforeEach(() => {
@@ -53,5 +53,23 @@ describe('clienteHttp', () => {
       new ErroDaApi(401, 'Faca login para continuar.'),
     )
     expect(aoExpirar).toHaveBeenCalledOnce()
+  })
+
+  it('permite cancelar uma requisicao em andamento', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (_entrada, opcoes) =>
+        new Promise((_resolver, rejeitar) => {
+          opcoes?.signal?.addEventListener('abort', () =>
+            rejeitar(new DOMException('Cancelada', 'AbortError')),
+          )
+        }),
+    )
+
+    const requisicao = criarRequisicaoCancelavel('/v1/dashboard')
+    requisicao.cancelar()
+
+    await expect(requisicao.promessa).rejects.toMatchObject({
+      name: 'AbortError',
+    })
   })
 })

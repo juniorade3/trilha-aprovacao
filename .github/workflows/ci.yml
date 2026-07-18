@@ -1,0 +1,78 @@
+name: Verificacao continua
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verificacao-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  estrutura:
+    name: Estrutura e Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v6
+      - name: Validar Docker Compose
+        run: docker compose config --quiet
+      - name: Validar diferencas de texto
+        run: git diff --check
+
+  backend:
+    name: Backend, migrations e arquitetura
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v6
+      - name: Preparar Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: aplicativos/backend/pom.xml
+      - name: Compilar e testar com PostgreSQL
+        working-directory: aplicativos/backend
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v6
+      - name: Preparar Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Instalar dependencias exatas
+        working-directory: aplicativos/frontend
+        run: npm ci
+      - name: Verificar tipos
+        working-directory: aplicativos/frontend
+        run: npm run verificar-tipos
+      - name: Executar lint
+        working-directory: aplicativos/frontend
+        run: npm run lint
+      - name: Executar testes
+        working-directory: aplicativos/frontend
+        run: npm run test
+      - name: Gerar build
+        working-directory: aplicativos/frontend
+        run: npm run build
+      - name: Verificar formatacao
+        working-directory: aplicativos/frontend
+        run: npm run verificar-formatacao
+      - name: Auditar dependencias
+        working-directory: aplicativos/frontend
+        run: npm audit --audit-level=low

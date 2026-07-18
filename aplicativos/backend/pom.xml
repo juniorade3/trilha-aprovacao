@@ -16,6 +16,8 @@
     <description>API do Trilha da Aprovacao</description>
     <properties>
         <java.version>21</java.version>
+        <versao.archunit>1.4.2</versao.archunit>
+        <versao.springdoc>3.0.3</versao.springdoc>
         <versao.testcontainers>2.0.5</versao.testcontainers>
     </properties>
     <dependencyManagement>
@@ -55,6 +57,11 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${versao.springdoc}</version>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
@@ -80,6 +87,12 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${versao.archunit}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

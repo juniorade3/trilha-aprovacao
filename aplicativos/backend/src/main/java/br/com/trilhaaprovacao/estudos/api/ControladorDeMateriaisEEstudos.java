@@ -5,6 +5,7 @@ import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
 import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;
 import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Materiais e estudos")
 public class ControladorDeMateriaisEEstudos {
     private final ServicoDeMateriaisEEstudos servico;
     private final ServicoDeTopicos topicos;

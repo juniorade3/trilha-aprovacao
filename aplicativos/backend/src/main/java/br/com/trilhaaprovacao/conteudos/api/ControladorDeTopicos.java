@@ -3,6 +3,7 @@ package br.com.trilhaaprovacao.conteudos.api;
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Matérias e tópicos")
 public class ControladorDeTopicos {
     private final ServicoDeTopicos topicos;
     private final IdentidadeDoUsuarioAtual usuarioAtual;

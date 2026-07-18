@@ -6,6 +6,7 @@ import {
 } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
+import LayoutDeAutenticacao from '@/aplicacao/layouts/LayoutDeAutenticacao.vue'
 import LayoutPrincipal from '@/aplicacao/layouts/LayoutPrincipal.vue'
 import InicioPagina from '@/modulos/inicio/InicioPagina.vue'
 import LoginPagina from '@/modulos/autenticacao/LoginPagina.vue'
@@ -67,14 +68,30 @@ const roteador = createRouter({
         },
         { path: 'estudos', name: 'estudos', component: EstudosPagina },
         {
+          path: 'materiais/:identificador',
+          name: 'material-detalhe',
+          component: MateriaisDeEstudoPagina,
+        },
+        {
+          path: 'estudos/novo',
+          name: 'estudo-novo',
+          component: EstudosPagina,
+        },
+        {
           path: 'materias/:identificador',
           name: 'materia-detalhe',
           component: MateriaDetalhePagina,
         },
       ],
     },
-    { path: '/login', name: 'login', component: LoginPagina },
-    { path: '/cadastro', name: 'cadastro', component: CadastroPagina },
+    {
+      path: '/',
+      component: LayoutDeAutenticacao,
+      children: [
+        { path: 'login', name: 'login', component: LoginPagina },
+        { path: 'cadastro', name: 'cadastro', component: CadastroPagina },
+      ],
+    },
   ],
 })
 

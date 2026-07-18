@@ -4,7 +4,7 @@ Monorepo para organizar concursos, conteudos reutilizaveis, materiais e registro
 
 ## Estado
 
-Sprints 0 a 7 concluidas: fundacao do monorepo, PostgreSQL/Flyway,
+Sprints 0 a 8 concluidas: fundacao do monorepo, PostgreSQL/Flyway,
 autenticacao por sessao, catalogo pessoal de materias e topicos e estrutura de
 concursos com conteudo programatico estao implementados. Itens oficiais formam
 arvores sob as materias da prova e podem ser mapeados para topicos pessoais da
@@ -13,9 +13,9 @@ vinculo. Materiais de estudo cobrem um ou mais topicos, e registros de estudo
 podem ser corrigidos ou cancelados com preservacao integral do historico. O
 dashboard do concurso ativo deriva medidas objetivas desses fatos e apresenta
 provas, cobertura de estudos, atividade recente e pendencias estruturais.
-
-A Sprint 8, contrato publico e consolidacao, somente pode comecar apos
-autorizacao explicita.
+O contrato OpenAPI documenta sessao, CSRF, grupos e erros; Swagger fica
+disponivel localmente, o perfil de producao o desabilita por padrao e a CI
+executa as mesmas portas de qualidade sem realizar deploy.
 
 ## Pre-requisitos
 
@@ -36,6 +36,7 @@ make frontend-executar
 ```
 
 O health check do backend fica em `http://localhost:8080/actuator/health`. O frontend inicia em `http://localhost:5173` e encaminha `/api` ao backend.
+Swagger fica em `http://localhost:8080/swagger-ui.html`.
 
 ## Verificacao
 
@@ -43,3 +44,17 @@ O health check do backend fica em `http://localhost:8080/actuator/health`. O fro
 docker compose config
 make verificar
 ```
+
+## Documentacao
+
+- [Operacao local](documentacao/operacao/README.md)
+- [Swagger, sessao e CSRF](documentacao/api/COMO-USAR-O-SWAGGER.md)
+- [Arquitetura](documentacao/arquitetura/ARQUITETURA-INICIAL.md)
+- [Modelo de dominio](documentacao/arquitetura/MODELO-DE-DOMINIO.md)
+- [Diagramas](documentacao/diagramas/README.md)
+- [Decisoes arquiteturais](documentacao/decisoes/)
+- [Validacao e aceite](documentacao/planejamento/VALIDACAO-E-ACEITE.md)
+
+O repositorio nao inclui deploy nem cliente gerado da OpenAPI. O frontend usa
+um cliente `fetch` pequeno, relativo a `/api`, com sessao, CSRF, erros
+padronizados e cancelamento por `AbortController`.

@@ -2,7 +2,9 @@ package br.com.trilhaaprovacao.conteudos.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
+import br.com.trilhaaprovacao.conteudos.aplicacao.ConsultaDeUsoDaMateria;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,12 +26,18 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1/materias")
+@Tag(name = "Matérias e tópicos")
 public class ControladorDeMaterias {
     private final ServicoDeMaterias materias;
+    private final ConsultaDeUsoDaMateria consultaDeUso;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
 
-    public ControladorDeMaterias(ServicoDeMaterias materias, IdentidadeDoUsuarioAtual usuarioAtual) {
+    public ControladorDeMaterias(
+            ServicoDeMaterias materias,
+            ConsultaDeUsoDaMateria consultaDeUso,
+            IdentidadeDoUsuarioAtual usuarioAtual) {
         this.materias = materias;
+        this.consultaDeUso = consultaDeUso;
         this.usuarioAtual = usuarioAtual;
     }
 
@@ -58,6 +66,13 @@ public class ControladorDeMaterias {
     @GetMapping("/{identificador}")
     public RespostaDeMateria obter(@PathVariable UUID identificador, Authentication autenticacao) {
         return RespostaDeMateria.de(materias.obter(usuarioAtual.obter(autenticacao), identificador));
+    }
+
+    @GetMapping("/{identificador}/uso")
+    public RespostaDeUsoDaMateria consultarUso(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return RespostaDeUsoDaMateria.de(consultaDeUso.consultar(
+                usuarioAtual.obter(autenticacao), identificador));
     }
 
     @PutMapping("/{identificador}")

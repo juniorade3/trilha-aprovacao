@@ -1,8 +1,8 @@
 package br.com.trilhaaprovacao.autenticacao.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.ServicoDeUsuarios;
-import br.com.trilhaaprovacao.autenticacao.infraestrutura.RepositorioDeUsuarios;
-import br.com.trilhaaprovacao.autenticacao.infraestrutura.UsuarioPersistido;
+import br.com.trilhaaprovacao.autenticacao.aplicacao.UsuarioDaAplicacao;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,23 +22,23 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/autenticacao")
+@Tag(name = "Autenticação")
 public class ControladorDeAutenticacao {
     private final ServicoDeUsuarios servicoDeUsuarios;
-    private final RepositorioDeUsuarios repositorioDeUsuarios;
     private final AuthenticationManager gerenciadorDeAutenticacao;
     private final SecurityContextRepository repositorioDeContexto;
 
-    public ControladorDeAutenticacao(ServicoDeUsuarios servicoDeUsuarios, RepositorioDeUsuarios repositorioDeUsuarios,
+    public ControladorDeAutenticacao(ServicoDeUsuarios servicoDeUsuarios,
             AuthenticationManager gerenciadorDeAutenticacao, SecurityContextRepository repositorioDeContexto) {
         this.servicoDeUsuarios = servicoDeUsuarios;
-        this.repositorioDeUsuarios = repositorioDeUsuarios;
         this.gerenciadorDeAutenticacao = gerenciadorDeAutenticacao;
         this.repositorioDeContexto = repositorioDeContexto;
     }
 
     @PostMapping("/cadastro")
     public ResponseEntity<RespostaDeUsuario> cadastrar(@Valid @RequestBody RequisicaoDeCadastro requisicao) {
-        UsuarioPersistido usuario = servicoDeUsuarios.cadastrar(requisicao.nome(), requisicao.email(), requisicao.senha());
+        UsuarioDaAplicacao usuario = servicoDeUsuarios.cadastrar(
+                requisicao.nome(), requisicao.email(), requisicao.senha());
         return ResponseEntity.created(URI.create("/api/v1/autenticacao/usuarios/" + usuario.identificador()))
                 .body(RespostaDeUsuario.de(usuario));
     }
@@ -79,7 +79,8 @@ public class ControladorDeAutenticacao {
     }
 
     private RespostaDeSessao sessaoDaAutenticacao(Authentication autenticacao) {
-        UsuarioPersistido usuario = repositorioDeUsuarios.findByEmail(autenticacao.getName()).orElseThrow();
+        UsuarioDaAplicacao usuario =
+                servicoDeUsuarios.consultarPorEmail(autenticacao.getName());
         return new RespostaDeSessao(true, RespostaDeUsuario.de(usuario));
     }
 }

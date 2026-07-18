@@ -8,6 +8,7 @@ const chamadas = vi.hoisted(() => ({
   alterarTopico: vi.fn(),
   arquivarMateria: vi.fn(),
   arquivarTopico: vi.fn(),
+  consultarUsoDaMateria: vi.fn(),
   criarTopico: vi.fn(),
   excluirTopico: vi.fn(),
   listarTopicos: vi.fn(),
@@ -60,6 +61,11 @@ describe('MateriaDetalhePagina', () => {
       tamanho: 100,
       totalDeItens: 0,
       totalDePaginas: 0,
+    })
+    chamadas.consultarUsoDaMateria.mockResolvedValue({
+      materiais: [],
+      estudosRecentes: [],
+      concursos: [],
     })
   })
 
@@ -127,5 +133,33 @@ describe('MateriaDetalhePagina', () => {
       'Restaure a materia para alterar seus topicos.',
     )
     expect(pagina.get('fieldset').attributes('disabled')).toBeDefined()
+  })
+
+  it('mostra os usos reais da materia sem textos de sprint', async () => {
+    chamadas.consultarUsoDaMateria.mockResolvedValue({
+      materiais: [
+        { identificador: 'material-1', titulo: 'Aula 01', tipo: 'AULA' },
+      ],
+      estudosRecentes: [
+        {
+          identificador: 'estudo-1',
+          nomeDoTopico: 'Direitos fundamentais',
+          dataHora: '2026-07-18T10:00:00-03:00',
+          duracaoEmMinutos: 60,
+        },
+      ],
+      concursos: [
+        { identificador: 'concurso-1', nome: 'Concurso A', ativo: true },
+      ],
+    })
+
+    const pagina = await montarPagina()
+    await flushPromises()
+
+    expect(pagina.text()).toContain('Aula 01')
+    expect(pagina.text()).toContain('Direitos fundamentais')
+    expect(pagina.text()).toContain('60 min')
+    expect(pagina.text()).toContain('Concurso A')
+    expect(pagina.text()).not.toContain('Disponivel na Sprint')
   })
 })

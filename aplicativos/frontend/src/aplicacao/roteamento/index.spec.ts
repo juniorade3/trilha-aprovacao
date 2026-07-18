@@ -7,7 +7,7 @@ const { requisitar } = vi.hoisted(() => ({ requisitar: vi.fn() }))
 
 vi.mock('@/compartilhado/api/clienteHttp', () => ({ requisitar }))
 
-import { protegerRotas } from './index'
+import roteador, { protegerRotas } from './index'
 
 describe('protegerRotas', () => {
   beforeEach(() => {
@@ -46,5 +46,20 @@ describe('protegerRotas', () => {
       name: 'login',
       query: { redirecionar: '/dashboard' },
     })
+  })
+
+  it('oferece todas as rotas publicas e autenticadas previstas', () => {
+    expect(roteador.resolve('/login').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/cadastro').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/dashboard').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/concursos/novo').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/concursos/concurso-1').matched).not.toHaveLength(
+      0,
+    )
+    expect(roteador.resolve('/materias/materia-1').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/materiais/material-1').matched).not.toHaveLength(
+      0,
+    )
+    expect(roteador.resolve('/estudos/novo').matched).not.toHaveLength(0)
   })
 })

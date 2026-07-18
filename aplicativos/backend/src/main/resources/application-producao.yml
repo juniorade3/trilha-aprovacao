@@ -3,6 +3,12 @@ spring:
     activate:
       on-profile: producao
 
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_HABILITADA:false}
+  swagger-ui:
+    enabled: ${SWAGGER_HABILITADO:false}
+
 server:
   servlet:
     session:

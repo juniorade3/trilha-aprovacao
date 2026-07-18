@@ -1,15 +1,120 @@
-# Como usar o Swagger
+# Como usar o Swagger e a OpenAPI
 
-Este documento sera validado no Sprint 8, depois da escolha registrada de `springdoc-openapi` 3.x compativel com Spring Boot 4.1.x.
+## Enderecos locais
 
-No perfil local, a API devera expor `/v3/api-docs` e a rota efetiva do Swagger UI confirmada na versao instalada, com compatibilidade esperada para `/swagger-ui.html` e `/swagger-ui/index.html`. Em producao, a UI permanece desabilitada por padrao; a publicacao do documento OpenAPI sera configuravel por ambiente.
+Com PostgreSQL e backend em execucao:
 
-Fluxo de teste autenticado:
+- Swagger UI: `http://localhost:8080/swagger-ui.html`;
+- rota final da interface: `http://localhost:8080/swagger-ui/index.html`;
+- documento OpenAPI JSON: `http://localhost:8080/v3/api-docs`.
 
-1. criar conta em `POST /api/v1/autenticacao/cadastro` ou entrar em `POST /api/v1/autenticacao/login`;
-2. confirmar a sessao por `GET /api/v1/autenticacao/sessao`;
-3. obter token em `GET /api/v1/autenticacao/csrf`;
-4. enviar o token CSRF no cabecalho configurado pelo backend nas requisicoes mutaveis, preservando o cookie de sessao;
-5. testar os endpoints de negocio.
+As três rotas sao publicas no perfil local. Os endpoints de negocio continuam
+protegidos por sessao e CSRF.
 
-O Swagger pode ter limitacoes para manter cookie e CSRF entre chamadas. A documentacao final deve explicar o cabecalho exato, demonstrar o fluxo em ambiente local e conter teste automatizado de `/v3/api-docs` com as tags principais.
+## Cadastro, login e sessao
+
+O exemplo abaixo guarda cookies em um arquivo temporario. O token CSRF deve ser
+obtido antes de cada sequencia de operacoes mutaveis.
+
+```bash
+curl -sS -c /tmp/trilha-cookies.txt \
+  http://localhost:8080/api/v1/autenticacao/csrf
+```
+
+A resposta informa `token` e `cabecalho`. Copie o valor de `token`:
+
+```json
+{
+  "token": "<token-csrf>",
+  "cabecalho": "X-XSRF-TOKEN",
+  "parametro": "_csrf"
+}
+```
+
+Cadastro:
+
+```bash
+curl -i -b /tmp/trilha-cookies.txt -c /tmp/trilha-cookies.txt \
+  -H 'Content-Type: application/json' \
+  -H 'X-XSRF-TOKEN: <token-csrf>' \
+  -d '{"nome":"Pessoa","email":"pessoa@example.com","senha":"senha-segura-123"}' \
+  http://localhost:8080/api/v1/autenticacao/cadastro
+```
+
+Obtenha um token novo e faça login:
+
+```bash
+curl -sS -b /tmp/trilha-cookies.txt -c /tmp/trilha-cookies.txt \
+  http://localhost:8080/api/v1/autenticacao/csrf
+
+curl -i -b /tmp/trilha-cookies.txt -c /tmp/trilha-cookies.txt \
+  -H 'Content-Type: application/json' \
+  -H 'X-XSRF-TOKEN: <novo-token-csrf>' \
+  -d '{"email":"pessoa@example.com","senha":"senha-segura-123"}' \
+  http://localhost:8080/api/v1/autenticacao/login
+```
+
+Confirme a sessao:
+
+```bash
+curl -i -b /tmp/trilha-cookies.txt \
+  http://localhost:8080/api/v1/autenticacao/sessao
+```
+
+## Teste de endpoint autenticado
+
+Leituras exigem o cookie de sessao:
+
+```bash
+curl -i -b /tmp/trilha-cookies.txt \
+  http://localhost:8080/api/v1/dashboard
+```
+
+Escritas exigem o cookie e o token CSRF:
+
+```bash
+curl -i -b /tmp/trilha-cookies.txt \
+  -H 'Content-Type: application/json' \
+  -H 'X-XSRF-TOKEN: <token-csrf-atual>' \
+  -d '{"nome":"Direito Constitucional","descricao":null,"cor":"#12355B"}' \
+  http://localhost:8080/api/v1/materias
+```
+
+Ao terminar:
+
+```bash
+curl -i -b /tmp/trilha-cookies.txt \
+  -H 'X-XSRF-TOKEN: <token-csrf-atual>' \
+  -X POST http://localhost:8080/api/v1/autenticacao/logout
+rm -f /tmp/trilha-cookies.txt
+```
+
+## Limitacoes da interface Swagger
+
+O navegador mantém `JSESSIONID`, mas a interface nao automatiza todo o ciclo de
+obter e renovar CSRF. Para operacoes mutaveis, consulte
+`GET /api/v1/autenticacao/csrf` e use **Authorize** para informar
+`X-XSRF-TOKEN`. Se a sessao for recriada no login, obtenha outro token.
+
+O esquema `sessao` apenas documenta o cookie: nao cole uma senha ou cookie real
+na especificacao. Para um fluxo longo e reproduzivel, prefira `curl` com o
+arquivo de cookies temporario.
+
+## Producao
+
+Com o perfil `producao`, OpenAPI e Swagger UI ficam desabilitados por padrao:
+
+```text
+OPENAPI_HABILITADA=false
+SWAGGER_HABILITADO=false
+```
+
+Cada recurso pode ser habilitado explicitamente por ambiente. Publicar a
+interface em producao exige uma decisao operacional consciente; nenhum deploy
+faz parte desta reconstrucao.
+
+## Validacao automatizada
+
+`DocumentacaoDaApiIntegracaoTest` inicia PostgreSQL vazio, aplica as migrations
+e confirma documento, grupos, caminhos principais, schemas de erro, sessao,
+CSRF e as duas rotas da interface Swagger.

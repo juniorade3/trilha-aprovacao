@@ -166,6 +166,38 @@ Para cada sprint, registrar no PR ou no log de execucao: commit local, comandos 
   encerrados e portas liberadas;
 - divergencias conhecidas da Sprint 7: nenhuma.
 
+### Sprint 8 — executada em 18/07/2026
+
+- `docker compose config` e `make verificar`: aprovados;
+- backend: 49 testes aprovados, incluindo OpenAPI, perfil de producao,
+  arquitetura, isolamento, migrations e PostgreSQL 17 real via Testcontainers;
+- frontend: 33 testes aprovados, tipos, lint, build e formatacao;
+- `npm audit`: nenhuma vulnerabilidade encontrada;
+- OpenAPI: `springdoc-openapi` 3.0.3, seis grupos funcionais, schemas de erro,
+  sessao por cookie e CSRF documentados; `/v3/api-docs` respondeu `200`;
+- Swagger UI: `/swagger-ui.html` respondeu `302` para
+  `/swagger-ui/index.html`, que respondeu `200`; perfil de producao
+  desabilitado por padrao e coberto por teste;
+- arquitetura: dominio independente de frameworks, entidades JPA limitadas a
+  infraestrutura e API sem dependencia de entidades, verificados por ArchUnit;
+- autenticacao: a API deixou de receber `UsuarioPersistido`; o caso de uso
+  retorna um resultado proprio da camada de aplicacao;
+- materia: detalhe passou a apresentar materiais relacionados, estudos ativos
+  recentes e concursos que reutilizam a materia, com isolamento por usuario;
+- CI: trabalhos separados para estrutura, backend e frontend, somente com
+  permissao de leitura e sem deploy;
+- fluxo funcional real: os 23 passos foram executados por HTTP; o Concurso B
+  reutilizou a mesma materia e topico e reconheceu os 60 minutos registrados no
+  Concurso A; depois do logout, o dashboard respondeu `401`;
+- frontend real: login, dashboard, materias, materiais e estudos responderam
+  pelo Vite; login inspecionado em 390, 768 e 1280 px, com correcao de
+  dimensionamento movel durante a validacao;
+- dashboard: painel completo ja validado na Sprint 7 e novamente exercitado no
+  fluxo entre dois concursos;
+- dados sinteticos removidos, capturas temporarias apagadas, containers e
+  processos encerrados e portas 5432, 8080 e 5173 liberadas;
+- divergencias conhecidas da Sprint 8: nenhuma.
+
 ## Relatorio de encerramento
 
 Usar exatamente as secoes exigidas no item 36 da especificacao-fonte. Resultados nao executados devem constar como `nao executado`, `parcial` ou `bloqueado`; nunca como aprovados por inferencia.

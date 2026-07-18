@@ -20,11 +20,25 @@ public class ServicoDeUsuarios {
     }
 
     @Transactional
-    public UsuarioPersistido cadastrar(String nome, String email, String senha) {
+    public UsuarioDaAplicacao cadastrar(String nome, String email, String senha) {
         String emailNormalizado = email.trim().toLowerCase(Locale.ROOT);
         if (repositorioDeUsuarios.existsByEmail(emailNormalizado)) {
             throw new ConflitoDeDominio("EMAIL_JA_CADASTRADO", "Ja existe uma conta com este e-mail.");
         }
-        return repositorioDeUsuarios.save(new UsuarioPersistido(nome.trim(), emailNormalizado, codificadorDeSenha.encode(senha)));
+        return paraAplicacao(repositorioDeUsuarios.save(
+                new UsuarioPersistido(nome.trim(), emailNormalizado,
+                        codificadorDeSenha.encode(senha))));
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioDaAplicacao consultarPorEmail(String email) {
+        return repositorioDeUsuarios.findByEmail(email)
+                .map(this::paraAplicacao)
+                .orElseThrow();
+    }
+
+    private UsuarioDaAplicacao paraAplicacao(UsuarioPersistido usuario) {
+        return new UsuarioDaAplicacao(
+                usuario.identificador(), usuario.nome(), usuario.email());
     }
 }

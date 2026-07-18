@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 import { usarSessao } from '@/aplicacao/estado/sessao'
 
@@ -9,8 +10,15 @@ const senha = ref('')
 const erro = ref('')
 const enviando = ref(false)
 const exibirSenha = ref(false)
+const lembrar = ref(false)
+const rota = useRoute()
 const roteador = useRouter()
 const sessao = usarSessao()
+const avisoDeSessao = computed(() =>
+  rota.query.sessao === 'expirada'
+    ? 'Sua sessão expirou. Entre novamente para continuar de onde parou.'
+    : '',
+)
 async function entrar() {
   erro.value = ''
   enviando.value = true
@@ -33,9 +41,14 @@ async function entrar() {
 }
 </script>
 <template>
-  <main class="container py-5">
-    <section class="col-md-6 mx-auto bg-white p-4 rounded-4 shadow-sm">
+  <section class="cartao-de-autenticacao">
+    <div>
+      <p class="rotulo-da-autenticacao mb-2">Bem-vindo de volta</p>
       <h1>Entrar</h1>
+      <p class="text-secondary">Continue sua trilha de preparação.</p>
+      <p v-if="avisoDeSessao" class="alert alert-info" aria-live="polite">
+        {{ avisoDeSessao }}
+      </p>
       <p v-if="erro" class="alert alert-danger" aria-live="polite">
         {{ erro }}
       </p>
@@ -69,10 +82,24 @@ async function entrar() {
             ></i>
           </button>
         </div>
-        <button class="btn btn-primary" :disabled="enviando">
+        <div class="form-check mb-4">
+          <input
+            id="lembrar"
+            v-model="lembrar"
+            class="form-check-input"
+            type="checkbox"
+          />
+          <label class="form-check-label" for="lembrar">
+            Lembrar meu e-mail neste dispositivo
+          </label>
+          <div class="form-text">
+            Preferência apenas visual nesta versão; nenhum dado será salvo.
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit" :disabled="enviando">
           {{ enviando ? 'Entrando...' : 'Entrar' }}</button
         ><RouterLink class="ms-3" to="/cadastro">Criar conta</RouterLink>
       </form>
-    </section>
-  </main>
+    </div>
+  </section>
 </template>

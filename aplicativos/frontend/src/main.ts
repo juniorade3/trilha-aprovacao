@@ -17,7 +17,10 @@ window.addEventListener('sessao-expirada', () => {
   if (!['login', 'cadastro'].includes(String(rotaAtual.name))) {
     void roteador.replace({
       name: 'login',
-      query: { redirecionar: rotaAtual.fullPath },
+      query: {
+        redirecionar: rotaAtual.fullPath,
+        sessao: 'expirada',
+      },
     })
   }
 })

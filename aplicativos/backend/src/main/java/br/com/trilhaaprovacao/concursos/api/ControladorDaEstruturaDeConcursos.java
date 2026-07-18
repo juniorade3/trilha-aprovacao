@@ -4,6 +4,7 @@ import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
 import br.com.trilhaaprovacao.concursos.aplicacao.ServicoDaEstruturaDeConcursos;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Concursos")
 public class ControladorDaEstruturaDeConcursos {
     private final ServicoDaEstruturaDeConcursos estrutura;
     private final ServicoDeMaterias materias;

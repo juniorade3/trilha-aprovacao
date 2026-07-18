@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -175,6 +176,35 @@ class ConteudosIntegracaoTest {
     }
 
     @Test
+    void deveResumirMateriaisEstudosEConcursosQueUsamAMateria() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("uso@example.com");
+        String materia = criarMateria(sessao, "Direito", null);
+        String topico = criarTopico(
+                sessao, materia, "Direitos fundamentais", null, 1);
+        UUID usuario = banco.queryForObject(
+                "SELECT identificador FROM usuarios WHERE email = ?",
+                UUID.class, "uso@example.com");
+        inserirUsoDaMateria(
+                usuario, UUID.fromString(materia), UUID.fromString(topico));
+
+        api.perform(get("/api/v1/materias/{id}/uso", materia).session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.materiais[0].titulo").value("Aula 01"))
+                .andExpect(jsonPath("$.materiais[0].tipo").value("AULA"))
+                .andExpect(jsonPath("$.estudosRecentes[0].nomeDoTopico")
+                        .value("Direitos fundamentais"))
+                .andExpect(jsonPath("$.estudosRecentes[0].duracaoEmMinutos")
+                        .value(60))
+                .andExpect(jsonPath("$.concursos[0].nome").value("Concurso A"))
+                .andExpect(jsonPath("$.concursos[0].ativo").value(true));
+
+        MockHttpSession outraSessao = criarContaEEntrar("outra@example.com");
+        api.perform(get("/api/v1/materias/{id}/uso", materia)
+                        .session(outraSessao))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void deveBloquearTopicosEnquantoMateriaEstiverArquivada() throws Exception {
         MockHttpSession sessao = criarContaEEntrar("pessoa.a@example.com");
         String materia = criarMateria(sessao, "Direito", null);
@@ -251,5 +281,66 @@ class ConteudosIntegracaoTest {
         return """
                 {"nome":"%s","descricao":"Descricao","identificadorDoTopicoPai":%s,"ordem":%d}
                 """.formatted(nome, pai == null ? "null" : "\"" + pai + "\"", ordem);
+    }
+
+    private void inserirUsoDaMateria(UUID usuario, UUID materia, UUID topico) {
+        OffsetDateTime agora = OffsetDateTime.now();
+        UUID material = UUID.randomUUID();
+        banco.update("""
+                INSERT INTO materiais_de_estudo (
+                    identificador, usuario_id, titulo, tipo, arquivado,
+                    criado_em, atualizado_em, versao
+                ) VALUES (?, ?, 'Aula 01', 'AULA', FALSE, ?, ?, 0)
+                """, material, usuario, agora, agora);
+        banco.update("""
+                INSERT INTO coberturas_de_topicos_por_material (
+                    identificador, material_id, topico_id, criado_em
+                ) VALUES (?, ?, ?, ?)
+                """, UUID.randomUUID(), material, topico, agora);
+        banco.update("""
+                INSERT INTO registros_de_estudo (
+                    identificador, topico_id, material_id, data_hora,
+                    duracao_em_minutos, situacao, criado_em, atualizado_em, versao
+                ) VALUES (?, ?, ?, ?, 60, 'ATIVO', ?, ?, 0)
+                """, UUID.randomUUID(), topico, material, agora, agora, agora);
+
+        UUID concurso = UUID.randomUUID();
+        UUID cargo = UUID.randomUUID();
+        UUID prova = UUID.randomUUID();
+        UUID grupo = UUID.randomUUID();
+        banco.update("""
+                INSERT INTO concursos (
+                    identificador, usuario_id, nome, nome_normalizado, situacao,
+                    ativo, criado_em, atualizado_em, versao
+                ) VALUES (?, ?, 'Concurso A', 'concurso a', 'PLANEJADO',
+                          TRUE, ?, ?, 0)
+                """, concurso, usuario, agora, agora);
+        banco.update("""
+                INSERT INTO cargos_do_concurso (
+                    identificador, concurso_id, nome, nome_normalizado,
+                    nivel_de_escolaridade, selecionado, ordem,
+                    criado_em, atualizado_em, versao
+                ) VALUES (?, ?, 'Analista', 'analista', 'SUPERIOR', TRUE, 1,
+                          ?, ?, 0)
+                """, cargo, concurso, agora, agora);
+        banco.update("""
+                INSERT INTO provas (
+                    identificador, cargo_id, nome, nome_normalizado, tipo,
+                    carater, ordem, criado_em, atualizado_em, versao
+                ) VALUES (?, ?, 'Objetiva', 'objetiva', 'OBJETIVA',
+                          'CLASSIFICATORIO', 1, ?, ?, 0)
+                """, prova, cargo, agora, agora);
+        banco.update("""
+                INSERT INTO grupos_de_conteudo (
+                    identificador, prova_id, nome, nome_normalizado, ordem,
+                    criado_em, atualizado_em, versao
+                ) VALUES (?, ?, 'Basicos', 'basicos', 1, ?, ?, 0)
+                """, grupo, prova, agora, agora);
+        banco.update("""
+                INSERT INTO materias_da_prova (
+                    identificador, grupo_de_conteudo_id, materia_id, ordem,
+                    criado_em, atualizado_em, versao
+                ) VALUES (?, ?, ?, 1, ?, ?, 0)
+                """, UUID.randomUUID(), grupo, materia, agora, agora);
     }
 }

@@ -9,6 +9,106 @@ body {
   color: #1d2a39;
 }
 
+.layout-de-autenticacao {
+  background:
+    radial-gradient(
+      circle at 75% 12%,
+      rgba(35, 183, 168, 0.11),
+      transparent 24rem
+    ),
+    #f5f8fb;
+  display: grid;
+  grid-template-columns: minmax(20rem, 0.9fr) minmax(25rem, 1.1fr);
+}
+
+.apresentacao-da-autenticacao {
+  background:
+    radial-gradient(
+      circle at 10% 100%,
+      rgba(35, 183, 168, 0.3),
+      transparent 24rem
+    ),
+    linear-gradient(145deg, #12355b, #0b4b63 64%, #0e7773);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: clamp(2rem, 6vw, 5rem);
+
+  h2 {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    letter-spacing: -0.04em;
+    line-height: 1.08;
+    max-width: 12ch;
+  }
+
+  p:not(.rotulo-da-autenticacao) {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 1.05rem;
+    max-width: 34rem;
+  }
+}
+
+.marca-da-autenticacao {
+  align-items: center;
+  color: #fff;
+  display: inline-flex;
+  font-weight: 750;
+  gap: 0.7rem;
+  text-decoration: none;
+}
+
+.rotulo-da-autenticacao {
+  color: var(--cor-destaque);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.apresentacao-da-autenticacao .rotulo-da-autenticacao {
+  color: #65e0bf;
+}
+
+.nota-da-autenticacao {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.conteudo-da-autenticacao {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: clamp(1.25rem, 6vw, 5rem);
+}
+
+.cartao-de-autenticacao {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(18, 53, 91, 0.08);
+  border-radius: 1.5rem;
+  box-sizing: border-box;
+  box-shadow: 0 1.5rem 4rem rgba(18, 53, 91, 0.11);
+  max-width: 34rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  width: 100%;
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    letter-spacing: -0.035em;
+  }
+
+  .btn-primary {
+    background: var(--cor-primaria);
+    border-color: var(--cor-primaria);
+    min-width: 8rem;
+  }
+}
+
 :focus-visible {
   outline: 3px solid var(--cor-destaque);
   outline-offset: 2px;
@@ -343,6 +443,40 @@ body {
   font-size: clamp(3rem, 7vw, 4.5rem);
   line-height: 1;
   margin-top: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+  .layout-de-autenticacao {
+    display: block;
+  }
+
+  .apresentacao-da-autenticacao {
+    min-height: auto;
+    padding: 1.25rem;
+
+    > div,
+    .nota-da-autenticacao {
+      display: none;
+    }
+  }
+
+  .conteudo-da-autenticacao {
+    display: block;
+    min-height: calc(100vh - 4.5rem);
+    padding: 1rem;
+  }
+
+  .cartao-de-autenticacao {
+    border-radius: 1.25rem;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 1.5rem;
+  }
+
+  .form-check-label,
+  .form-text {
+    overflow-wrap: anywhere;
+  }
 }
 
 .texto-da-prova {

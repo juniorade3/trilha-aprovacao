@@ -12,6 +12,15 @@ spring:
   flyway:
     enabled: true
 
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_HABILITADA:true}
+  swagger-ui:
+    enabled: ${SWAGGER_HABILITADO:true}
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:

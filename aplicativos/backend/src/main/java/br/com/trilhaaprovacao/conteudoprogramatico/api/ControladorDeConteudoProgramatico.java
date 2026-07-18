@@ -3,6 +3,7 @@ package br.com.trilhaaprovacao.conteudoprogramatico.api;
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.conteudoprogramatico.aplicacao.ServicoDeConteudoProgramatico;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Conteúdo programático")
 public class ControladorDeConteudoProgramatico {
     private final ServicoDeConteudoProgramatico conteudo;
     private final ServicoDeTopicos topicos;

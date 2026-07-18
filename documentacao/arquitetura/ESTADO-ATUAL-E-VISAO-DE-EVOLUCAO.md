@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-As Sprints 0 a 7 estao concluidas. A aplicacao usa PostgreSQL com migrations
+As Sprints 0 a 8 estao concluidas. A aplicacao usa PostgreSQL com migrations
 Flyway e validacao do esquema, autenticacao por sessao com CSRF e dados
 isolados pelo usuario autenticado.
 
@@ -34,11 +34,16 @@ topicos com estudo ativo, itens mapeados, atividade recente e alertas
 deterministicos. O mesmo registro aparece no calculo de concursos diferentes
 quando ambos exigem o mesmo topico.
 
-Ainda nao estao implementados OpenAPI e CI. Esses itens pertencem a Sprint 8.
+O contrato OpenAPI e gerado por `springdoc-openapi`, documenta os grupos,
+schemas de erro, sessao por cookie e CSRF. Swagger e publico no perfil local e
+desabilitado por padrao em producao. A CI executa Compose, Maven `verify`,
+Testcontainers, testes de arquitetura e a porta completa do frontend, sem
+deploy.
 
 ## Base alvo
 
-A evolucao continua a partir do contrato publico e consolidacao da Sprint 8.
+A base consolidada inclui contrato publico, teste funcional de ponta a ponta e
+portas de qualidade locais e na CI.
 Cada etapa deve reutilizar o catalogo, a estrutura de concursos e os mapeamentos
 existentes sem copiar materias, topicos ou historico.
 

@@ -36,9 +36,11 @@ async function cadastrar() {
 }
 </script>
 <template>
-  <main class="container py-5">
-    <section class="col-md-6 mx-auto bg-white p-4 rounded-4 shadow-sm">
+  <section class="cartao-de-autenticacao">
+    <div>
+      <p class="rotulo-da-autenticacao mb-2">Comece sua trilha</p>
       <h1>Criar conta</h1>
+      <p class="text-secondary">Organize sua preparação em poucos minutos.</p>
       <p v-if="erro" class="alert alert-danger" aria-live="polite">
         {{ erro }}
       </p>
@@ -75,6 +77,6 @@ async function cadastrar() {
           {{ enviando ? 'Cadastrando...' : 'Cadastrar' }}</button
         ><RouterLink class="ms-3" to="/login">Ja tenho conta</RouterLink>
       </form>
-    </section>
-  </main>
+    </div>
+  </section>
 </template>

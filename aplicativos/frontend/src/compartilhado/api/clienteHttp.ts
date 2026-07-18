@@ -52,3 +52,17 @@ export async function requisitar<T>(
     ? (undefined as T)
     : (resposta.json() as Promise<T>)
 }
+
+export function criarRequisicaoCancelavel<T>(
+  caminho: string,
+  opcoes: RequestInit = {},
+): { promessa: Promise<T>; cancelar: () => void } {
+  const controle = new AbortController()
+  return {
+    promessa: requisitar<T>(caminho, {
+      ...opcoes,
+      signal: controle.signal,
+    }),
+    cancelar: () => controle.abort(),
+  }
+}

@@ -7,12 +7,14 @@ import {
   alterarTopico,
   arquivarMateria,
   arquivarTopico,
+  consultarUsoDaMateria,
   criarTopico,
   excluirTopico,
   listarTopicos,
   obterMateria,
   type Materia,
   type Topico,
+  type UsoDaMateria,
 } from './apiDeConteudos'
 
 const rota = useRoute()
@@ -20,6 +22,11 @@ const roteador = useRouter()
 const identificadorDaMateria = String(rota.params.identificador)
 const materia = ref<Materia>()
 const topicos = ref<Topico[]>([])
+const uso = ref<UsoDaMateria>({
+  materiais: [],
+  estudosRecentes: [],
+  concursos: [],
+})
 const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
@@ -44,12 +51,14 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const [materiaObtida, respostaDeTopicos] = await Promise.all([
+    const [materiaObtida, respostaDeTopicos, usoObtido] = await Promise.all([
       obterMateria(identificadorDaMateria, cancelamento.signal),
       listarTopicos(identificadorDaMateria, true, cancelamento.signal),
+      consultarUsoDaMateria(identificadorDaMateria, cancelamento.signal),
     ])
     materia.value = materiaObtida
     topicos.value = respostaDeTopicos.itens
+    uso.value = usoObtido
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
     erro.value =
@@ -78,6 +87,13 @@ function editar(topico: Topico) {
   document.querySelector('#formulario-topico')?.scrollIntoView({
     behavior: 'smooth',
   })
+}
+
+function dataHoraLegivel(valor: string) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(valor))
 }
 
 async function salvar() {
@@ -244,19 +260,78 @@ onBeforeUnmount(() => cancelamento.abort())
             <div class="col-md-4">
               <section class="card card-body border-0 shadow-sm h-100">
                 <h2 class="h6">Materiais relacionados</h2>
-                <p class="small text-secondary mb-0">Disponivel na Sprint 6.</p>
+                <p
+                  v-if="uso.materiais.length === 0"
+                  class="small text-secondary mb-0"
+                >
+                  Nenhum material cobre os tópicos desta matéria.
+                </p>
+                <ul v-else class="list-unstyled small mb-0">
+                  <li
+                    v-for="material in uso.materiais"
+                    :key="material.identificador"
+                    class="mb-2"
+                  >
+                    <RouterLink :to="`/materiais/${material.identificador}`">
+                      {{ material.titulo }}
+                    </RouterLink>
+                    <span class="badge text-bg-light ms-1">{{
+                      material.tipo
+                    }}</span>
+                  </li>
+                </ul>
               </section>
             </div>
             <div class="col-md-4">
               <section class="card card-body border-0 shadow-sm h-100">
                 <h2 class="h6">Estudos recentes</h2>
-                <p class="small text-secondary mb-0">Disponivel na Sprint 6.</p>
+                <p
+                  v-if="uso.estudosRecentes.length === 0"
+                  class="small text-secondary mb-0"
+                >
+                  Nenhum estudo ativo nesta matéria.
+                </p>
+                <ul v-else class="list-unstyled small mb-0">
+                  <li
+                    v-for="estudo in uso.estudosRecentes"
+                    :key="estudo.identificador"
+                    class="mb-2"
+                  >
+                    <strong>{{ estudo.nomeDoTopico }}</strong>
+                    <span class="d-block text-secondary">
+                      {{ estudo.duracaoEmMinutos }} min ·
+                      {{ dataHoraLegivel(estudo.dataHora) }}
+                    </span>
+                  </li>
+                </ul>
               </section>
             </div>
             <div class="col-md-4">
               <section class="card card-body border-0 shadow-sm h-100">
                 <h2 class="h6">Concursos relacionados</h2>
-                <p class="small text-secondary mb-0">Disponivel na Sprint 4.</p>
+                <p
+                  v-if="uso.concursos.length === 0"
+                  class="small text-secondary mb-0"
+                >
+                  Esta matéria ainda não é exigida em um concurso.
+                </p>
+                <ul v-else class="list-unstyled small mb-0">
+                  <li
+                    v-for="concurso in uso.concursos"
+                    :key="concurso.identificador"
+                    class="mb-2"
+                  >
+                    <RouterLink :to="`/concursos/${concurso.identificador}`">
+                      {{ concurso.nome }}
+                    </RouterLink>
+                    <span
+                      v-if="concurso.ativo"
+                      class="badge text-bg-success ms-1"
+                    >
+                      Ativo
+                    </span>
+                  </li>
+                </ul>
               </section>
             </div>
           </div>

@@ -45,6 +45,25 @@ export type DadosDeTopico = {
   ordem: number
 }
 
+export type UsoDaMateria = {
+  materiais: {
+    identificador: string
+    titulo: string
+    tipo: string
+  }[]
+  estudosRecentes: {
+    identificador: string
+    nomeDoTopico: string
+    dataHora: string
+    duracaoEmMinutos: number
+  }[]
+  concursos: {
+    identificador: string
+    nome: string
+    ativo: boolean
+  }[]
+}
+
 export function listarMaterias(
   pesquisa: string,
   incluirArquivadas: boolean,
@@ -65,6 +84,15 @@ export function listarMaterias(
 
 export function obterMateria(identificador: string, sinal?: AbortSignal) {
   return requisitar<Materia>(`/v1/materias/${identificador}`, {
+    signal: sinal,
+  })
+}
+
+export function consultarUsoDaMateria(
+  identificador: string,
+  sinal?: AbortSignal,
+) {
+  return requisitar<UsoDaMateria>(`/v1/materias/${identificador}/uso`, {
     signal: sinal,
   })
 }
