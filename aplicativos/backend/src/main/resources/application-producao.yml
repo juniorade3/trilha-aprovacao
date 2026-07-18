@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: producao
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true

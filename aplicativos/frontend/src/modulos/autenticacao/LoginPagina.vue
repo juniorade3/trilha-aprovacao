@@ -8,6 +8,7 @@ const email = ref('')
 const senha = ref('')
 const erro = ref('')
 const enviando = ref(false)
+const exibirSenha = ref(false)
 const roteador = useRouter()
 const sessao = usarSessao()
 async function entrar() {
@@ -19,7 +20,10 @@ async function entrar() {
       body: JSON.stringify({ email: email.value, senha: senha.value }),
     })
     await sessao.atualizar()
-    await roteador.push('/')
+    const redirecionar = roteador.currentRoute.value.query.redirecionar
+    await roteador.push(
+      typeof redirecionar === 'string' ? redirecionar : '/dashboard',
+    )
   } catch (causa) {
     erro.value =
       causa instanceof Error ? causa.message : 'Nao foi possivel entrar.'
@@ -43,14 +47,29 @@ async function entrar() {
           class="form-control mb-3"
           type="email"
           required
-        /><label class="form-label" for="senha">Senha</label
-        ><input
-          id="senha"
-          v-model="senha"
-          class="form-control mb-3"
-          type="password"
-          required
-        /><button class="btn btn-primary" :disabled="enviando">
+        /><label class="form-label" for="senha">Senha</label>
+        <div class="input-group mb-3">
+          <input
+            id="senha"
+            v-model="senha"
+            class="form-control"
+            :type="exibirSenha ? 'text' : 'password'"
+            required
+          />
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            :aria-label="exibirSenha ? 'Ocultar senha' : 'Mostrar senha'"
+            @click="exibirSenha = !exibirSenha"
+          >
+            <i
+              class="bi"
+              :class="exibirSenha ? 'bi-eye-slash' : 'bi-eye'"
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
+        <button class="btn btn-primary" :disabled="enviando">
           {{ enviando ? 'Entrando...' : 'Entrar' }}</button
         ><RouterLink class="ms-3" to="/cadastro">Criar conta</RouterLink>
       </form>

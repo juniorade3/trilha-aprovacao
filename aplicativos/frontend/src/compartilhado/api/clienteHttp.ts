@@ -33,6 +33,13 @@ export async function requisitar<T>(
     credentials: 'include',
   })
   if (!resposta.ok) {
+    if (
+      resposta.status === 401 &&
+      caminho !== '/v1/autenticacao/login' &&
+      typeof window !== 'undefined'
+    ) {
+      window.dispatchEvent(new CustomEvent('sessao-expirada'))
+    }
     const erro = (await resposta.json().catch(() => null)) as {
       mensagem?: string
     } | null

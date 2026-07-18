@@ -8,12 +8,15 @@ const email = ref('')
 const senha = ref('')
 const confirmacao = ref('')
 const erro = ref('')
+const enviando = ref(false)
 const roteador = useRouter()
 async function cadastrar() {
+  erro.value = ''
   if (senha.value !== confirmacao.value) {
     erro.value = 'As senhas nao conferem.'
     return
   }
+  enviando.value = true
   try {
     await requisitar('/v1/autenticacao/cadastro', {
       method: 'POST',
@@ -27,6 +30,8 @@ async function cadastrar() {
   } catch (causa) {
     erro.value =
       causa instanceof Error ? causa.message : 'Nao foi possivel cadastrar.'
+  } finally {
+    enviando.value = false
   }
 }
 </script>
@@ -66,7 +71,8 @@ async function cadastrar() {
           class="form-control mb-3"
           type="password"
           required
-        /><button class="btn btn-primary">Cadastrar</button
+        /><button class="btn btn-primary" :disabled="enviando">
+          {{ enviando ? 'Cadastrando...' : 'Cadastrar' }}</button
         ><RouterLink class="ms-3" to="/login">Ja tenho conta</RouterLink>
       </form>
     </section>

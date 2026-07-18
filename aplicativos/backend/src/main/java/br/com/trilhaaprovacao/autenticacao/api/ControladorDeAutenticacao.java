@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
-import java.util.Locale;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -47,7 +46,11 @@ public class ControladorDeAutenticacao {
     @PostMapping("/login")
     public RespostaDeSessao login(@Valid @RequestBody RequisicaoDeLogin requisicao, HttpServletRequest pedido, HttpServletResponse resposta) {
         Authentication autenticacao = gerenciadorDeAutenticacao.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(requisicao.email().trim().toLowerCase(Locale.ROOT), requisicao.senha()));
+                UsernamePasswordAuthenticationToken.unauthenticated(requisicao.email(), requisicao.senha()));
+        var sessaoAnterior = pedido.getSession(false);
+        if (sessaoAnterior != null) {
+            sessaoAnterior.invalidate();
+        }
         var contexto = SecurityContextHolder.createEmptyContext();
         contexto.setAuthentication(autenticacao);
         SecurityContextHolder.setContext(contexto);
@@ -57,7 +60,10 @@ public class ControladorDeAutenticacao {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest pedido, HttpServletResponse resposta) {
-        pedido.getSession(false).invalidate();
+        var sessao = pedido.getSession(false);
+        if (sessao != null) {
+            sessao.invalidate();
+        }
         SecurityContextHolder.clearContext();
         return ResponseEntity.noContent().build();
     }

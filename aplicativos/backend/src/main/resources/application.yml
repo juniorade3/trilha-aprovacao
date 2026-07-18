@@ -18,5 +18,15 @@ management:
       exposure:
         include: health,info
 
+logging:
+  level:
+    org.hibernate.SQL: info
+    org.springframework: info
+
 server:
   port: ${PORTA_BACKEND:8080}
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax

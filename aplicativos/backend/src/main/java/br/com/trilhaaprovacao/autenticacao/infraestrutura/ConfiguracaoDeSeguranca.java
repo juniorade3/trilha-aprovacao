@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -36,14 +36,13 @@ public class ConfiguracaoDeSeguranca {
     }
 
     @Bean
-    DaoAuthenticationProvider provedorDeAutenticacao(UserDetailsService detalhesDoUsuario, PasswordEncoder codificadorDeSenha) {
+    AuthenticationManager gerenciadorDeAutenticacao(UserDetailsService detalhesDoUsuario, PasswordEncoder codificadorDeSenha) {
         DaoAuthenticationProvider provedor = new DaoAuthenticationProvider(detalhesDoUsuario);
         provedor.setPasswordEncoder(codificadorDeSenha);
-        return provedor;
+        return new ProviderManager(provedor);
     }
 
     @Bean SecurityContextRepository repositorioDeContexto() { return new HttpSessionSecurityContextRepository(); }
-    @Bean AuthenticationManager gerenciadorDeAutenticacao(AuthenticationConfiguration configuracao) throws Exception { return configuracao.getAuthenticationManager(); }
 
     @Bean
     SecurityFilterChain filtroDeSeguranca(HttpSecurity http, SecurityContextRepository repositorioDeContexto, ObjectMapper mapeador) throws Exception {

@@ -17,7 +17,6 @@ public class UsuarioPersistido {
     @Id
     private UUID identificador;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private String nome;
 
@@ -27,6 +26,7 @@ public class UsuarioPersistido {
     @Column(name = "senha_hash", nullable = false)
     private String senhaHash;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SituacaoDoUsuario situacao;
 
