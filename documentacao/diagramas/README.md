@@ -4,3 +4,4 @@
 - [Estrutura de concursos](ESTRUTURA-DE-CONCURSOS.md)
 - [Conteudo programatico e mapeamentos](CONTEUDO-PROGRAMATICO-E-MAPEAMENTOS.md)
 - [Materiais e registros de estudo](MATERIAIS-E-ESTUDOS.md)
+- [Dashboard objetivo](DASHBOARD-OBJETIVO.md)

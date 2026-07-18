@@ -4,15 +4,17 @@ Monorepo para organizar concursos, conteudos reutilizaveis, materiais e registro
 
 ## Estado
 
-Sprints 0 a 6 concluidas: fundacao do monorepo, PostgreSQL/Flyway,
+Sprints 0 a 7 concluidas: fundacao do monorepo, PostgreSQL/Flyway,
 autenticacao por sessao, catalogo pessoal de materias e topicos e estrutura de
 concursos com conteudo programatico estao implementados. Itens oficiais formam
 arvores sob as materias da prova e podem ser mapeados para topicos pessoais da
 mesma materia, sem copiar o catalogo ou apagar seus registros ao remover o
 vinculo. Materiais de estudo cobrem um ou mais topicos, e registros de estudo
-podem ser corrigidos ou cancelados com preservacao integral do historico.
+podem ser corrigidos ou cancelados com preservacao integral do historico. O
+dashboard do concurso ativo deriva medidas objetivas desses fatos e apresenta
+provas, cobertura de estudos, atividade recente e pendencias estruturais.
 
-A Sprint 7, dashboard objetivo, somente pode comecar apos
+A Sprint 8, contrato publico e consolidacao, somente pode comecar apos
 autorizacao explicita.
 
 ## Pre-requisitos

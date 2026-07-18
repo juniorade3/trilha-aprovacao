@@ -137,6 +137,35 @@ Para cada sprint, registrar no PR ou no log de execucao: commit local, comandos 
   processos temporarios encerrados e portas liberadas;
 - divergencias conhecidas da Sprint 6: nenhuma.
 
+### Sprint 7 — executada em 18/07/2026
+
+- `make verificar`: aprovado;
+- backend: 41 testes aprovados, incluindo agregacao do dashboard, alertas,
+  isolamento e PostgreSQL real com Testcontainers;
+- frontend: 29 testes aprovados, verificacao de tipos, lint, build e
+  formatacao;
+- `npm audit`: nenhuma vulnerabilidade encontrada;
+- endpoint `GET /api/v1/dashboard`: estado sem concurso, concurso incompleto e
+  painel completo validados;
+- agregacoes validadas: proxima prova, dias restantes, tempo semanal, materias,
+  topicos exigidos, topicos com estudo, itens mapeados e sem mapeamento e
+  atividade recente;
+- alertas deterministicos validados: sem cargo, sem prova, grupo sem materia,
+  item sem mapeamento e materia sem topico; a regra de prova marcada sem estudos
+  tambem esta implementada;
+- isolamento A-versus-B: o Usuario B recebeu o estado sem concurso e nao viu
+  medidas do Usuario A;
+- reutilizacao A-versus-B de concursos: ao ativar o Concurso B com o mesmo
+  topico exigido, o unico estudo ativo continuou contabilizado sem copia;
+- fluxo HTTP real: dashboard retornou concurso, cargo, prova em 33 dias, 145
+  minutos semanais, dois de tres topicos com estudo, duas atividades e os tres
+  alertas esperados;
+- interface real inspecionada em 1280, 768 e 390 px, incluindo navegacao
+  recolhivel, cards, linha do tempo, alertas e atalhos, sem estouro horizontal;
+- dados e capturas sinteticos removidos ao final, processos temporarios
+  encerrados e portas liberadas;
+- divergencias conhecidas da Sprint 7: nenhuma.
+
 ## Relatorio de encerramento
 
 Usar exatamente as secoes exigidas no item 36 da especificacao-fonte. Resultados nao executados devem constar como `nao executado`, `parcial` ou `bloqueado`; nunca como aprovados por inferencia.

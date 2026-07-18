@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
@@ -6,6 +7,11 @@ import { requisitar } from '@/compartilhado/api/clienteHttp'
 
 const sessao = usarSessao()
 const roteador = useRouter()
+const menuAberto = ref(false)
+
+function fecharMenu() {
+  menuAberto.value = false
+}
 
 async function sair() {
   try {
@@ -19,39 +25,65 @@ async function sair() {
 
 <template>
   <div class="min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <nav class="navbar navbar-expand-lg navbar-dark barra-principal">
       <div class="container">
-        <RouterLink class="navbar-brand fw-semibold" to="/dashboard">
-          Trilha da Aprovacao
-        </RouterLink>
-        <div
-          class="d-flex flex-wrap justify-content-end align-items-center gap-2 gap-md-3"
+        <RouterLink
+          class="navbar-brand marca-da-aplicacao"
+          to="/dashboard"
+          @click="fecharMenu"
         >
-          <RouterLink class="nav-link text-white" to="/dashboard">
-            Inicio
-          </RouterLink>
-          <RouterLink class="nav-link text-white" to="/concursos">
-            Concursos
-          </RouterLink>
-          <RouterLink class="nav-link text-white" to="/materias">
-            Materias
-          </RouterLink>
-          <RouterLink class="nav-link text-white" to="/materiais">
-            Materiais
-          </RouterLink>
-          <RouterLink class="nav-link text-white" to="/estudos">
-            Estudos
-          </RouterLink>
-          <span class="text-white-50 d-none d-md-inline">
-            {{ sessao.usuario?.nome }}
+          <span class="simbolo-da-marca" aria-hidden="true">
+            <i class="bi bi-check2"></i>
           </span>
-          <button
-            class="btn btn-outline-light btn-sm"
-            type="button"
-            @click="sair"
-          >
-            Sair
-          </button>
+          <span>Trilha da Aprovação</span>
+        </RouterLink>
+        <button
+          class="navbar-toggler border-0"
+          type="button"
+          aria-controls="navegacao-principal"
+          :aria-expanded="menuAberto"
+          aria-label="Alternar navegação"
+          @click="menuAberto = !menuAberto"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div
+          id="navegacao-principal"
+          class="collapse navbar-collapse"
+          :class="{ show: menuAberto }"
+        >
+          <div class="navbar-nav navegacao-do-produto mx-lg-auto">
+            <RouterLink class="nav-link" to="/dashboard" @click="fecharMenu">
+              Painel
+            </RouterLink>
+            <RouterLink class="nav-link" to="/concursos" @click="fecharMenu">
+              Concursos
+            </RouterLink>
+            <RouterLink class="nav-link" to="/materias" @click="fecharMenu">
+              Matérias
+            </RouterLink>
+            <RouterLink class="nav-link" to="/materiais" @click="fecharMenu">
+              Materiais
+            </RouterLink>
+            <RouterLink class="nav-link" to="/estudos" @click="fecharMenu">
+              Estudos
+            </RouterLink>
+          </div>
+          <div class="usuario-da-navegacao">
+            <span class="avatar-do-usuario" aria-hidden="true">
+              {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
+            </span>
+            <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
+            <button
+              class="btn botao-sair"
+              type="button"
+              aria-label="Sair da conta"
+              title="Sair"
+              @click="sair"
+            >
+              <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
