@@ -42,7 +42,19 @@ import {
   type MateriaDaProva,
   type Prova,
 } from './apiDeConcursos'
-import type { Materia } from '@/modulos/materias/apiDeConteudos'
+import {
+  alterarItemDoEdital,
+  criarItemDoEdital,
+  criarMapeamentoDoItem,
+  excluirItemDoEdital,
+  excluirMapeamentoDoItem,
+  listarItensDoEdital,
+  listarMapeamentosDoItem,
+  listarTopicosDisponiveis,
+  type ItemDoEdital,
+  type MapeamentoDeItem,
+} from './apiDeConteudoProgramatico'
+import type { Materia, Topico } from '@/modulos/materias/apiDeConteudos'
 
 const rota = useRoute()
 const roteador = useRouter()
@@ -54,6 +66,9 @@ const materiasDisponiveis = ref<Materia[]>([])
 const provasPorCargo = reactive<Record<string, Prova[]>>({})
 const gruposPorProva = reactive<Record<string, Grupo[]>>({})
 const materiasPorGrupo = reactive<Record<string, MateriaDaProva[]>>({})
+const itensPorMateriaDaProva = reactive<Record<string, ItemDoEdital[]>>({})
+const mapeamentosPorItem = reactive<Record<string, MapeamentoDeItem[]>>({})
+const topicosPorMateria = reactive<Record<string, Topico[]>>({})
 const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
@@ -65,6 +80,12 @@ const concursoArquivado = computed(
 )
 const todasAsProvas = computed(() => Object.values(provasPorCargo).flat())
 const todosOsGrupos = computed(() => Object.values(gruposPorProva).flat())
+const todasAsMateriasDaProva = computed(() =>
+  Object.values(materiasPorGrupo).flat(),
+)
+const todosOsItens = computed(() =>
+  Object.values(itensPorMateriaDaProva).flat(),
+)
 
 const formularioConcurso = reactive<DadosDeConcurso>({
   nome: '',
@@ -115,6 +136,52 @@ const formularioMateria = reactive<
   identificadorDaMateria: '',
   ordem: 1,
 })
+const formularioItem = reactive<{
+  identificador?: string
+  identificadorDaMateriaDaProva: string
+  identificadorDoEdital: string
+  descricaoOriginal: string
+  identificadorDoItemPai: string
+  ordem: number
+}>({
+  identificadorDaMateriaDaProva: '',
+  identificadorDoEdital: '',
+  descricaoOriginal: '',
+  identificadorDoItemPai: '',
+  ordem: 1,
+})
+const formularioMapeamento = reactive({
+  identificadorDoItem: '',
+  identificadorDoTopico: '',
+})
+
+const itemSelecionadoParaMapeamento = computed(() =>
+  todosOsItens.value.find(
+    (item) => item.identificador === formularioMapeamento.identificadorDoItem,
+  ),
+)
+const materiaDaProvaDoItemSelecionado = computed(() =>
+  todasAsMateriasDaProva.value.find(
+    (materia) =>
+      materia.identificador ===
+      itemSelecionadoParaMapeamento.value?.identificadorDaMateriaDaProva,
+  ),
+)
+const topicosParaMapeamento = computed(
+  () =>
+    topicosPorMateria[
+      materiaDaProvaDoItemSelecionado.value?.identificadorDaMateria ?? ''
+    ] ?? [],
+)
+const paisDisponiveisParaOItem = computed(() =>
+  (
+    itensPorMateriaDaProva[formularioItem.identificadorDaMateriaDaProva] ?? []
+  ).filter(
+    (item) =>
+      item.identificador !== formularioItem.identificador &&
+      item.identificadorDoEdital === formularioItem.identificadorDoEdital,
+  ),
+)
 
 async function carregar() {
   carregando.value = true
@@ -148,6 +215,9 @@ async function carregarDescendentes(cargosAtuais: Cargo[]) {
   limparMapa(provasPorCargo)
   limparMapa(gruposPorProva)
   limparMapa(materiasPorGrupo)
+  limparMapa(itensPorMateriaDaProva)
+  limparMapa(mapeamentosPorItem)
+  limparMapa(topicosPorMateria)
   const paresDeProvas = await Promise.all(
     cargosAtuais.map(async (cargo) => ({
       cargo: cargo.identificador,
@@ -174,12 +244,56 @@ async function carregarDescendentes(cargosAtuais: Cargo[]) {
     })),
   )
   for (const par of paresDeMaterias) materiasPorGrupo[par.grupo] = par.materias
+  const materiasDaProva = paresDeMaterias.flatMap((par) => par.materias)
+  const paresDeItens = await Promise.all(
+    materiasDaProva.map(async (materia) => ({
+      materiaDaProva: materia.identificador,
+      itens: await listarItensDoEdital(
+        materia.identificador,
+        cancelamento.signal,
+      ),
+    })),
+  )
+  for (const par of paresDeItens)
+    itensPorMateriaDaProva[par.materiaDaProva] = par.itens
+  const itens = paresDeItens.flatMap((par) => par.itens)
+  const paresDeMapeamentos = await Promise.all(
+    itens.map(async (item) => ({
+      item: item.identificador,
+      mapeamentos: await listarMapeamentosDoItem(
+        item.identificador,
+        cancelamento.signal,
+      ),
+    })),
+  )
+  for (const par of paresDeMapeamentos)
+    mapeamentosPorItem[par.item] = par.mapeamentos
+  const materiasDoCatalogo = [
+    ...new Set(
+      materiasDaProva.map((materia) => materia.identificadorDaMateria),
+    ),
+  ]
+  const paresDeTopicos = await Promise.all(
+    materiasDoCatalogo.map(async (materia) => ({
+      materia,
+      topicos: (await listarTopicosDisponiveis(materia, cancelamento.signal))
+        .itens,
+    })),
+  )
+  for (const par of paresDeTopicos) topicosPorMateria[par.materia] = par.topicos
   if (!formularioProva.identificadorDoCargo && cargosAtuais[0])
     formularioProva.identificadorDoCargo = cargosAtuais[0].identificador
   if (!formularioGrupo.identificadorDaProva && provas[0])
     formularioGrupo.identificadorDaProva = provas[0].identificador
   if (!formularioMateria.identificadorDoGrupo && grupos[0])
     formularioMateria.identificadorDoGrupo = grupos[0].identificador
+  if (!formularioItem.identificadorDaMateriaDaProva && materiasDaProva[0])
+    formularioItem.identificadorDaMateriaDaProva =
+      materiasDaProva[0].identificador
+  if (!formularioItem.identificadorDoEdital && editais.value[0])
+    formularioItem.identificadorDoEdital = editais.value[0].identificador
+  if (!formularioMapeamento.identificadorDoItem && itens[0])
+    formularioMapeamento.identificadorDoItem = itens[0].identificador
 }
 
 function limparMapa(mapa: Record<string, unknown>) {
@@ -443,6 +557,76 @@ async function salvarMateria() {
         }),
   )
   if (sucesso) limparMateria()
+}
+
+function editalDoItem(item: ItemDoEdital) {
+  return (
+    editais.value.find(
+      (edital) => edital.identificador === item.identificadorDoEdital,
+    )?.titulo ?? 'Edital nao encontrado'
+  )
+}
+
+function nivelDoItem(item: ItemDoEdital, itens: ItemDoEdital[]) {
+  let nivel = 0
+  let pai = item.identificadorDoItemPai
+  const visitados = new Set<string>()
+  while (pai && !visitados.has(pai)) {
+    visitados.add(pai)
+    nivel += 1
+    pai = itens.find(
+      (candidato) => candidato.identificador === pai,
+    )?.identificadorDoItemPai
+  }
+  return nivel
+}
+
+function editarItem(item: ItemDoEdital) {
+  Object.assign(formularioItem, {
+    identificador: item.identificador,
+    identificadorDaMateriaDaProva: item.identificadorDaMateriaDaProva,
+    identificadorDoEdital: item.identificadorDoEdital,
+    descricaoOriginal: item.descricaoOriginal,
+    identificadorDoItemPai: item.identificadorDoItemPai ?? '',
+    ordem: item.ordem,
+  })
+  secaoAberta.value = 'item'
+}
+
+function limparItem() {
+  Object.assign(formularioItem, {
+    identificador: undefined,
+    descricaoOriginal: '',
+    identificadorDoItemPai: '',
+    ordem: 1,
+  })
+}
+
+async function salvarItem() {
+  const dados = {
+    descricaoOriginal: formularioItem.descricaoOriginal,
+    identificadorDoItemPai: formularioItem.identificadorDoItemPai || undefined,
+    ordem: Number(formularioItem.ordem),
+  }
+  const sucesso = await executar(() =>
+    formularioItem.identificador
+      ? alterarItemDoEdital(formularioItem.identificador, dados)
+      : criarItemDoEdital(formularioItem.identificadorDaMateriaDaProva, {
+          ...dados,
+          identificadorDoEdital: formularioItem.identificadorDoEdital,
+        }),
+  )
+  if (sucesso) limparItem()
+}
+
+async function salvarMapeamento() {
+  const sucesso = await executar(() =>
+    criarMapeamentoDoItem(
+      formularioMapeamento.identificadorDoItem,
+      formularioMapeamento.identificadorDoTopico,
+    ),
+  )
+  if (sucesso) formularioMapeamento.identificadorDoTopico = ''
 }
 
 async function remover(rotulo: string, acao: () => Promise<void>) {
@@ -807,42 +991,142 @@ onBeforeUnmount(() => cancelamento.abort())
                   >
                     6. Nenhuma materia neste grupo.
                   </div>
-                  <div
+                  <article
                     v-for="materia in materiasPorGrupo[grupo.identificador] ??
                     []"
                     :key="materia.identificador"
-                    class="item-da-estrutura ms-3"
+                    class="ramo-da-estrutura ms-3"
                   >
-                    <div>
-                      <strong>6. {{ materia.nomeDaMateria }}</strong>
-                      <p class="small text-secondary mb-0">
-                        Ordem {{ materia.ordem }}
-                        <span v-if="materia.peso">
-                          · peso {{ materia.peso }}</span
+                    <div class="item-da-estrutura">
+                      <div>
+                        <strong>6. {{ materia.nomeDaMateria }}</strong>
+                        <p class="small text-secondary mb-0">
+                          Ordem {{ materia.ordem }}
+                          <span v-if="materia.peso">
+                            · peso {{ materia.peso }}</span
+                          >
+                        </p>
+                      </div>
+                      <div class="acoes-da-estrutura">
+                        <button
+                          class="btn btn-outline-primary btn-sm"
+                          :disabled="concursoArquivado"
+                          @click="editarMateria(materia)"
                         >
-                      </p>
+                          Editar
+                        </button>
+                        <button
+                          class="btn btn-outline-danger btn-sm"
+                          :disabled="concursoArquivado"
+                          @click="
+                            remover(`a materia ${materia.nomeDaMateria}`, () =>
+                              excluirMateriaDaProva(materia.identificador),
+                            )
+                          "
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     </div>
-                    <div class="acoes-da-estrutura">
-                      <button
-                        class="btn btn-outline-primary btn-sm"
-                        :disabled="concursoArquivado"
-                        @click="editarMateria(materia)"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        class="btn btn-outline-danger btn-sm"
-                        :disabled="concursoArquivado"
-                        @click="
-                          remover(`a materia ${materia.nomeDaMateria}`, () =>
-                            excluirMateriaDaProva(materia.identificador),
-                          )
-                        "
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
+
+                    <p
+                      v-if="
+                        (itensPorMateriaDaProva[materia.identificador] ?? [])
+                          .length === 0
+                      "
+                      class="estado-vazio-compacto ms-3"
+                    >
+                      7. Nenhum item oficial cadastrado.
+                    </p>
+                    <article
+                      v-for="item in itensPorMateriaDaProva[
+                        materia.identificador
+                      ] ?? []"
+                      :key="item.identificador"
+                      class="item-do-edital"
+                      :style="{
+                        marginLeft: `${
+                          nivelDoItem(
+                            item,
+                            itensPorMateriaDaProva[materia.identificador] ?? [],
+                          ) * 1.25
+                        }rem`,
+                      }"
+                    >
+                      <div class="item-da-estrutura">
+                        <div>
+                          <strong>7. {{ item.descricaoOriginal }}</strong>
+                          <p class="small text-secondary mb-1">
+                            {{ editalDoItem(item) }} · ordem {{ item.ordem }}
+                          </p>
+                          <p
+                            v-if="
+                              (mapeamentosPorItem[item.identificador] ?? [])
+                                .length === 0
+                            "
+                            class="small text-secondary mb-0"
+                          >
+                            Sem mapeamento para topico.
+                          </p>
+                          <ul
+                            v-else
+                            class="lista-de-mapeamentos small mb-0"
+                            aria-label="Topicos mapeados"
+                          >
+                            <li
+                              v-for="mapeamento in mapeamentosPorItem[
+                                item.identificador
+                              ] ?? []"
+                              :key="mapeamento.identificador"
+                            >
+                              <span class="badge text-bg-success me-1">
+                                Confirmado
+                              </span>
+                              {{ mapeamento.nomeDoTopico }}
+                              <button
+                                class="btn btn-link btn-sm text-danger"
+                                type="button"
+                                :disabled="concursoArquivado"
+                                :aria-label="`Remover mapeamento com ${mapeamento.nomeDoTopico}`"
+                                @click="
+                                  remover(
+                                    `o mapeamento com ${mapeamento.nomeDoTopico}`,
+                                    () =>
+                                      excluirMapeamentoDoItem(
+                                        item.identificador,
+                                        mapeamento.identificadorDoTopicoDaMateria,
+                                      ),
+                                  )
+                                "
+                              >
+                                Remover vinculo
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                        <div class="acoes-da-estrutura">
+                          <button
+                            class="btn btn-outline-primary btn-sm"
+                            :disabled="concursoArquivado"
+                            @click="editarItem(item)"
+                          >
+                            Editar item
+                          </button>
+                          <button
+                            class="btn btn-outline-danger btn-sm"
+                            :disabled="concursoArquivado"
+                            @click="
+                              remover('o item do edital', () =>
+                                excluirItemDoEdital(item.identificador),
+                              )
+                            "
+                          >
+                            Excluir item
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  </article>
                 </article>
               </article>
             </article>
@@ -1431,6 +1715,207 @@ onBeforeUnmount(() => cancelamento.abort())
                       @click="limparMateria"
                     >
                       Cancelar
+                    </button>
+                  </fieldset>
+                </form>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button"
+                  :class="{ collapsed: secaoAberta !== 'item' }"
+                  type="button"
+                  :aria-expanded="secaoAberta === 'item'"
+                  aria-controls="formulario-item-do-edital"
+                  @click="alternarSecao('item')"
+                >
+                  {{ formularioItem.identificador ? 'Editar' : 'Adicionar' }}
+                  item oficial
+                </button>
+              </h2>
+              <div
+                id="formulario-item-do-edital"
+                class="accordion-collapse collapse"
+                :class="{ show: secaoAberta === 'item' }"
+              >
+                <form class="accordion-body" @submit.prevent="salvarItem">
+                  <fieldset
+                    :disabled="
+                      concursoArquivado ||
+                      salvando ||
+                      todasAsMateriasDaProva.length === 0 ||
+                      editais.length === 0
+                    "
+                  >
+                    <label class="form-label" for="materia-do-item">
+                      Materia da prova
+                    </label>
+                    <select
+                      id="materia-do-item"
+                      v-model="formularioItem.identificadorDaMateriaDaProva"
+                      class="form-select mb-2"
+                      :disabled="Boolean(formularioItem.identificador)"
+                      required
+                      @change="formularioItem.identificadorDoItemPai = ''"
+                    >
+                      <option
+                        v-for="materia in todasAsMateriasDaProva"
+                        :key="materia.identificador"
+                        :value="materia.identificador"
+                      >
+                        {{ materia.nomeDaMateria }}
+                      </option>
+                    </select>
+                    <label class="form-label" for="edital-do-item">
+                      Edital
+                    </label>
+                    <select
+                      id="edital-do-item"
+                      v-model="formularioItem.identificadorDoEdital"
+                      class="form-select mb-2"
+                      :disabled="Boolean(formularioItem.identificador)"
+                      required
+                      @change="formularioItem.identificadorDoItemPai = ''"
+                    >
+                      <option
+                        v-for="edital in editais"
+                        :key="edital.identificador"
+                        :value="edital.identificador"
+                      >
+                        {{ edital.titulo }}
+                      </option>
+                    </select>
+                    <label class="form-label" for="descricao-original">
+                      Redacao original
+                    </label>
+                    <textarea
+                      id="descricao-original"
+                      v-model="formularioItem.descricaoOriginal"
+                      class="form-control mb-2"
+                      rows="4"
+                      required
+                      aria-describedby="ajuda-redacao-original"
+                    ></textarea>
+                    <p id="ajuda-redacao-original" class="form-text">
+                      Transcreva o texto oficial sem resumir ou normalizar.
+                    </p>
+                    <label class="form-label" for="pai-do-item">
+                      Item-pai, opcional
+                    </label>
+                    <select
+                      id="pai-do-item"
+                      v-model="formularioItem.identificadorDoItemPai"
+                      class="form-select mb-2"
+                    >
+                      <option value="">Item raiz</option>
+                      <option
+                        v-for="item in paisDisponiveisParaOItem"
+                        :key="item.identificador"
+                        :value="item.identificador"
+                      >
+                        {{ item.descricaoOriginal }}
+                      </option>
+                    </select>
+                    <label class="form-label" for="ordem-item">Ordem</label>
+                    <input
+                      id="ordem-item"
+                      v-model.number="formularioItem.ordem"
+                      class="form-control"
+                      type="number"
+                      min="1"
+                      required
+                    />
+                    <button class="btn btn-primary mt-3">Salvar item</button>
+                    <button
+                      v-if="formularioItem.identificador"
+                      class="btn btn-link mt-3"
+                      type="button"
+                      @click="limparItem"
+                    >
+                      Cancelar
+                    </button>
+                  </fieldset>
+                </form>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button"
+                  :class="{ collapsed: secaoAberta !== 'mapeamento' }"
+                  type="button"
+                  :aria-expanded="secaoAberta === 'mapeamento'"
+                  aria-controls="formulario-mapeamento"
+                  @click="alternarSecao('mapeamento')"
+                >
+                  Mapear item para topico
+                </button>
+              </h2>
+              <div
+                id="formulario-mapeamento"
+                class="accordion-collapse collapse"
+                :class="{ show: secaoAberta === 'mapeamento' }"
+              >
+                <form class="accordion-body" @submit.prevent="salvarMapeamento">
+                  <fieldset
+                    :disabled="
+                      concursoArquivado || salvando || todosOsItens.length === 0
+                    "
+                  >
+                    <label class="form-label" for="item-do-mapeamento">
+                      Item oficial
+                    </label>
+                    <select
+                      id="item-do-mapeamento"
+                      v-model="formularioMapeamento.identificadorDoItem"
+                      class="form-select mb-2"
+                      required
+                      @change="formularioMapeamento.identificadorDoTopico = ''"
+                    >
+                      <option
+                        v-for="item in todosOsItens"
+                        :key="item.identificador"
+                        :value="item.identificador"
+                      >
+                        {{ item.descricaoOriginal }}
+                      </option>
+                    </select>
+                    <label class="form-label" for="topico-do-mapeamento">
+                      Topico da mesma materia
+                    </label>
+                    <select
+                      id="topico-do-mapeamento"
+                      v-model="formularioMapeamento.identificadorDoTopico"
+                      class="form-select"
+                      :disabled="topicosParaMapeamento.length === 0"
+                      required
+                    >
+                      <option value="" disabled>Selecione</option>
+                      <option
+                        v-for="topico in topicosParaMapeamento"
+                        :key="topico.identificador"
+                        :value="topico.identificador"
+                      >
+                        {{ topico.nome }}
+                      </option>
+                    </select>
+                    <p
+                      v-if="
+                        formularioMapeamento.identificadorDoItem &&
+                        topicosParaMapeamento.length === 0
+                      "
+                      class="form-text"
+                    >
+                      A materia deste item ainda nao possui topicos ativos.
+                    </p>
+                    <button
+                      class="btn btn-primary mt-3"
+                      :disabled="topicosParaMapeamento.length === 0"
+                    >
+                      Confirmar mapeamento
                     </button>
                   </fieldset>
                 </form>

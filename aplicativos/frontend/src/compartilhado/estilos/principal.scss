@@ -77,6 +77,16 @@ body {
   justify-content: flex-end;
 }
 
+.item-do-edital {
+  border-left: 2px solid #c8d8e6;
+  padding-left: 0.75rem;
+}
+
+.lista-de-mapeamentos {
+  list-style: none;
+  padding-left: 0;
+}
+
 @media (max-width: 575.98px) {
   .navbar .nav-link {
     font-size: 0.875rem;

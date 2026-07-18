@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-As Sprints 0 a 4 estao concluidas. A aplicacao usa PostgreSQL com migrations
+As Sprints 0 a 5 estao concluidas. A aplicacao usa PostgreSQL com migrations
 Flyway e validacao do esquema, autenticacao por sessao com CSRF e dados
 isolados pelo usuario autenticado.
 
@@ -17,14 +17,18 @@ ativo por usuario, um edital principal e um cargo selecionado por concurso e
 reutiliza Materia por referencia. Concursos arquivados bloqueiam alteracoes de
 conteudo, e exclusoes fisicas com dependencias sao recusadas.
 
-Ainda nao estao implementados itens de conteudo programatico, mapeamentos,
-materiais, registros de estudo, dashboard consolidado, OpenAPI e CI. Esses itens
-pertencem as Sprints 5 a 8.
+O conteudo programatico implementa ItemDoEdital em arvore por MateriaDaProva,
+preserva a redacao recebida e impede pais de outra materia, outro edital e
+ciclos. MapeamentoDeItemDoEdital liga manualmente o item a um TopicoDaMateria
+compativel e confirmado. Excluir esse mapeamento remove somente o vinculo.
+
+Ainda nao estao implementados materiais, coberturas, registros de estudo,
+dashboard consolidado, OpenAPI e CI. Esses itens pertencem as Sprints 6 a 8.
 
 ## Base alvo
 
-A evolucao continua a partir do conteudo programatico e dos mapeamentos da
-Sprint 5. Cada etapa deve reutilizar o catalogo e a estrutura de concursos
+A evolucao continua a partir dos materiais e registros de estudo da Sprint 6.
+Cada etapa deve reutilizar o catalogo, a estrutura de concursos e os mapeamentos
 existentes sem copiar materias, topicos ou historico.
 
 ## Evolucao posterior

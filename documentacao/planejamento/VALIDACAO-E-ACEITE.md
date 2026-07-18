@@ -91,6 +91,28 @@ Para cada sprint, registrar no PR ou no log de execucao: commit local, comandos 
   processos temporarios encerrados e portas liberadas;
 - divergencias conhecidas da Sprint 4: nenhuma.
 
+### Sprint 5 — executada em 18/07/2026
+
+- `make verificar`: aprovado;
+- backend: 30 testes aprovados, incluindo dominio, API, seguranca, isolamento,
+  arvore sem ciclos e PostgreSQL real com Testcontainers;
+- frontend: 23 testes aprovados, verificacao de tipos, lint, build e formatacao;
+- `npm audit`: nenhuma vulnerabilidade encontrada;
+- migration `V4__cria_conteudo_programatico_e_mapeamentos.sql`: aplicada do
+  esquema v3 ao v4, aplicada tambem em bancos vazios e validada pelo Hibernate
+  com `ddl-auto=validate`;
+- fluxo HTTP real: item raiz e filho criados, tentativa de ciclo recusada com
+  `422`, redacao original preservada e mapeamento manual confirmado;
+- isolamento A-versus-B: item e lista de mapeamentos retornaram `404`;
+- remocao do mapeamento: item e topico continuaram respondendo `200`, enquanto a
+  lista de vinculos passou a ter zero elementos;
+- concurso arquivado: tentativa de mapear um item retornou `422`;
+- frontend real: Vite respondeu `/concursos` e encaminhou uma chamada `/api` ao
+  backend, ambos com `200`;
+- dados sinteticos removidos ao final, migration atual confirmada como v4,
+  processos temporarios encerrados e portas liberadas;
+- divergencias conhecidas da Sprint 5: nenhuma.
+
 ## Relatorio de encerramento
 
 Usar exatamente as secoes exigidas no item 36 da especificacao-fonte. Resultados nao executados devem constar como `nao executado`, `parcial` ou `bloqueado`; nunca como aprovados por inferencia.

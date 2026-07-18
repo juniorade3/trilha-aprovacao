@@ -33,7 +33,19 @@ const chamadas = vi.hoisted(() => ({
   selecionarCargo: vi.fn(),
 }))
 
+const chamadasConteudo = vi.hoisted(() => ({
+  alterarItemDoEdital: vi.fn(),
+  criarItemDoEdital: vi.fn(),
+  criarMapeamentoDoItem: vi.fn(),
+  excluirItemDoEdital: vi.fn(),
+  excluirMapeamentoDoItem: vi.fn(),
+  listarItensDoEdital: vi.fn(),
+  listarMapeamentosDoItem: vi.fn(),
+  listarTopicosDisponiveis: vi.fn(),
+}))
+
 vi.mock('./apiDeConcursos', () => chamadas)
+vi.mock('./apiDeConteudoProgramatico', () => chamadasConteudo)
 
 import ConcursoDetalhePagina from './ConcursoDetalhePagina.vue'
 
@@ -116,9 +128,38 @@ describe('ConcursoDetalhePagina', () => {
         ordem: 1,
       },
     ])
+    chamadasConteudo.listarItensDoEdital.mockResolvedValue([
+      {
+        identificador: 'item-1',
+        identificadorDoEdital: 'edital-1',
+        identificadorDaMateriaDaProva: 'vinculo-1',
+        descricaoOriginal: 'Direitos fundamentais.',
+        ordem: 1,
+      },
+    ])
+    chamadasConteudo.listarMapeamentosDoItem.mockResolvedValue([
+      {
+        identificador: 'mapeamento-1',
+        identificadorDoItemDoEdital: 'item-1',
+        identificadorDoTopicoDaMateria: 'topico-1',
+        nomeDoTopico: 'Direitos fundamentais',
+        confirmado: true,
+      },
+    ])
+    chamadasConteudo.listarTopicosDisponiveis.mockResolvedValue({
+      itens: [
+        {
+          identificador: 'topico-1',
+          identificadorDaMateria: 'materia-1',
+          nome: 'Direitos fundamentais',
+          ordem: 1,
+          arquivado: false,
+        },
+      ],
+    })
   })
 
-  it('apresenta cargo, prova, grupo e materia na hierarquia', async () => {
+  it('apresenta toda a hierarquia ate o item e seu mapeamento', async () => {
     const pagina = await montar()
     await flushPromises()
 
@@ -127,6 +168,27 @@ describe('ConcursoDetalhePagina', () => {
     expect(pagina.text()).toContain('4. Objetiva')
     expect(pagina.text()).toContain('5. Conhecimentos especificos')
     expect(pagina.text()).toContain('6. Direito')
+    expect(pagina.text()).toContain('7. Direitos fundamentais.')
+    expect(pagina.text()).toContain('Confirmado')
+    expect(pagina.text()).toContain('Direitos fundamentais')
+  })
+
+  it('mapeia um item somente para topico da materia correspondente', async () => {
+    chamadasConteudo.criarMapeamentoDoItem.mockResolvedValue({})
+    const pagina = await montar()
+    await flushPromises()
+
+    await pagina
+      .get('button[aria-controls="formulario-mapeamento"]')
+      .trigger('click')
+    await pagina.get('#topico-do-mapeamento').setValue('topico-1')
+    await pagina.get('#formulario-mapeamento form').trigger('submit')
+    await flushPromises()
+
+    expect(chamadasConteudo.criarMapeamentoDoItem).toHaveBeenCalledWith(
+      'item-1',
+      'topico-1',
+    )
   })
 
   it('mantem o formulario preenchido quando a API rejeita a criacao', async () => {
@@ -158,6 +220,9 @@ describe('ConcursoDetalhePagina', () => {
     )
     expect(
       pagina.get('#formulario-edital fieldset').attributes('disabled'),
+    ).toBeDefined()
+    expect(
+      pagina.get('#formulario-item-do-edital fieldset').attributes('disabled'),
     ).toBeDefined()
   })
 })

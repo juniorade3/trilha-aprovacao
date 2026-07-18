@@ -26,6 +26,7 @@ import br.com.trilhaaprovacao.concursos.infraestrutura.RepositorioDeGrupos;
 import br.com.trilhaaprovacao.concursos.infraestrutura.RepositorioDeMateriasDaProva;
 import br.com.trilhaaprovacao.concursos.infraestrutura.RepositorioDeProvas;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
+import br.com.trilhaaprovacao.conteudoprogramatico.infraestrutura.RepositorioDeItensDoEdital;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -46,6 +47,7 @@ public class ServicoDaEstruturaDeConcursos {
     private final RepositorioDeProvas provas;
     private final RepositorioDeGrupos grupos;
     private final RepositorioDeMateriasDaProva materiasDaProva;
+    private final RepositorioDeItensDoEdital itensDoEdital;
     private final ServicoDeMaterias materias;
 
     public ServicoDaEstruturaDeConcursos(
@@ -55,6 +57,7 @@ public class ServicoDaEstruturaDeConcursos {
             RepositorioDeProvas provas,
             RepositorioDeGrupos grupos,
             RepositorioDeMateriasDaProva materiasDaProva,
+            RepositorioDeItensDoEdital itensDoEdital,
             ServicoDeMaterias materias) {
         this.concursos = concursos;
         this.editais = editais;
@@ -62,6 +65,7 @@ public class ServicoDaEstruturaDeConcursos {
         this.provas = provas;
         this.grupos = grupos;
         this.materiasDaProva = materiasDaProva;
+        this.itensDoEdital = itensDoEdital;
         this.materias = materias;
     }
 
@@ -188,6 +192,10 @@ public class ServicoDaEstruturaDeConcursos {
     public void excluirEdital(UUID usuario, UUID identificador) {
         EditalPersistido edital = editalPersistido(usuario, identificador);
         exigirConcursoAlteravel(usuario, edital.identificadorDoConcurso());
+        if (itensDoEdital.existsByIdentificadorDoEdital(identificador)) {
+            throw conflito("EDITAL_POSSUI_ITENS",
+                    "O edital possui itens de conteudo e nao pode ser excluido.");
+        }
         editais.delete(edital);
     }
 
@@ -397,6 +405,10 @@ public class ServicoDaEstruturaDeConcursos {
         MateriaDaProvaPersistida materia = materiaDaProvaPersistida(usuario, identificador);
         exigirConcursoAlteravelDoGrupo(
                 usuario, materia.identificadorDoGrupoDeConteudo());
+        if (itensDoEdital.existsByIdentificadorDaMateriaDaProva(identificador)) {
+            throw conflito("MATERIA_DA_PROVA_POSSUI_ITENS",
+                    "A materia da prova possui itens e nao pode ser excluida.");
+        }
         materiasDaProva.delete(materia);
     }
 

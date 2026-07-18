@@ -7,6 +7,7 @@ import br.com.trilhaaprovacao.conteudos.dominio.Materia;
 import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.RepositorioJpaDeTopicos;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.TopicoPersistido;
+import br.com.trilhaaprovacao.conteudoprogramatico.infraestrutura.RepositorioDeMapeamentosDeItens;
 import java.util.HashSet;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -18,10 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ServicoDeTopicos {
     private final RepositorioJpaDeTopicos topicos;
+    private final RepositorioDeMapeamentosDeItens mapeamentos;
     private final ServicoDeMaterias materias;
 
-    public ServicoDeTopicos(RepositorioJpaDeTopicos topicos, ServicoDeMaterias materias) {
+    public ServicoDeTopicos(RepositorioJpaDeTopicos topicos,
+            RepositorioDeMapeamentosDeItens mapeamentos, ServicoDeMaterias materias) {
         this.topicos = topicos;
+        this.mapeamentos = mapeamentos;
         this.materias = materias;
     }
 
@@ -93,6 +97,10 @@ public class ServicoDeTopicos {
         if (topicos.existsByIdentificadorDoTopicoPai(identificador)) {
             throw new ConflitoDeDominio("TOPICO_POSSUI_FILHOS",
                     "Arquive o topico, pois ele possui topicos filhos.");
+        }
+        if (mapeamentos.existsByIdentificadorDoTopicoDaMateria(identificador)) {
+            throw new ConflitoDeDominio("TOPICO_POSSUI_MAPEAMENTOS",
+                    "Remova os mapeamentos antes de excluir o topico.");
         }
         topicos.delete(persistido);
     }
