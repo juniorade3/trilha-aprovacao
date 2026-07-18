@@ -4,9 +4,13 @@ Monorepo para organizar concursos, conteudos reutilizaveis, materiais e registro
 
 ## Estado
 
-Sprints 0, 1 e 2 concluidas: fundacao do monorepo, PostgreSQL, migrations,
-autenticacao por sessao, CSRF e frontend de login/cadastro estao implementados.
-O proximo marco e a Sprint 3, com o catalogo pessoal de materias e topicos.
+Sprints 0 a 3 concluidas: fundacao do monorepo, PostgreSQL/Flyway,
+autenticacao por sessao e catalogo pessoal de materias e topicos estao
+implementados. O catalogo possui CRUD paginado, arquivamento, arvore sem ciclos,
+isolamento por usuario e interface autenticada.
+
+A Sprint 4, estrutura de concursos, somente pode comecar apos autorizacao
+explicita.
 
 ## Pre-requisitos
 

@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(properties = "debug=false")
 @AutoConfigureMockMvc
@@ -32,7 +33,7 @@ class AutenticacaoIntegracaoTest {
 
     @Container
     static final PostgreSQLContainer POSTGRESQL =
-            new PostgreSQLContainer("postgres:17-alpine")
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
                     .withDatabaseName("trilha_aprovacao_teste")
                     .withUsername("teste")
                     .withPassword("teste");

@@ -13,3 +13,36 @@ body {
   outline: 3px solid var(--cor-destaque);
   outline-offset: 2px;
 }
+
+.bg-primary {
+  background-color: var(--cor-primaria) !important;
+}
+
+.marca-de-cor {
+  width: 0.75rem;
+  min-height: 3rem;
+  border-radius: 999px;
+}
+
+.marca-de-cor-grande {
+  width: 1rem;
+  min-height: 4.5rem;
+}
+
+.lista-de-topicos {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+
+  .lista-de-topicos {
+    border-left: 2px solid #dce5ed;
+    margin-left: 1rem;
+    padding-left: 1rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .navbar .nav-link {
+    font-size: 0.875rem;
+  }
+}

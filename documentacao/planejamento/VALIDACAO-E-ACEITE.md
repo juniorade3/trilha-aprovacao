@@ -52,6 +52,23 @@ Os nomes finais dos alvos do Makefile devem corresponder aos requeridos pela esp
 
 Para cada sprint, registrar no PR ou no log de execucao: commit local, comandos executados, resultado, versoes relevantes, migrations criadas, testes novos, capturas apenas quando ajudarem a provar o comportamento e divergencias conhecidas. Falhas devem bloquear o proximo sprint ou ser explicitamente autorizadas como excecao.
 
+### Sprint 3 — executada em 18/07/2026
+
+- `make verificar`: aprovado;
+- backend: 14 testes aprovados, incluindo dominio, API, seguranca e PostgreSQL
+  real com Testcontainers;
+- frontend: 16 testes aprovados, verificacao de tipos, lint, build e formatacao;
+- `npm audit`: nenhuma vulnerabilidade encontrada;
+- migration `V2__cria_materias_e_topicos.sql`: aplicada do esquema v1 ao v2 e
+  validada pelo Hibernate com `ddl-auto=validate`;
+- fluxo HTTP real: health `UP`, criacao de materia, topico raiz e filho,
+  duplicidade `409`, ciclo `422`, bloqueio de materia arquivada `422` e
+  isolamento A-versus-B com `404`;
+- frontend real: Vite respondeu a rota `/materias` e encaminhou `/api` ao
+  backend;
+- dados sinteticos removidos ao final e processos temporarios encerrados;
+- divergencias conhecidas da Sprint 3: nenhuma.
+
 ## Relatorio de encerramento
 
 Usar exatamente as secoes exigidas no item 36 da especificacao-fonte. Resultados nao executados devem constar como `nao executado`, `parcial` ou `bloqueado`; nunca como aprovados por inferencia.

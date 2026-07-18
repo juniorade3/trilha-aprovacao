@@ -6,9 +6,12 @@ import {
 } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
+import LayoutPrincipal from '@/aplicacao/layouts/LayoutPrincipal.vue'
 import InicioPagina from '@/modulos/inicio/InicioPagina.vue'
 import LoginPagina from '@/modulos/autenticacao/LoginPagina.vue'
 import CadastroPagina from '@/modulos/autenticacao/CadastroPagina.vue'
+import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
+import MateriaDetalhePagina from '@/modulos/materias/MateriaDetalhePagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -33,12 +36,20 @@ export async function protegerRotas(
 const roteador = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/dashboard' },
     {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: InicioPagina,
+      path: '/',
+      component: LayoutPrincipal,
       meta: { requerAutenticacao: true },
+      children: [
+        { path: '', redirect: '/dashboard' },
+        { path: 'dashboard', name: 'dashboard', component: InicioPagina },
+        { path: 'materias', name: 'materias', component: MateriasPagina },
+        {
+          path: 'materias/:identificador',
+          name: 'materia-detalhe',
+          component: MateriaDetalhePagina,
+        },
+      ],
     },
     { path: '/login', name: 'login', component: LoginPagina },
     { path: '/cadastro', name: 'cadastro', component: CadastroPagina },

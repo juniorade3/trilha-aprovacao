@@ -1,13 +1,15 @@
 # Plano de execucao
 
-As Sprints 0, 1 e 2 da reconstrucao descrita em
+As Sprints 0, 1, 2 e 3 da reconstrucao descrita em
 `RECONSTRUCAO-COMPLETA-TRILHA-APROVACAO.md` estao concluidas. O projeto foi
 incorporado ao repositorio original em `~/Projetos/trilha-aprovacao`, preservando
-o historico das implementacoes.
+o historico das implementacoes. A Sprint 3 entregou o catalogo pessoal de
+materias e topicos, com isolamento, arquivamento e hierarquia sem ciclos.
 
 O planejamento detalhado esta em `documentacao/planejamento/PLANO-DE-EXECUCAO.md`.
 Cada sprint so pode iniciar depois que os criterios de saida do anterior forem
-atendidos e registrados. A proxima etapa autorizavel e a Sprint 3.
+atendidos e registrados. A proxima etapa candidata e a Sprint 4, que ainda
+depende de autorizacao explicita do usuario.
 
 Ordem obrigatoria:
 
