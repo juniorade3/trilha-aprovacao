@@ -9,16 +9,23 @@ import br.com.trilhaaprovacao.conteudos.dominio.Materia;
 import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;
 import br.com.trilhaaprovacao.planejamento.dominio.BlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.DisponibilidadeDoDia;
+import br.com.trilhaaprovacao.planejamento.dominio.ExecucaoDoBloco;
+import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoBlocoDeEstudo;
+import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoPlanoSemanal;
 import br.com.trilhaaprovacao.planejamento.dominio.PlanoSemanal;
+import br.com.trilhaaprovacao.planejamento.dominio.ResultadoDaExecucao;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.BlocoDeEstudoPersistido;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.DisponibilidadeDoDiaPersistida;
+import br.com.trilhaaprovacao.planejamento.infraestrutura.ExecucaoDoBlocoPersistida;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.PlanoSemanalPersistido;
-import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeDisponibilidadesDoDia;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeBlocosDeEstudo;
+import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeDisponibilidadesDoDia;
+import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeExecucoesDeBloco;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDePlanosSemanais;
 import java.time.LocalDate;
-import java.util.HashSet;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,17 +41,20 @@ public class ServicoDePlanejamento {
     private final RepositorioDePlanosSemanais planos;
     private final RepositorioDeDisponibilidadesDoDia disponibilidades;
     private final RepositorioDeBlocosDeEstudo blocos;
+    private final RepositorioDeExecucoesDeBloco execucoes;
     private final ServicoDeMaterias materias;
     private final ServicoDeTopicos topicos;
 
     public ServicoDePlanejamento(RepositorioDePlanosSemanais planos,
             RepositorioDeDisponibilidadesDoDia disponibilidades,
             RepositorioDeBlocosDeEstudo blocos,
+            RepositorioDeExecucoesDeBloco execucoes,
             ServicoDeMaterias materias,
             ServicoDeTopicos topicos) {
         this.planos = planos;
         this.disponibilidades = disponibilidades;
         this.blocos = blocos;
+        this.execucoes = execucoes;
         this.materias = materias;
         this.topicos = topicos;
     }
@@ -80,13 +90,8 @@ public class ServicoDePlanejamento {
                 .findByIdentificadorAndIdentificadorDoUsuario(identificadorDoPlano, usuario)
                 .orElseThrow(this::naoEncontrado);
         PlanoSemanal plano = planoPersistido.paraDominio();
-        try {
-            plano.exigirEditavel();
-        } catch (IllegalStateException excecao) {
-            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_EDITAVEL", excecao.getMessage());
-        }
+        exigirPlanoEditavel(plano);
         validarConjuntoDeDias(plano, informadas);
-
         Map<LocalDate, DisponibilidadeInformada> porData = informadas.stream()
                 .collect(Collectors.toMap(DisponibilidadeInformada::data, item -> item));
         List<DisponibilidadeDoDiaPersistida> persistidas = disponibilidades
@@ -110,7 +115,7 @@ public class ServicoDePlanejamento {
         PlanoSemanalPersistido persistido = planoPersistido(usuario, identificadorDoPlano);
         PlanoSemanal plano = persistido.paraDominio();
         if (plano.estaAtivo()) return resultado(plano);
-        if (plano.estado() != br.com.trilhaaprovacao.planejamento.dominio.EstadoDoPlanoSemanal.RASCUNHO) {
+        if (plano.estado() != EstadoDoPlanoSemanal.RASCUNHO) {
             throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_ATIVAVEL",
                     "O estado atual do plano nao permite ativacao.");
         }
@@ -157,7 +162,6 @@ public class ServicoDePlanejamento {
         PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();
         exigirPlanoEditavel(plano);
         validarDadosDoBloco(usuario, plano, dados);
-
         List<BlocoDeEstudoPersistido> origem = blocos
                 .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
                         atual.identificadorDoPlano(), atual.data());
@@ -193,7 +197,7 @@ public class ServicoDePlanejamento {
         BlocoDeEstudo bloco = persistido.paraDominio();
         PlanoSemanal plano = planoPersistido(usuario, bloco.identificadorDoPlano()).paraDominio();
         exigirPlanoEditavel(plano);
-        if (bloco.estado() != br.com.trilhaaprovacao.planejamento.dominio.EstadoDoBlocoDeEstudo.PLANEJADO) {
+        if (bloco.estado() != EstadoDoBlocoDeEstudo.PLANEJADO) {
             throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_EDITAVEL",
                     "Somente bloco planejado pode ser excluido.");
         }
@@ -232,6 +236,112 @@ public class ServicoDePlanejamento {
         normalizarDia(ordenados, data);
         blocos.flush();
         return resultado(plano);
+    }
+
+    @Transactional
+    public ResultadoDaExecucaoDoBloco iniciarBloco(UUID usuario,
+            UUID identificadorDoBloco, LocalDate dataDeReferencia) {
+        if (dataDeReferencia == null) {
+            throw new RegraDeDominio("DATA_DE_REFERENCIA_INVALIDA",
+                    "Informe a data local de referencia.");
+        }
+        BlocoDeEstudoPersistido blocoPersistido = blocoPersistido(usuario, identificadorDoBloco);
+        BlocoDeEstudo bloco = blocoPersistido.paraDominio();
+        PlanoSemanal plano = planoPersistido(usuario, bloco.identificadorDoPlano()).paraDominio();
+        if (!plano.estaAtivo()) {
+            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_ATIVO",
+                    "Ative o plano antes de iniciar um bloco.");
+        }
+        if (bloco.data().isAfter(dataDeReferencia)) {
+            throw new RegraDeDominio("BLOCO_FUTURO_NAO_EXECUTAVEL",
+                    "Um bloco futuro precisa ser reagendado antes de iniciar.");
+        }
+        if (execucoes.findByIdentificadorDoBloco(identificadorDoBloco).isPresent()) {
+            throw new ConflitoDeDominio("BLOCO_JA_POSSUI_EXECUCAO",
+                    "O bloco ja possui uma execucao.");
+        }
+        execucoes.findByIdentificadorDoUsuarioAndEncerradaEmIsNull(usuario)
+                .ifPresent(existente -> {
+                    throw new ConflitoDeDominio("USUARIO_POSSUI_EXECUCAO_EM_ANDAMENTO",
+                            "Conclua ou interrompa o bloco em andamento antes de iniciar outro.");
+                });
+        OffsetDateTime agora = OffsetDateTime.now();
+        ExecucaoDoBloco execucao = regra("EXECUCAO_DO_BLOCO_INVALIDA",
+                () -> ExecucaoDoBloco.iniciar(usuario, identificadorDoBloco, agora));
+        BlocoDeEstudo iniciado;
+        try {
+            iniciado = bloco.iniciar();
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("BLOCO_NAO_INICIAVEL", excecao.getMessage());
+        }
+        blocoPersistido.atualizarDe(iniciado);
+        ExecucaoDoBlocoPersistida execucaoPersistida =
+                execucoes.saveAndFlush(new ExecucaoDoBlocoPersistida(execucao));
+        blocos.flush();
+        return new ResultadoDaExecucaoDoBloco(blocoPersistido.paraDominio(),
+                execucaoPersistida.paraDominio());
+    }
+
+    @Transactional
+    public ResultadoDaExecucaoDoBloco concluirBloco(UUID usuario, UUID bloco,
+            int duracao, String observacao) {
+        return finalizarBloco(usuario, bloco, ResultadoDaExecucao.CONCLUIDO,
+                duracao, observacao);
+    }
+
+    @Transactional
+    public ResultadoDaExecucaoDoBloco interromperBloco(UUID usuario, UUID bloco,
+            int duracao, String observacao) {
+        return finalizarBloco(usuario, bloco,
+                ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO, duracao, observacao);
+    }
+
+    @Transactional(readOnly = true)
+    public ResultadoDaExecucaoDoBloco obterExecucaoEmAndamento(UUID usuario) {
+        ExecucaoDoBlocoPersistida execucao = execucoes
+                .findByIdentificadorDoUsuarioAndEncerradaEmIsNull(usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "EXECUCAO_EM_ANDAMENTO_NAO_ENCONTRADA",
+                        "Nao existe execucao em andamento."));
+        BlocoDeEstudoPersistido bloco = blocoPersistido(usuario,
+                execucao.paraDominio().identificadorDoBloco());
+        return new ResultadoDaExecucaoDoBloco(bloco.paraDominio(), execucao.paraDominio());
+    }
+
+    private ResultadoDaExecucaoDoBloco finalizarBloco(UUID usuario, UUID identificadorDoBloco,
+            ResultadoDaExecucao resultado, int duracao, String observacao) {
+        BlocoDeEstudoPersistido blocoPersistido = blocoPersistido(usuario, identificadorDoBloco);
+        BlocoDeEstudo bloco = blocoPersistido.paraDominio();
+        ExecucaoDoBlocoPersistida execucaoPersistida = execucoes
+                .findByIdentificadorDoBloco(identificadorDoBloco)
+                .filter(item -> item.paraDominio().identificadorDoUsuario().equals(usuario))
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA",
+                        "Execucao do bloco nao encontrada."));
+        ExecucaoDoBloco execucao = execucaoPersistida.paraDominio();
+        if (!execucao.estaEmAndamento()) {
+            if (execucao.equivaleAoEncerramento(resultado, duracao, observacao)) {
+                return new ResultadoDaExecucaoDoBloco(bloco, execucao);
+            }
+            throw new ConflitoDeDominio("EXECUCAO_JA_ENCERRADA",
+                    "A execucao ja foi encerrada com dados diferentes.");
+        }
+        OffsetDateTime agora = OffsetDateTime.now();
+        ExecucaoDoBloco encerrada = regra("EXECUCAO_DO_BLOCO_INVALIDA",
+                () -> execucao.encerrar(resultado, duracao, observacao, agora));
+        BlocoDeEstudo finalizado;
+        try {
+            finalizado = resultado == ResultadoDaExecucao.CONCLUIDO
+                    ? bloco.concluir() : bloco.concluirParcialmente();
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("BLOCO_NAO_FINALIZAVEL", excecao.getMessage());
+        }
+        execucaoPersistida.atualizarDe(encerrada);
+        blocoPersistido.atualizarDe(finalizado);
+        execucoes.flush();
+        blocos.flush();
+        return new ResultadoDaExecucaoDoBloco(blocoPersistido.paraDominio(),
+                execucaoPersistida.paraDominio());
     }
 
     private void validarConjuntoDeDias(PlanoSemanal plano,
