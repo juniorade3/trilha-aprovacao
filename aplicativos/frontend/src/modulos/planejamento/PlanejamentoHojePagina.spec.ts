@@ -66,7 +66,10 @@ async function montar() {
   await roteador.push('/planejamento/hoje')
   await roteador.isReady()
   const pagina = mount(PlanejamentoHojePagina, {
-    global: { plugins: [roteador] },
+    global: {
+      plugins: [roteador],
+      stubs: { teleport: true },
+    },
   })
   await flushPromises()
   return pagina
