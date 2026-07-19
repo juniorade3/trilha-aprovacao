@@ -31,19 +31,19 @@ public record ExecucaoDoBloco(
                 throw new IllegalArgumentException(
                         "Execucao em andamento nao possui dados de encerramento.");
             }
-            return;
+        } else {
+            if (encerradaEm.isBefore(iniciadaEm)) {
+                throw new IllegalArgumentException(
+                        "Encerramento nao pode ocorrer antes do inicio.");
+            }
+            if (duracaoExecutadaEmMinutos == null
+                    || duracaoExecutadaEmMinutos < 1
+                    || duracaoExecutadaEmMinutos > 1440) {
+                throw new IllegalArgumentException(
+                        "Duracao executada deve estar entre 1 e 1440 minutos.");
+            }
+            Objects.requireNonNull(resultado);
         }
-        if (encerradaEm.isBefore(iniciadaEm)) {
-            throw new IllegalArgumentException(
-                    "Encerramento nao pode ocorrer antes do inicio.");
-        }
-        if (duracaoExecutadaEmMinutos == null
-                || duracaoExecutadaEmMinutos < 1
-                || duracaoExecutadaEmMinutos > 1440) {
-            throw new IllegalArgumentException(
-                    "Duracao executada deve estar entre 1 e 1440 minutos.");
-        }
-        Objects.requireNonNull(resultado);
     }
 
     public static ExecucaoDoBloco iniciar(UUID usuario, UUID bloco, OffsetDateTime momento) {
