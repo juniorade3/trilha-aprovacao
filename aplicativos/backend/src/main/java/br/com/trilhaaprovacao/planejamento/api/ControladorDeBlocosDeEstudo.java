@@ -69,4 +69,34 @@ public class ControladorDeBlocosDeEstudo {
                 usuarioAtual.obter(autenticacao), plano, requisicao.data(),
                 requisicao.identificadoresOrdenados()));
     }
+
+    @PostMapping("/blocos-de-estudo/{identificador}/inicio")
+    public RespostaDaExecucaoDoBloco iniciar(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeInicioDaExecucao requisicao,
+            Authentication autenticacao) {
+        return RespostaDaExecucaoDoBloco.de(servico.iniciarBloco(
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.dataDeReferencia()));
+    }
+
+    @PostMapping("/blocos-de-estudo/{identificador}/conclusao")
+    public RespostaDaExecucaoDoBloco concluir(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeFinalizacaoDaExecucao requisicao,
+            Authentication autenticacao) {
+        return RespostaDaExecucaoDoBloco.de(servico.concluirBloco(
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
+    }
+
+    @PostMapping("/blocos-de-estudo/{identificador}/interrupcao")
+    public RespostaDaExecucaoDoBloco interromper(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeFinalizacaoDaExecucao requisicao,
+            Authentication autenticacao) {
+        return RespostaDaExecucaoDoBloco.de(servico.interromperBloco(
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
+    }
 }
