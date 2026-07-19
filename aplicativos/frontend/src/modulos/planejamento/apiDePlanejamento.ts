@@ -1,7 +1,10 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 
 export type EstadoDoPlanoSemanal =
-  'RASCUNHO' | 'ATIVO' | 'ENCERRADO' | 'CANCELADO'
+  | 'RASCUNHO'
+  | 'ATIVO'
+  | 'ENCERRADO'
+  | 'CANCELADO'
 
 export interface DisponibilidadeDoDia {
   identificador: string
@@ -45,6 +48,13 @@ export type TipoDeAtividade =
   | 'DISCURSIVA'
   | 'OUTRA'
 
+export type EstadoDoBlocoDeEstudo =
+  | 'PLANEJADO'
+  | 'EM_ANDAMENTO'
+  | 'CONCLUIDO'
+  | 'PARCIALMENTE_CONCLUIDO'
+  | 'CANCELADO'
+
 export interface BlocoDeEstudo {
   identificador: string
   identificadorDoPlano: string
@@ -57,10 +67,28 @@ export interface BlocoDeEstudo {
   ordem: number
   horarioPrevisto?: string
   observacao?: string
-  estado: 'PLANEJADO'
+  estado: EstadoDoBlocoDeEstudo
   criadoEm: string
   atualizadoEm: string
   versao: number
+}
+
+export interface ExecucaoDoBloco {
+  identificador: string
+  identificadorDoBloco: string
+  iniciadaEm: string
+  encerradaEm?: string
+  duracaoExecutadaEmMinutos?: number
+  resultado?: 'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO'
+  observacao?: string
+  criadoEm: string
+  atualizadoEm: string
+  versao: number
+}
+
+export interface ResultadoDaExecucaoDoBloco {
+  bloco: BlocoDeEstudo
+  execucao: ExecucaoDoBloco
 }
 
 export interface DadosDoBlocoDeEstudo {
@@ -76,7 +104,10 @@ export interface DadosDoBlocoDeEstudo {
 }
 
 export type EstadoDoPlanejamentoDeHoje =
-  'SEM_PLANO' | 'PLANO_EM_RASCUNHO' | 'DIA_SEM_BLOCOS' | 'DIA_PLANEJADO'
+  | 'SEM_PLANO'
+  | 'PLANO_EM_RASCUNHO'
+  | 'DIA_SEM_BLOCOS'
+  | 'DIA_PLANEJADO'
 
 export interface PlanejamentoDeHoje {
   estado: EstadoDoPlanejamentoDeHoje
@@ -117,6 +148,53 @@ export function obterPlanejamentoDeHoje(
   return requisitar<PlanejamentoDeHoje>(`/v1/planejamento/hoje?${parametros}`, {
     signal: sinal,
   })
+}
+
+export function obterExecucaoEmAndamento(): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    '/v1/planejamento/execucao-em-andamento',
+  )
+}
+
+export function iniciarBloco(
+  identificador: string,
+  dataDeReferencia: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/blocos-de-estudo/${identificador}/inicio`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ dataDeReferencia }),
+    },
+  )
+}
+
+export function concluirBloco(
+  identificador: string,
+  duracaoExecutadaEmMinutos: number,
+  observacao?: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/blocos-de-estudo/${identificador}/conclusao`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),
+    },
+  )
+}
+
+export function interromperBloco(
+  identificador: string,
+  duracaoExecutadaEmMinutos: number,
+  observacao?: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/blocos-de-estudo/${identificador}/interrupcao`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),
+    },
+  )
 }
 
 export function alterarDisponibilidades(
