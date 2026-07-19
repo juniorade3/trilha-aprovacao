@@ -57,6 +57,15 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/materias'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/concursos'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/materiais'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/disponibilidades'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{plano}/blocos'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].delete").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{plano}/ordem-dos-blocos'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/ativacao'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planejamento/hoje'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/dashboard'].get").exists())
                 .andReturn().getResponse().getContentAsString();
 
@@ -70,10 +79,13 @@ class DocumentacaoDaApiIntegracaoTest {
                 "Concursos",
                 "Conteúdo programático",
                 "Materiais e estudos",
+                "Planejamento",
                 "Dashboard");
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/security/0/sessao")
                 .isMissingNode()).isFalse();
         assertThat(documento.at("/paths/~1api~1v1~1estudos/post/security/0/csrf")
+                .isMissingNode()).isFalse();
+        assertThat(documento.at("/paths/~1api~1v1~1planos-semanais/post/security/0/csrf")
                 .isMissingNode()).isFalse();
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/responses/401")
                 .isMissingNode()).isFalse();

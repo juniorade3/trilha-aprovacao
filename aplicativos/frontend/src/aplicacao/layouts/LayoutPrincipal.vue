@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
           <RouterLink to="/concursos">Meu concurso</RouterLink>
           <RouterLink to="/materias">Conteúdos</RouterLink>
           <RouterLink to="/materiais">Materiais</RouterLink>
-          <RouterLink to="/estudos">Histórico</RouterLink>
+          <RouterLink to="/planejamento/semana">Planejamento</RouterLink>
         </nav>
 
         <button
@@ -120,9 +120,9 @@ onBeforeUnmount(() => {
         <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
         <span>Materiais</span>
       </RouterLink>
-      <RouterLink to="/estudos">
-        <i class="bi bi-clock-history" aria-hidden="true"></i>
-        <span>Histórico</span>
+      <RouterLink to="/planejamento/semana">
+        <i class="bi bi-calendar-week" aria-hidden="true"></i>
+        <span>Planejar</span>
       </RouterLink>
     </nav>
 

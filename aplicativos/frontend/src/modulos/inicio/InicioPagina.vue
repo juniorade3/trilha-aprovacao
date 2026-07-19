@@ -196,6 +196,10 @@ onBeforeUnmount(() => {
           descricao="Mantenha o ritmo e siga firme até a prova. Consistência hoje, aprovação amanhã."
         >
           <template #acoes>
+            <RouterLink class="btn btn-outline-primary" to="/planejamento/hoje">
+              <i class="bi bi-sun me-2" aria-hidden="true"></i>
+              Ver plano de hoje
+            </RouterLink>
             <button
               class="btn btn-primary"
               type="button"

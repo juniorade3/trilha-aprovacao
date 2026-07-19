@@ -20,6 +20,7 @@ function criarRoteador() {
       { path: '/concursos/:identificador', component: { template: '<div />' } },
       { path: '/estudos', component: { template: '<div />' } },
       { path: '/materiais', component: { template: '<div />' } },
+      { path: '/planejamento/hoje', component: { template: '<div />' } },
     ],
   })
 }
@@ -107,6 +108,9 @@ describe('InicioPagina', () => {
     expect(pagina.text()).toContain('Direitos fundamentais')
     expect(pagina.text()).toContain('Itens aguardando mapeamento')
     expect(pagina.text()).toContain('Faltam 33 dias')
+    expect(pagina.get('a[href="/planejamento/hoje"]').text()).toContain(
+      'Ver plano de hoje',
+    )
   })
 
   it('permite tentar novamente quando a consulta falha', async () => {

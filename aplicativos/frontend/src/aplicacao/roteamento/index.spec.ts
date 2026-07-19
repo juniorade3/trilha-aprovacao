@@ -60,6 +60,12 @@ describe('protegerRotas', () => {
     expect(roteador.resolve('/materiais/material-1').matched).not.toHaveLength(
       0,
     )
+    expect(
+      roteador.getRoutes().find((rota) => rota.path === '/planejamento')
+        ?.redirect,
+    ).toBe('/planejamento/hoje')
+    expect(roteador.resolve('/planejamento/hoje').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/planejamento/semana').matched).not.toHaveLength(0)
     const rotaDeNovoEstudo = roteador.resolve('/estudos/novo')
     expect(rotaDeNovoEstudo.matched).not.toHaveLength(0)
     expect(

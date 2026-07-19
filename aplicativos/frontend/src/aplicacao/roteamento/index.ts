@@ -17,6 +17,8 @@ import ConcursosPagina from '@/modulos/concursos/ConcursosPagina.vue'
 import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
 import MateriaisDeEstudoPagina from '@/modulos/estudos/MateriaisDeEstudoPagina.vue'
 import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
+import PlanejamentoSemanaPagina from '@/modulos/planejamento/PlanejamentoSemanaPagina.vue'
+import PlanejamentoHojePagina from '@/modulos/planejamento/PlanejamentoHojePagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -68,6 +70,17 @@ const roteador = createRouter({
           component: MateriaisDeEstudoPagina,
         },
         { path: 'estudos', name: 'estudos', component: EstudosPagina },
+        { path: 'planejamento', redirect: '/planejamento/hoje' },
+        {
+          path: 'planejamento/hoje',
+          name: 'planejamento-hoje',
+          component: PlanejamentoHojePagina,
+        },
+        {
+          path: 'planejamento/semana',
+          name: 'planejamento-semana',
+          component: PlanejamentoSemanaPagina,
+        },
         {
           path: 'materiais/:identificador',
           name: 'material-detalhe',
