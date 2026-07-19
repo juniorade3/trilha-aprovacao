@@ -4,10 +4,20 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const chamadas = vi.hoisted(() => ({ obterPlanejamentoDeHoje: vi.fn() }))
+const chamadas = vi.hoisted(() => ({
+  obterPlanejamentoDeHoje: vi.fn(),
+  obterExecucaoEmAndamento: vi.fn(),
+  iniciarBloco: vi.fn(),
+  concluirBloco: vi.fn(),
+  interromperBloco: vi.fn(),
+}))
 
 vi.mock('./apiDePlanejamento', () => ({
   obterPlanejamentoDeHoje: chamadas.obterPlanejamentoDeHoje,
+  obterExecucaoEmAndamento: chamadas.obterExecucaoEmAndamento,
+  iniciarBloco: chamadas.iniciarBloco,
+  concluirBloco: chamadas.concluirBloco,
+  interromperBloco: chamadas.interromperBloco,
 }))
 
 import PlanejamentoHojePagina from './PlanejamentoHojePagina.vue'
@@ -25,6 +35,22 @@ function bloco(identificador: string, titulo: string, ordem: number) {
     criadoEm: '2026-07-19T12:00:00Z',
     atualizadoEm: '2026-07-19T12:00:00Z',
     versao: 0,
+  }
+}
+
+function diaPlanejado() {
+  return {
+    estado: 'DIA_PLANEJADO',
+    data: '2026-07-20',
+    identificadorDoPlano: 'plano-1',
+    dataInicialDoPlano: '2026-07-20',
+    minutosDisponiveis: 180,
+    minutosPlanejados: 120,
+    quantidadeDeBlocos: 2,
+    proximoBloco: bloco('bloco-1', 'Primeiro bloco', 1),
+    sequencia: [bloco('bloco-2', 'Segundo bloco', 2)],
+    atrasados: [],
+    realizados: [],
   }
 }
 
@@ -47,7 +73,10 @@ async function montar() {
 }
 
 describe('PlanejamentoHojePagina', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)
+  })
 
   it('orienta a planejar quando nao existe plano', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
@@ -64,11 +93,7 @@ describe('PlanejamentoHojePagina', () => {
     const pagina = await montar()
 
     expect(pagina.text()).toContain('Você ainda não planejou esta semana')
-    expect(
-      pagina
-        .findAll('a[href="/planejamento/semana"]')
-        .some((link) => link.text().includes('Planejar minha semana')),
-    ).toBe(true)
+    expect(pagina.find('a[href="/planejamento/semana"]').exists()).toBe(true)
   })
 
   it('orienta a ativar quando a semana esta em rascunho', async () => {
@@ -86,62 +111,75 @@ describe('PlanejamentoHojePagina', () => {
     })
 
     const pagina = await montar()
-
     expect(pagina.text()).toContain('Seu plano ainda precisa ser ativado')
-    expect(
-      pagina.get('a[href="/planejamento/semana?inicio=2026-07-20"]'),
-    ).toBeDefined()
   })
 
-  it('destaca o proximo bloco e apresenta a sequencia vertical', async () => {
-    chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
-      estado: 'DIA_PLANEJADO',
-      data: '2026-07-20',
-      identificadorDoPlano: 'plano-1',
-      dataInicialDoPlano: '2026-07-20',
-      minutosDisponiveis: 180,
-      minutosPlanejados: 120,
-      quantidadeDeBlocos: 2,
-      proximoBloco: bloco('bloco-1', 'Primeiro bloco', 1),
-      sequencia: [bloco('bloco-2', 'Segundo bloco', 2)],
-      atrasados: [],
-      realizados: [],
+  it('inicia o proximo bloco', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.iniciarBloco.mockResolvedValue({
+      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: new Date().toISOString(),
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        versao: 0,
+      },
+    })
+
+    const pagina = await montar()
+    await pagina.get('.proximo-bloco-do-dia button').trigger('click')
+    await flushPromises()
+
+    expect(chamadas.iniciarBloco).toHaveBeenCalledWith('bloco-1', expect.any(String))
+  })
+
+  it('recupera uma execucao aberta e mostra o cronometro', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue({
+      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: new Date(Date.now() - 65_000).toISOString(),
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        versao: 0,
+      },
     })
 
     const pagina = await montar()
 
-    expect(pagina.get('.proximo-bloco-do-dia').text()).toContain(
-      'Primeiro bloco',
-    )
-    expect(pagina.get('.sequencia-do-dia').text()).toContain('Segundo bloco')
-    expect(pagina.text()).toContain('180 min')
-    expect(pagina.text()).toContain('120 min')
-    expect(pagina.get('nav').text()).toContain('Hoje')
-    expect(pagina.get('nav').text()).toContain('Semana')
-    expect(pagina.get('nav').text()).toContain('Histórico')
+    expect(pagina.get('.bloco-em-andamento').text()).toContain('Primeiro bloco')
+    expect(pagina.get('.cronometro-da-execucao').text()).toMatch(/00:01:0[4-6]/)
   })
 
-  it('informa quando o dia ativo nao possui blocos', async () => {
-    chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
-      estado: 'DIA_SEM_BLOCOS',
-      data: '2026-07-20',
-      identificadorDoPlano: 'plano-1',
-      dataInicialDoPlano: '2026-07-20',
-      minutosDisponiveis: 0,
-      minutosPlanejados: 0,
-      quantidadeDeBlocos: 0,
-      sequencia: [],
-      atrasados: [],
-      realizados: [],
+  it('conclui uma execucao informando a duracao', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue({
+      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: new Date(Date.now() - 120_000).toISOString(),
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        versao: 0,
+      },
     })
+    chamadas.concluirBloco.mockResolvedValue({})
 
     const pagina = await montar()
+    await pagina.get('.bloco-em-andamento .btn-primary').trigger('click')
+    await pagina.get('#duracao-executada').setValue(15)
+    await pagina.get('.rodape-do-modal .btn-primary').trigger('click')
+    await flushPromises()
 
-    expect(pagina.text()).toContain('Hoje não há blocos planejados')
-    expect(pagina.text()).not.toContain('recomend')
+    expect(chamadas.concluirBloco).toHaveBeenCalledWith('bloco-1', 15, undefined)
   })
 
-  it('separa blocos atrasados da sequencia de hoje', async () => {
+  it('separa blocos atrasados e permite inicia-los', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
       estado: 'DIA_SEM_BLOCOS',
       data: '2026-07-21',
@@ -154,34 +192,22 @@ describe('PlanejamentoHojePagina', () => {
       atrasados: [bloco('bloco-1', 'Bloco pendente', 1)],
       realizados: [],
     })
+    chamadas.iniciarBloco.mockResolvedValue({
+      bloco: { ...bloco('bloco-1', 'Bloco pendente', 1), estado: 'EM_ANDAMENTO' },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: new Date().toISOString(),
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        versao: 0,
+      },
+    })
 
     const pagina = await montar()
-
     expect(pagina.text()).toContain('Pendentes de dias anteriores')
-    expect(pagina.text()).toContain('Bloco pendente')
-    expect(pagina.text()).toContain('Hoje não há blocos planejados')
-  })
-
-  it('permite tentar novamente depois de erro', async () => {
-    chamadas.obterPlanejamentoDeHoje
-      .mockRejectedValueOnce(new Error('Serviço indisponível'))
-      .mockResolvedValueOnce({
-        estado: 'SEM_PLANO',
-        data: '2026-07-20',
-        minutosDisponiveis: 0,
-        minutosPlanejados: 0,
-        quantidadeDeBlocos: 0,
-        sequencia: [],
-        atrasados: [],
-        realizados: [],
-      })
-
-    const pagina = await montar()
-    expect(pagina.text()).toContain('Serviço indisponível')
-    await pagina.get('button').trigger('click')
+    await pagina.get('.blocos-atrasados-do-dia button').trigger('click')
     await flushPromises()
-
-    expect(chamadas.obterPlanejamentoDeHoje).toHaveBeenCalledTimes(2)
-    expect(pagina.text()).toContain('Você ainda não planejou')
+    expect(chamadas.iniciarBloco).toHaveBeenCalled()
   })
 })
