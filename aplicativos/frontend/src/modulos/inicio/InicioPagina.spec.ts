@@ -99,7 +99,8 @@ describe('InicioPagina', () => {
 
     const pagina = await montar()
 
-    expect(pagina.get('h1').text()).toBe('Receita Federal')
+    expect(pagina.get('h1').text()).toContain('avançando')
+    expect(pagina.text()).toContain('Receita Federal')
     expect(pagina.text()).toContain('Auditor Fiscal')
     expect(pagina.text()).toContain('1 de 3')
     expect(pagina.text()).toContain('1h 35min')

@@ -82,6 +82,30 @@ export function listarMaterias(
   })
 }
 
+export async function listarTodasAsMaterias(
+  pesquisa = '',
+  incluirArquivadas = false,
+  sinal?: AbortSignal,
+) {
+  const primeiraPagina = await listarMaterias(
+    pesquisa,
+    incluirArquivadas,
+    0,
+    sinal,
+    100,
+  )
+  if (primeiraPagina.totalDePaginas <= 1) return primeiraPagina.itens
+  const demaisPaginas = await Promise.all(
+    Array.from({ length: primeiraPagina.totalDePaginas - 1 }, (_, indice) =>
+      listarMaterias(pesquisa, incluirArquivadas, indice + 1, sinal, 100),
+    ),
+  )
+  return [
+    ...primeiraPagina.itens,
+    ...demaisPaginas.flatMap((pagina) => pagina.itens),
+  ]
+}
+
 export function obterMateria(identificador: string, sinal?: AbortSignal) {
   return requisitar<Materia>(`/v1/materias/${identificador}`, {
     signal: sinal,
@@ -128,15 +152,48 @@ export function listarTopicos(
   identificadorDaMateria: string,
   incluirArquivados = true,
   sinal?: AbortSignal,
+  pagina = 0,
+  tamanho = 100,
 ) {
   const parametros = new URLSearchParams({
     incluirArquivados: String(incluirArquivados),
-    tamanho: '100',
+    pagina: String(pagina),
+    tamanho: String(tamanho),
   })
   return requisitar<RespostaPaginada<Topico>>(
     `/v1/materias/${identificadorDaMateria}/topicos?${parametros}`,
     { signal: sinal },
   )
+}
+
+export async function listarTodosOsTopicos(
+  identificadorDaMateria: string,
+  incluirArquivados = true,
+  sinal?: AbortSignal,
+) {
+  const primeiraPagina = await listarTopicos(
+    identificadorDaMateria,
+    incluirArquivados,
+    sinal,
+    0,
+    100,
+  )
+  if (primeiraPagina.totalDePaginas <= 1) return primeiraPagina.itens
+  const demaisPaginas = await Promise.all(
+    Array.from({ length: primeiraPagina.totalDePaginas - 1 }, (_, indice) =>
+      listarTopicos(
+        identificadorDaMateria,
+        incluirArquivados,
+        sinal,
+        indice + 1,
+        100,
+      ),
+    ),
+  )
+  return [
+    ...primeiraPagina.itens,
+    ...demaisPaginas.flatMap((pagina) => pagina.itens),
+  ]
 }
 
 export function criarTopico(

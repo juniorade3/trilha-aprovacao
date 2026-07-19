@@ -60,6 +60,11 @@ describe('protegerRotas', () => {
     expect(roteador.resolve('/materiais/material-1').matched).not.toHaveLength(
       0,
     )
-    expect(roteador.resolve('/estudos/novo').matched).not.toHaveLength(0)
+    const rotaDeNovoEstudo = roteador.resolve('/estudos/novo')
+    expect(rotaDeNovoEstudo.matched).not.toHaveLength(0)
+    expect(
+      rotaDeNovoEstudo.matched[rotaDeNovoEstudo.matched.length - 1]?.props
+        .default,
+    ).toEqual({ abrirRegistroRapidoAoEntrar: true })
   })
 })

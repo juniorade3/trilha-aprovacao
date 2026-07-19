@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
+import RegistroRapidoDeEstudo from '@/modulos/estudos/RegistroRapidoDeEstudo.vue'
 
 const sessao = usarSessao()
 const roteador = useRouter()
 const menuAberto = ref(false)
+const registroRapidoAberto = ref(false)
+const aviso = ref('')
+let temporizadorDoAviso: number | undefined
 
 function fecharMenu() {
   menuAberto.value = false
@@ -21,72 +25,128 @@ async function sair() {
     await roteador.push('/login')
   }
 }
+
+function estudoRegistrado() {
+  registroRapidoAberto.value = false
+  aviso.value = 'Estudo registrado. Seu progresso foi atualizado.'
+  window.dispatchEvent(new CustomEvent('estudo-registrado'))
+  window.clearTimeout(temporizadorDoAviso)
+  temporizadorDoAviso = window.setTimeout(() => {
+    aviso.value = ''
+  }, 3500)
+}
+
+function abrirRegistroRapido() {
+  registroRapidoAberto.value = true
+}
+
+onMounted(() => {
+  window.addEventListener('abrir-registro-rapido', abrirRegistroRapido)
+})
+
+onBeforeUnmount(() => {
+  window.clearTimeout(temporizadorDoAviso)
+  window.removeEventListener('abrir-registro-rapido', abrirRegistroRapido)
+})
 </script>
 
 <template>
-  <div class="min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-dark barra-principal">
-      <div class="container">
+  <div class="aplicacao-autenticada">
+    <header class="topo-da-aplicacao">
+      <div class="topo-da-aplicacao-interno">
         <RouterLink
-          class="navbar-brand marca-da-aplicacao"
+          class="marca-da-aplicacao"
           to="/dashboard"
           @click="fecharMenu"
         >
-          <span class="simbolo-da-marca" aria-hidden="true">
-            <i class="bi bi-check2"></i>
-          </span>
+          <svg class="simbolo-da-marca" viewBox="0 0 48 36" aria-hidden="true">
+            <path d="M4 28 14 19l7 5L34 8" />
+            <path d="M8 10c5 3 9 3 13-1M27 28c6 0 11-3 17-9" />
+          </svg>
           <span>Trilha da Aprovação</span>
         </RouterLink>
+
+        <nav class="navegacao-principal" aria-label="Navegação principal">
+          <RouterLink to="/dashboard">Visão geral</RouterLink>
+          <RouterLink to="/concursos">Meu concurso</RouterLink>
+          <RouterLink to="/materias">Conteúdos</RouterLink>
+          <RouterLink to="/materiais">Materiais</RouterLink>
+          <RouterLink to="/estudos">Histórico</RouterLink>
+        </nav>
+
         <button
-          class="navbar-toggler border-0"
+          class="acao-global-de-estudo"
           type="button"
-          aria-controls="navegacao-principal"
-          :aria-expanded="menuAberto"
-          aria-label="Alternar navegação"
-          @click="menuAberto = !menuAberto"
+          @click="registroRapidoAberto = true"
         >
-          <span class="navbar-toggler-icon"></span>
+          <i class="bi bi-pencil-square" aria-hidden="true"></i>
+          Registrar estudo
         </button>
-        <div
-          id="navegacao-principal"
-          class="collapse navbar-collapse"
-          :class="{ show: menuAberto }"
-        >
-          <div class="navbar-nav navegacao-do-produto mx-lg-auto">
-            <RouterLink class="nav-link" to="/dashboard" @click="fecharMenu">
-              Painel
-            </RouterLink>
-            <RouterLink class="nav-link" to="/concursos" @click="fecharMenu">
-              Concursos
-            </RouterLink>
-            <RouterLink class="nav-link" to="/materias" @click="fecharMenu">
-              Matérias
-            </RouterLink>
-            <RouterLink class="nav-link" to="/materiais" @click="fecharMenu">
-              Materiais
-            </RouterLink>
-            <RouterLink class="nav-link" to="/estudos" @click="fecharMenu">
-              Estudos
-            </RouterLink>
-          </div>
-          <div class="usuario-da-navegacao">
-            <span class="avatar-do-usuario" aria-hidden="true">
-              {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
-            </span>
-            <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
-            <button
-              class="btn botao-sair"
-              type="button"
-              aria-label="Sair da conta"
-              title="Sair"
-              @click="sair"
-            >
-              <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
-            </button>
-          </div>
+
+        <div class="perfil-da-aplicacao">
+          <span class="avatar-do-usuario" aria-hidden="true">
+            {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
+          </span>
+          <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
+          <button
+            class="botao-de-icone"
+            type="button"
+            aria-label="Sair da conta"
+            title="Sair"
+            @click="sair"
+          >
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
-    </nav>
+    </header>
+
     <RouterView />
+
+    <nav class="navegacao-movel" aria-label="Navegação principal">
+      <RouterLink to="/dashboard">
+        <i class="bi bi-house" aria-hidden="true"></i>
+        <span>Visão</span>
+      </RouterLink>
+      <RouterLink to="/concursos">
+        <i class="bi bi-bullseye" aria-hidden="true"></i>
+        <span>Concurso</span>
+      </RouterLink>
+      <RouterLink to="/materias">
+        <i class="bi bi-book" aria-hidden="true"></i>
+        <span>Conteúdos</span>
+      </RouterLink>
+      <RouterLink to="/materiais">
+        <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+        <span>Materiais</span>
+      </RouterLink>
+      <RouterLink to="/estudos">
+        <i class="bi bi-clock-history" aria-hidden="true"></i>
+        <span>Histórico</span>
+      </RouterLink>
+    </nav>
+
+    <button
+      class="acao-flutuante-de-estudo"
+      type="button"
+      aria-label="Registrar estudo"
+      title="Registrar estudo"
+      @click="registroRapidoAberto = true"
+    >
+      <i class="bi bi-plus-lg" aria-hidden="true"></i>
+    </button>
+
+    <RegistroRapidoDeEstudo
+      v-if="registroRapidoAberto"
+      @fechar="registroRapidoAberto = false"
+      @registrado="estudoRegistrado"
+    />
+
+    <Transition name="aviso">
+      <div v-if="aviso" class="aviso-da-aplicacao" role="status">
+        <span><i class="bi bi-check2" aria-hidden="true"></i></span>
+        {{ aviso }}
+      </div>
+    </Transition>
   </div>
 </template>

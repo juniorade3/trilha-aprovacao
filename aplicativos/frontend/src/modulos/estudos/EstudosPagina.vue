@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-
 import {
-  listarMaterias,
-  listarTopicos,
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+} from 'vue'
+
+import BarraDeProgresso from '@/compartilhado/componentes/BarraDeProgresso.vue'
+import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
+import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
+import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import {
+  listarTodasAsMaterias,
+  listarTodosOsTopicos,
   type Materia,
   type Topico,
 } from '@/modulos/materias/apiDeConteudos'
@@ -11,13 +22,24 @@ import {
   cancelarEstudo,
   corrigirEstudo,
   listarCoberturas,
-  listarEstudos,
-  listarMateriaisDeEstudo,
+  listarTodosOsEstudos,
+  listarTodosOsMateriaisDeEstudo,
   registrarEstudo,
   type CoberturaDeTopico,
   type MaterialDeEstudo,
   type RegistroDeEstudo,
 } from './apiDeEstudos'
+
+const propriedades = withDefaults(
+  defineProps<{
+    abrirRegistroRapidoAoEntrar?: boolean
+  }>(),
+  {
+    abrirRegistroRapidoAoEntrar: false,
+  },
+)
+
+type PeriodoDoHistorico = 'TODOS' | 'SETE_DIAS' | 'TRINTA_DIAS'
 
 const registros = ref<RegistroDeEstudo[]>([])
 const materias = ref<Materia[]>([])
@@ -28,6 +50,8 @@ const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
 const identificadorEmCorrecao = ref<string>()
+const formularioAberto = ref(false)
+const periodoSelecionado = ref<PeriodoDoHistorico>('TODOS')
 const formulario = reactive({
   identificadorDaMateria: '',
   identificadorDoTopico: '',
@@ -58,10 +82,108 @@ const materiaisDoTopico = computed(() => {
   )
 })
 
-function dataHoraLocalAtual() {
+const registrosAtivos = computed(() =>
+  registros.value.filter((registro) => registro.situacao === 'ATIVO'),
+)
+
+const registrosFiltrados = computed(() => {
+  if (periodoSelecionado.value === 'TODOS') return registros.value
+
+  const quantidadeDeDias = periodoSelecionado.value === 'SETE_DIAS' ? 7 : 30
+  const inicioDoPeriodo = new Date()
+  inicioDoPeriodo.setHours(0, 0, 0, 0)
+  inicioDoPeriodo.setDate(inicioDoPeriodo.getDate() - quantidadeDeDias + 1)
+
+  return registros.value.filter(
+    (registro) => new Date(registro.dataHora) >= inicioDoPeriodo,
+  )
+})
+
+const registrosAgrupados = computed(() => {
+  const grupos = new Map<string, RegistroDeEstudo[]>()
+  for (const registro of registrosFiltrados.value) {
+    const chave = new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'full',
+    }).format(new Date(registro.dataHora))
+    grupos.set(chave, [...(grupos.get(chave) ?? []), registro])
+  }
+  return [...grupos.entries()]
+})
+
+const inicioDaSemana = computed(() => {
   const agora = new Date()
-  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
-  return agora.toISOString().slice(0, 16)
+  const dia = agora.getDay() || 7
+  const inicio = new Date(agora)
+  inicio.setHours(0, 0, 0, 0)
+  inicio.setDate(agora.getDate() - dia + 1)
+  return inicio
+})
+
+const registrosDaSemana = computed(() =>
+  registrosAtivos.value.filter(
+    (registro) => new Date(registro.dataHora) >= inicioDaSemana.value,
+  ),
+)
+
+const minutosDaSemana = computed(() =>
+  registrosDaSemana.value.reduce(
+    (total, registro) => total + registro.duracaoEmMinutos,
+    0,
+  ),
+)
+
+const diasComEstudo = computed(
+  () =>
+    new Set(
+      registrosDaSemana.value.map((registro) =>
+        new Date(registro.dataHora).toDateString(),
+      ),
+    ).size,
+)
+
+const materiasDaSemana = computed(
+  () =>
+    new Set(
+      registrosDaSemana.value
+        .map((registro) =>
+          topicos.value.find(
+            (topico) => topico.identificador === registro.identificadorDoTopico,
+          ),
+        )
+        .map((topico) => topico?.identificadorDaMateria)
+        .filter(Boolean),
+    ).size,
+)
+
+const ritmoDaSemana = computed(() =>
+  Array.from({ length: 7 }, (_, indice) => {
+    const data = new Date(inicioDaSemana.value)
+    data.setDate(data.getDate() + indice)
+    const minutos = registrosDaSemana.value
+      .filter(
+        (registro) =>
+          new Date(registro.dataHora).toDateString() === data.toDateString(),
+      )
+      .reduce((total, registro) => total + registro.duracaoEmMinutos, 0)
+    return {
+      dia: ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'][indice],
+      minutos,
+    }
+  }),
+)
+
+const maiorRitmo = computed(() =>
+  Math.max(...ritmoDaSemana.value.map((dia) => dia.minutos), 1),
+)
+
+function dataHoraLocalAtual() {
+  return dataHoraParaCampoLocal(new Date().toISOString())
+}
+
+function dataHoraParaCampoLocal(dataHora: string) {
+  const data = new Date(dataHora)
+  data.setMinutes(data.getMinutes() - data.getTimezoneOffset())
+  return data.toISOString().slice(0, 16)
 }
 
 async function carregar() {
@@ -71,21 +193,21 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const [respostaDeEstudos, respostaDeMaterias, respostaDeMateriais] =
+    const [estudosObtidos, materiasObtidas, materiaisObtidos] =
       await Promise.all([
-        listarEstudos(requisicao.signal),
-        listarMaterias('', false, 0, requisicao.signal, 100),
-        listarMateriaisDeEstudo('', false, requisicao.signal),
+        listarTodosOsEstudos(requisicao.signal),
+        listarTodasAsMaterias('', false, requisicao.signal),
+        listarTodosOsMateriaisDeEstudo('', false, requisicao.signal),
       ])
-    registros.value = respostaDeEstudos.itens
-    materias.value = respostaDeMaterias.itens
-    materiais.value = respostaDeMateriais.itens
+    registros.value = estudosObtidos
+    materias.value = materiasObtidas
+    materiais.value = materiaisObtidos
     const respostasDeTopicos = await Promise.all(
       materias.value.map((materia) =>
-        listarTopicos(materia.identificador, false, requisicao.signal),
+        listarTodosOsTopicos(materia.identificador, false, requisicao.signal),
       ),
     )
-    topicos.value = respostasDeTopicos.flatMap((resposta) => resposta.itens)
+    topicos.value = respostasDeTopicos.flat()
     const respostasDeCoberturas = await Promise.all(
       materiais.value.map((material) =>
         listarCoberturas(material.identificador, requisicao.signal),
@@ -97,7 +219,7 @@ async function carregar() {
     erro.value =
       causa instanceof Error
         ? causa.message
-        : 'Nao foi possivel carregar os estudos.'
+        : 'Não foi possível carregar os estudos.'
   } finally {
     if (cancelamento === requisicao) carregando.value = false
   }
@@ -144,10 +266,11 @@ async function salvar() {
       await registrarEstudo(dadosDoFormulario())
     }
     limparFormulario()
+    formularioAberto.value = false
     await carregar()
   } catch (causa) {
     erro.value =
-      causa instanceof Error ? causa.message : 'Nao foi possivel salvar.'
+      causa instanceof Error ? causa.message : 'Não foi possível salvar.'
   } finally {
     salvando.value = false
   }
@@ -162,13 +285,11 @@ function corrigir(registro: RegistroDeEstudo) {
     identificadorDaMateria: topico?.identificadorDaMateria ?? '',
     identificadorDoTopico: registro.identificadorDoTopico,
     identificadorDoMaterial: registro.identificadorDoMaterial ?? '',
-    dataHora: registro.dataHora.slice(0, 16),
+    dataHora: dataHoraParaCampoLocal(registro.dataHora),
     duracaoEmMinutos: registro.duracaoEmMinutos,
     observacao: registro.observacao ?? '',
   })
-  document
-    .querySelector('#formulario-estudo')
-    ?.scrollIntoView({ behavior: 'smooth' })
+  formularioAberto.value = true
 }
 
 async function cancelar(registro: RegistroDeEstudo) {
@@ -179,128 +300,286 @@ async function cancelar(registro: RegistroDeEstudo) {
     await carregar()
   } catch (causa) {
     erro.value =
-      causa instanceof Error ? causa.message : 'Nao foi possivel cancelar.'
+      causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
   }
 }
 
-function formatarData(dataHora: string) {
+function formatarHora(dataHora: string) {
   return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(dataHora))
 }
 
-onMounted(() => carregar())
-onBeforeUnmount(() => cancelamento?.abort())
+function formatarTempo(minutos: number) {
+  const horas = Math.floor(minutos / 60)
+  const restante = minutos % 60
+  if (!horas) return `${restante}min`
+  return `${horas}h${restante ? ` ${restante}min` : ''}`
+}
+
+function nomeDaMateria(registro: RegistroDeEstudo) {
+  const topico = topicos.value.find(
+    (item) => item.identificador === registro.identificadorDoTopico,
+  )
+  return (
+    materias.value.find(
+      (materia) => materia.identificador === topico?.identificadorDaMateria,
+    )?.nome ?? 'Matéria não encontrada'
+  )
+}
+
+function rotuloDaSituacao(registro: RegistroDeEstudo) {
+  const rotulos: Record<RegistroDeEstudo['situacao'], string> = {
+    ATIVO: 'Ativo',
+    CORRIGIDO: 'Corrigido',
+    CANCELADO: 'Cancelado',
+  }
+  return rotulos[registro.situacao]
+}
+
+function abrirRegistroRapido() {
+  window.dispatchEvent(new CustomEvent('abrir-registro-rapido'))
+}
+
+onMounted(async () => {
+  void carregar()
+  window.addEventListener('estudo-registrado', carregar)
+  if (propriedades.abrirRegistroRapidoAoEntrar) {
+    await nextTick()
+    abrirRegistroRapido()
+  }
+})
+onBeforeUnmount(() => {
+  cancelamento?.abort()
+  window.removeEventListener('estudo-registrado', carregar)
+})
 </script>
 
 <template>
-  <main class="container py-4 py-md-5">
-    <header class="mb-4">
-      <p class="text-uppercase fw-semibold text-success mb-1">
-        Historico confiavel
-      </p>
-      <h1 class="mb-1">Estudos</h1>
-      <p class="text-secondary mb-0">
-        Registre o tempo dedicado a cada topico e corrija sem perder o
-        historico.
-      </p>
-    </header>
+  <main class="pagina-da-jornada pagina-do-historico">
+    <CabecalhoDaPagina
+      etiqueta="Evidências da sua caminhada"
+      titulo="Histórico de estudos"
+      descricao="Consulte o que foi estudado, corrija registros e acompanhe sua constância sem perder a rastreabilidade."
+    >
+      <template #acoes>
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="abrirRegistroRapido"
+        >
+          <i class="bi bi-pencil-square me-2" aria-hidden="true"></i>
+          Registrar estudo
+        </button>
+      </template>
+    </CabecalhoDaPagina>
 
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
 
-    <div class="row g-4">
-      <section class="col-xl-8" aria-labelledby="titulo-historico">
-        <h2 id="titulo-historico" class="h4 mb-3">Historico de estudos</h2>
-        <div
-          v-if="carregando"
-          class="card card-body border-0 shadow-sm text-center py-5"
-        >
-          Carregando estudos...
+    <section class="resumo-do-historico" aria-label="Resumo da semana">
+      <article class="card">
+        <span class="mini-icone-da-jornada">
+          <i class="bi bi-clock" aria-hidden="true"></i>
+        </span>
+        <div>
+          <strong>{{ formatarTempo(minutosDaSemana) }}</strong>
+          <small>nesta semana</small>
         </div>
-        <div
-          v-else-if="registros.length === 0"
-          class="card card-body border-0 shadow-sm text-center py-5"
-        >
-          <h3 class="h4">Nenhum estudo registrado</h3>
-          <p class="text-secondary mb-0">
-            Use o formulario para registrar sua sessao.
-          </p>
+      </article>
+      <article class="card">
+        <span class="mini-icone-da-jornada">
+          <i class="bi bi-calendar-check" aria-hidden="true"></i>
+        </span>
+        <div>
+          <strong>
+            {{ diasComEstudo }} {{ diasComEstudo === 1 ? 'dia' : 'dias' }}
+          </strong>
+          <small>com estudo na semana</small>
         </div>
-        <div v-else class="vstack gap-3">
-          <article
-            v-for="registro in registros"
-            :key="registro.identificador"
-            class="card border-0 shadow-sm"
+      </article>
+      <article class="card">
+        <span class="mini-icone-da-jornada">
+          <i class="bi bi-book" aria-hidden="true"></i>
+        </span>
+        <div>
+          <strong>
+            {{ materiasDaSemana }}
+            {{ materiasDaSemana === 1 ? 'matéria' : 'matérias' }}
+          </strong>
+          <small>estudadas na semana</small>
+        </div>
+      </article>
+    </section>
+
+    <div class="estrutura-do-historico">
+      <section
+        class="card linha-do-tempo-de-estudos"
+        aria-labelledby="titulo-historico"
+      >
+        <header class="cabecalho-do-cartao-da-jornada">
+          <div>
+            <span class="rotulo-discreto">Registros preservados</span>
+            <h2 id="titulo-historico">Atividade recente</h2>
+          </div>
+          <span class="badge text-bg-light">
+            {{ registrosFiltrados.length }}
+            {{ registrosFiltrados.length === 1 ? 'registro' : 'registros' }}
+          </span>
+        </header>
+
+        <div
+          class="btn-group align-self-start mb-3"
+          role="group"
+          aria-label="Filtrar histórico por período"
+        >
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            :class="{ active: periodoSelecionado === 'TODOS' }"
+            type="button"
+            :aria-pressed="periodoSelecionado === 'TODOS'"
+            @click="periodoSelecionado = 'TODOS'"
           >
-            <div
-              class="card-body d-flex flex-wrap justify-content-between gap-3"
-            >
-              <div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <h3 class="h5 mb-0">{{ registro.nomeDoTopico }}</h3>
-                  <span
-                    class="badge"
-                    :class="
-                      registro.situacao === 'ATIVO'
-                        ? 'text-bg-success'
-                        : 'text-bg-secondary'
-                    "
-                  >
-                    {{ registro.situacao }}
-                  </span>
-                </div>
-                <p class="mb-1 mt-2">
-                  {{ formatarData(registro.dataHora) }} ·
-                  {{ registro.duracaoEmMinutos }} minutos
-                </p>
-                <p v-if="registro.tituloDoMaterial" class="text-secondary mb-1">
-                  Material: {{ registro.tituloDoMaterial }}
-                </p>
-                <p v-if="registro.observacao" class="text-secondary mb-0">
-                  {{ registro.observacao }}
-                </p>
-              </div>
-              <div
-                v-if="registro.situacao === 'ATIVO'"
-                class="d-flex gap-2 align-self-start"
-              >
-                <button
-                  class="btn btn-outline-primary btn-sm"
-                  type="button"
-                  @click="corrigir(registro)"
-                >
-                  Corrigir
-                </button>
-                <button
-                  class="btn btn-outline-danger btn-sm"
-                  type="button"
-                  @click="cancelar(registro)"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </article>
+            Todos
+          </button>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            :class="{ active: periodoSelecionado === 'SETE_DIAS' }"
+            type="button"
+            :aria-pressed="periodoSelecionado === 'SETE_DIAS'"
+            @click="periodoSelecionado = 'SETE_DIAS'"
+          >
+            7 dias
+          </button>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            :class="{ active: periodoSelecionado === 'TRINTA_DIAS' }"
+            type="button"
+            :aria-pressed="periodoSelecionado === 'TRINTA_DIAS'"
+            @click="periodoSelecionado = 'TRINTA_DIAS'"
+          >
+            30 dias
+          </button>
         </div>
+
+        <EstadoDaPagina
+          v-if="carregando"
+          titulo="Carregando estudos..."
+          carregando
+        />
+        <EstadoDaPagina
+          v-else-if="registrosFiltrados.length === 0"
+          titulo="Nenhum estudo neste período"
+          descricao="Escolha outro período ou use a ação Registrar estudo para adicionar uma atividade."
+          icone="bi-clock-history"
+        />
+        <template v-else>
+          <section
+            v-for="[data, registrosDoDia] in registrosAgrupados"
+            :key="data"
+            class="grupo-da-linha-do-tempo"
+          >
+            <h3>{{ data }}</h3>
+            <article
+              v-for="registro in registrosDoDia"
+              :key="registro.identificador"
+              class="registro-na-linha-do-tempo"
+            >
+              <time>{{ formatarHora(registro.dataHora) }}</time>
+              <span class="marcador-do-registro"></span>
+              <div>
+                <span class="etiqueta-da-materia-no-historico">
+                  {{ nomeDaMateria(registro) }}
+                </span>
+                <h4>{{ registro.nomeDoTopico }}</h4>
+                <small>
+                  {{ registro.tituloDoMaterial || 'Sem material' }}
+                  <span v-if="registro.observacao">
+                    · {{ registro.observacao }}
+                  </span>
+                </small>
+              </div>
+              <b>{{ formatarTempo(registro.duracaoEmMinutos) }}</b>
+              <span
+                v-if="registro.situacao !== 'ATIVO'"
+                class="badge text-bg-secondary"
+              >
+                {{ rotuloDaSituacao(registro) }}
+              </span>
+              <details v-else class="acoes-do-registro">
+                <summary class="botao-de-icone" aria-label="Ações do registro">
+                  <i class="bi bi-three-dots" aria-hidden="true"></i>
+                </summary>
+                <div>
+                  <button type="button" @click="corrigir(registro)">
+                    Corrigir
+                  </button>
+                  <button
+                    class="text-danger"
+                    type="button"
+                    @click="cancelar(registro)"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </details>
+            </article>
+          </section>
+        </template>
       </section>
 
-      <aside class="col-xl-4">
-        <form
-          id="formulario-estudo"
-          class="card card-body border-0 shadow-sm position-sticky formulario-lateral"
-          @submit.prevent="salvar"
-        >
-          <h2 class="h4">
-            {{
-              identificadorEmCorrecao ? 'Corrigir estudo' : 'Registrar estudo'
-            }}
-          </h2>
-          <label class="form-label" for="materia-estudo">Materia</label>
+      <aside class="card ritmo-real-da-semana">
+        <span class="rotulo-discreto">Ritmo da semana</span>
+        <h2 class="titulo-editorial">Consistência</h2>
+        <div class="grafico-do-ritmo" aria-label="Minutos por dia da semana">
+          <div v-for="(dia, indice) in ritmoDaSemana" :key="indice">
+            <span>
+              <i
+                :style="{
+                  height: `${Math.round((dia.minutos / maiorRitmo) * 100)}%`,
+                }"
+              ></i>
+            </span>
+            <b>{{ dia.dia }}</b>
+            <small>{{ dia.minutos || '' }}</small>
+          </div>
+        </div>
+        <div class="resumo-do-ritmo">
+          <span>
+            <b>{{ formatarTempo(minutosDaSemana) }}</b>
+            <small>tempo registrado</small>
+          </span>
+          <strong>{{ diasComEstudo }}/7</strong>
+        </div>
+        <BarraDeProgresso
+          :valor="Math.round((diasComEstudo / 7) * 100)"
+          rotulo="Dias com estudo nesta semana"
+        />
+        <p>
+          O gráfico usa somente registros ativos da semana atual. Correções e
+          cancelamentos permanecem visíveis na linha do tempo.
+        </p>
+      </aside>
+    </div>
+
+    <ModalDaAplicacao
+      v-if="formularioAberto"
+      etiqueta="Correção rastreável"
+      titulo="Corrigir estudo"
+      descricao="O registro original será preservado no histórico."
+      @fechar="formularioAberto = false"
+    >
+      <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
+      <form
+        id="formulario-estudo"
+        class="formulario-da-aplicacao"
+        @submit.prevent="salvar"
+      >
+        <label>
+          <span>Matéria</span>
           <select
             id="materia-estudo"
             v-model="formulario.identificadorDaMateria"
-            class="form-select mb-3"
             required
             @change="ajustarTopico"
           >
@@ -313,11 +592,12 @@ onBeforeUnmount(() => cancelamento?.abort())
               {{ materia.nome }}
             </option>
           </select>
-          <label class="form-label" for="topico-estudo">Topico</label>
+        </label>
+        <label>
+          <span>Tópico</span>
           <select
             id="topico-estudo"
             v-model="formulario.identificadorDoTopico"
-            class="form-select mb-3"
             required
             @change="ajustarMaterial"
           >
@@ -330,13 +610,12 @@ onBeforeUnmount(() => cancelamento?.abort())
               {{ topico.nome }}
             </option>
           </select>
-          <label class="form-label" for="material-estudo"
-            >Material (opcional)</label
-          >
+        </label>
+        <label>
+          <span>Material <em>opcional</em></span>
           <select
             id="material-estudo"
             v-model="formulario.identificadorDoMaterial"
-            class="form-select mb-3"
           >
             <option value="">Sem material</option>
             <option
@@ -347,52 +626,41 @@ onBeforeUnmount(() => cancelamento?.abort())
               {{ material.titulo }}
             </option>
           </select>
-          <label class="form-label" for="data-estudo">Data e hora</label>
-          <input
-            id="data-estudo"
-            v-model="formulario.dataHora"
-            class="form-control mb-3"
-            type="datetime-local"
-            required
-          />
-          <label class="form-label" for="duracao-estudo"
-            >Duracao (minutos)</label
-          >
-          <input
-            id="duracao-estudo"
-            v-model.number="formulario.duracaoEmMinutos"
-            class="form-control mb-3"
-            type="number"
-            min="1"
-            max="1440"
-            required
-          />
-          <label class="form-label" for="observacao-estudo">Observacao</label>
+        </label>
+        <div class="duas-colunas-do-formulario">
+          <label>
+            <span>Data e hora</span>
+            <input
+              id="data-estudo"
+              v-model="formulario.dataHora"
+              type="datetime-local"
+              required
+            />
+          </label>
+          <label>
+            <span>Duração em minutos</span>
+            <input
+              id="duracao-estudo"
+              v-model.number="formulario.duracaoEmMinutos"
+              type="number"
+              min="1"
+              max="1440"
+              required
+            />
+          </label>
+        </div>
+        <label>
+          <span>Observação <em>opcional</em></span>
           <textarea
             id="observacao-estudo"
             v-model="formulario.observacao"
-            class="form-control mb-3"
             rows="3"
           ></textarea>
-          <div class="d-flex gap-2">
-            <button
-              class="btn btn-primary flex-grow-1"
-              type="submit"
-              :disabled="salvando"
-            >
-              {{ salvando ? 'Salvando...' : 'Salvar' }}
-            </button>
-            <button
-              v-if="identificadorEmCorrecao"
-              class="btn btn-outline-secondary"
-              type="button"
-              @click="limparFormulario"
-            >
-              Desistir
-            </button>
-          </div>
-        </form>
-      </aside>
-    </div>
+        </label>
+        <button class="btn btn-primary" :disabled="salvando">
+          {{ salvando ? 'Salvando...' : 'Salvar correção' }}
+        </button>
+      </form>
+    </ModalDaAplicacao>
   </main>
 </template>

@@ -63,17 +63,49 @@ export function listarMateriaisDeEstudo(
   pesquisa = '',
   incluirArquivados = false,
   sinal?: AbortSignal,
+  pagina = 0,
+  tamanho = 100,
 ) {
   const parametros = new URLSearchParams({
     pesquisa,
     incluirArquivados: String(incluirArquivados),
-    pagina: '0',
-    tamanho: '100',
+    pagina: String(pagina),
+    tamanho: String(tamanho),
   })
   return requisitar<RespostaPaginada<MaterialDeEstudo>>(
     `/v1/materiais?${parametros}`,
     { signal: sinal },
   )
+}
+
+export async function listarTodosOsMateriaisDeEstudo(
+  pesquisa = '',
+  incluirArquivados = false,
+  sinal?: AbortSignal,
+) {
+  const primeiraPagina = await listarMateriaisDeEstudo(
+    pesquisa,
+    incluirArquivados,
+    sinal,
+    0,
+    100,
+  )
+  if (primeiraPagina.totalDePaginas <= 1) return primeiraPagina.itens
+  const demaisPaginas = await Promise.all(
+    Array.from({ length: primeiraPagina.totalDePaginas - 1 }, (_, indice) =>
+      listarMateriaisDeEstudo(
+        pesquisa,
+        incluirArquivados,
+        sinal,
+        indice + 1,
+        100,
+      ),
+    ),
+  )
+  return [
+    ...primeiraPagina.itens,
+    ...demaisPaginas.flatMap((pagina) => pagina.itens),
+  ]
 }
 
 export function criarMaterialDeEstudo(dados: DadosDeMaterial) {
@@ -145,11 +177,25 @@ export function removerCobertura(
   )
 }
 
-export function listarEstudos(sinal?: AbortSignal) {
+export function listarEstudos(sinal?: AbortSignal, pagina = 0, tamanho = 100) {
   return requisitar<RespostaPaginada<RegistroDeEstudo>>(
-    '/v1/estudos?pagina=0&tamanho=100',
+    `/v1/estudos?pagina=${pagina}&tamanho=${tamanho}`,
     { signal: sinal },
   )
+}
+
+export async function listarTodosOsEstudos(sinal?: AbortSignal) {
+  const primeiraPagina = await listarEstudos(sinal, 0, 100)
+  if (primeiraPagina.totalDePaginas <= 1) return primeiraPagina.itens
+  const demaisPaginas = await Promise.all(
+    Array.from({ length: primeiraPagina.totalDePaginas - 1 }, (_, indice) =>
+      listarEstudos(sinal, indice + 1, 100),
+    ),
+  )
+  return [
+    ...primeiraPagina.itens,
+    ...demaisPaginas.flatMap((pagina) => pagina.itens),
+  ]
 }
 
 export function registrarEstudo(dados: DadosDeRegistroDeEstudo) {

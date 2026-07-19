@@ -1,0 +1,285 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+
+import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import {
+  listarTodasAsMaterias,
+  listarTodosOsTopicos,
+  type Materia,
+  type Topico,
+} from '@/modulos/materias/apiDeConteudos'
+import {
+  listarCoberturas,
+  listarTodosOsMateriaisDeEstudo,
+  registrarEstudo,
+  type CoberturaDeTopico,
+  type MaterialDeEstudo,
+} from './apiDeEstudos'
+
+const emitir = defineEmits<{
+  fechar: []
+  registrado: []
+}>()
+
+const materias = ref<Materia[]>([])
+const topicos = ref<Topico[]>([])
+const materiais = ref<MaterialDeEstudo[]>([])
+const coberturas = ref<CoberturaDeTopico[]>([])
+const carregando = ref(true)
+const salvando = ref(false)
+const erro = ref('')
+const cancelamento = new AbortController()
+const duracoesRapidas = [30, 50, 60, 90]
+
+const formulario = reactive({
+  identificadorDaMateria: '',
+  identificadorDoTopico: '',
+  identificadorDoMaterial: '',
+  dataHora: dataHoraLocalAtual(),
+  duracaoEmMinutos: 50,
+  observacao: '',
+})
+
+const topicosDaMateria = computed(() =>
+  topicos.value.filter(
+    (topico) =>
+      topico.identificadorDaMateria === formulario.identificadorDaMateria,
+  ),
+)
+
+const materiaisDoTopico = computed(() => {
+  const identificadores = new Set(
+    coberturas.value
+      .filter(
+        (cobertura) =>
+          cobertura.identificadorDoTopico === formulario.identificadorDoTopico,
+      )
+      .map((cobertura) => cobertura.identificadorDoMaterial),
+  )
+  return materiais.value.filter((material) =>
+    identificadores.has(material.identificador),
+  )
+})
+
+function dataHoraLocalAtual() {
+  const agora = new Date()
+  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
+  return agora.toISOString().slice(0, 16)
+}
+
+async function carregar() {
+  carregando.value = true
+  erro.value = ''
+  try {
+    const [materiasObtidas, materiaisObtidos] = await Promise.all([
+      listarTodasAsMaterias('', false, cancelamento.signal),
+      listarTodosOsMateriaisDeEstudo('', false, cancelamento.signal),
+    ])
+    materias.value = materiasObtidas
+    materiais.value = materiaisObtidos
+    const [respostasDeTopicos, respostasDeCoberturas] = await Promise.all([
+      Promise.all(
+        materias.value.map((materia) =>
+          listarTodosOsTopicos(
+            materia.identificador,
+            false,
+            cancelamento.signal,
+          ),
+        ),
+      ),
+      Promise.all(
+        materiais.value.map((material) =>
+          listarCoberturas(material.identificador, cancelamento.signal),
+        ),
+      ),
+    ])
+    topicos.value = respostasDeTopicos.flat()
+    coberturas.value = respostasDeCoberturas.flat()
+  } catch (causa) {
+    if (causa instanceof DOMException && causa.name === 'AbortError') return
+    erro.value =
+      causa instanceof Error
+        ? causa.message
+        : 'Não foi possível preparar o registro.'
+  } finally {
+    carregando.value = false
+  }
+}
+
+function ajustarTopico() {
+  formulario.identificadorDoTopico = ''
+  formulario.identificadorDoMaterial = ''
+}
+
+function ajustarMaterial() {
+  formulario.identificadorDoMaterial = ''
+}
+
+async function salvar() {
+  salvando.value = true
+  erro.value = ''
+  try {
+    await registrarEstudo({
+      identificadorDoTopico: formulario.identificadorDoTopico,
+      identificadorDoMaterial: formulario.identificadorDoMaterial || undefined,
+      dataHora: new Date(formulario.dataHora).toISOString(),
+      duracaoEmMinutos: formulario.duracaoEmMinutos,
+      observacao: formulario.observacao || undefined,
+    })
+    emitir('registrado')
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error
+        ? causa.message
+        : 'Não foi possível registrar o estudo.'
+  } finally {
+    salvando.value = false
+  }
+}
+
+onMounted(() => carregar())
+onBeforeUnmount(() => cancelamento.abort())
+</script>
+
+<template>
+  <ModalDaAplicacao
+    etiqueta="Registro rápido"
+    titulo="Registrar estudo"
+    descricao="Guarde o fato estudado. O progresso dos concursos será atualizado automaticamente."
+    @fechar="emitir('fechar')"
+  >
+    <div v-if="carregando" class="estado-do-modal" aria-live="polite">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      Preparando seu catálogo...
+    </div>
+
+    <form v-else id="registro-rapido-de-estudo" @submit.prevent="salvar">
+      <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
+      <div v-if="materias.length === 0" class="nota-contextual">
+        <i class="bi bi-journal-plus" aria-hidden="true"></i>
+        <p>
+          <strong>Cadastre uma matéria e um tópico primeiro.</strong>
+          <span>O estudo precisa apontar para um tópico do seu catálogo.</span>
+        </p>
+      </div>
+      <div class="formulario-da-aplicacao">
+        <label>
+          <span>Matéria</span>
+          <select
+            v-model="formulario.identificadorDaMateria"
+            required
+            @change="ajustarTopico"
+          >
+            <option value="" disabled>Selecione a matéria</option>
+            <option
+              v-for="materia in materias"
+              :key="materia.identificador"
+              :value="materia.identificador"
+            >
+              {{ materia.nome }}
+            </option>
+          </select>
+        </label>
+        <label>
+          <span>Tópico estudado</span>
+          <select
+            v-model="formulario.identificadorDoTopico"
+            :disabled="!formulario.identificadorDaMateria"
+            required
+            @change="ajustarMaterial"
+          >
+            <option value="" disabled>Selecione o tópico</option>
+            <option
+              v-for="topico in topicosDaMateria"
+              :key="topico.identificador"
+              :value="topico.identificador"
+            >
+              {{ topico.nome }}
+            </option>
+          </select>
+        </label>
+        <label>
+          <span>Material utilizado <em>opcional</em></span>
+          <select
+            v-model="formulario.identificadorDoMaterial"
+            :disabled="!formulario.identificadorDoTopico"
+          >
+            <option value="">Sem material</option>
+            <option
+              v-for="material in materiaisDoTopico"
+              :key="material.identificador"
+              :value="material.identificador"
+            >
+              {{ material.titulo }}
+            </option>
+          </select>
+        </label>
+        <div class="duas-colunas-do-formulario">
+          <label>
+            <span>Data e horário</span>
+            <input
+              v-model="formulario.dataHora"
+              type="datetime-local"
+              required
+            />
+          </label>
+          <label>
+            <span>Duração em minutos</span>
+            <input
+              v-model.number="formulario.duracaoEmMinutos"
+              type="number"
+              min="1"
+              max="1440"
+              required
+            />
+          </label>
+        </div>
+        <fieldset>
+          <legend>Duração rápida</legend>
+          <div class="duracoes-rapidas">
+            <button
+              v-for="duracao in duracoesRapidas"
+              :key="duracao"
+              class="botao-de-duracao"
+              :class="{
+                ativo: formulario.duracaoEmMinutos === duracao,
+              }"
+              :aria-pressed="formulario.duracaoEmMinutos === duracao"
+              type="button"
+              @click="formulario.duracaoEmMinutos = duracao"
+            >
+              {{ duracao }} min
+            </button>
+          </div>
+        </fieldset>
+        <label>
+          <span>Observação <em>opcional</em></span>
+          <textarea
+            v-model="formulario.observacao"
+            rows="3"
+            placeholder="O que você estudou ou precisa revisar depois?"
+          ></textarea>
+        </label>
+      </div>
+    </form>
+
+    <template #rodape>
+      <button
+        class="btn btn-link text-secondary text-decoration-none"
+        type="button"
+        @click="emitir('fechar')"
+      >
+        Cancelar
+      </button>
+      <button
+        class="btn btn-primary px-4"
+        type="submit"
+        form="registro-rapido-de-estudo"
+        :disabled="carregando || salvando || materias.length === 0"
+      >
+        <i class="bi bi-check2 me-2" aria-hidden="true"></i>
+        {{ salvando ? 'Salvando...' : 'Salvar estudo' }}
+      </button>
+    </template>
+  </ModalDaAplicacao>
+</template>

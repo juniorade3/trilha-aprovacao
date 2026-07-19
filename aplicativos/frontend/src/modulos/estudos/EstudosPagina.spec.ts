@@ -1,30 +1,30 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const chamadas = vi.hoisted(() => ({
   cancelarEstudo: vi.fn(),
   corrigirEstudo: vi.fn(),
   listarCoberturas: vi.fn(),
-  listarEstudos: vi.fn(),
-  listarMateriaisDeEstudo: vi.fn(),
+  listarTodosOsEstudos: vi.fn(),
+  listarTodosOsMateriaisDeEstudo: vi.fn(),
   registrarEstudo: vi.fn(),
-  listarMaterias: vi.fn(),
-  listarTopicos: vi.fn(),
+  listarTodasAsMaterias: vi.fn(),
+  listarTodosOsTopicos: vi.fn(),
 }))
 
 vi.mock('./apiDeEstudos', () => ({
   cancelarEstudo: chamadas.cancelarEstudo,
   corrigirEstudo: chamadas.corrigirEstudo,
   listarCoberturas: chamadas.listarCoberturas,
-  listarEstudos: chamadas.listarEstudos,
-  listarMateriaisDeEstudo: chamadas.listarMateriaisDeEstudo,
+  listarTodosOsEstudos: chamadas.listarTodosOsEstudos,
+  listarTodosOsMateriaisDeEstudo: chamadas.listarTodosOsMateriaisDeEstudo,
   registrarEstudo: chamadas.registrarEstudo,
 }))
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
-  listarMaterias: chamadas.listarMaterias,
-  listarTopicos: chamadas.listarTopicos,
+  listarTodasAsMaterias: chamadas.listarTodasAsMaterias,
+  listarTodosOsTopicos: chamadas.listarTodosOsTopicos,
 }))
 
 import EstudosPagina from './EstudosPagina.vue'
@@ -61,23 +61,13 @@ const material = {
   arquivado: false,
 }
 
-function resposta(itens: unknown[]) {
-  return {
-    itens,
-    pagina: 0,
-    tamanho: 100,
-    totalDeItens: itens.length,
-    totalDePaginas: 1,
-  }
-}
-
 describe('EstudosPagina', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    chamadas.listarEstudos.mockResolvedValue(resposta([registro]))
-    chamadas.listarMaterias.mockResolvedValue(resposta([materia]))
-    chamadas.listarMateriaisDeEstudo.mockResolvedValue(resposta([material]))
-    chamadas.listarTopicos.mockResolvedValue(resposta([topico]))
+    chamadas.listarTodosOsEstudos.mockResolvedValue([registro])
+    chamadas.listarTodasAsMaterias.mockResolvedValue([materia])
+    chamadas.listarTodosOsMateriaisDeEstudo.mockResolvedValue([material])
+    chamadas.listarTodosOsTopicos.mockResolvedValue([topico])
     chamadas.listarCoberturas.mockResolvedValue([
       {
         identificador: 'cobertura-1',
@@ -94,29 +84,98 @@ describe('EstudosPagina', () => {
     })
   })
 
-  it('registra um estudo usando apenas material que cobre o topico', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('apresenta a linha do tempo e abre o registro rapido global', async () => {
+    const despachar = vi.spyOn(window, 'dispatchEvent')
     const pagina = mount(EstudosPagina)
     await flushPromises()
 
-    await pagina.get('#materia-estudo').setValue('materia-1')
-    await pagina.get('#topico-estudo').setValue('topico-1')
-    await pagina.get('#material-estudo').setValue('material-1')
-    await pagina.get('#duracao-estudo').setValue(90)
-    await pagina.get('#formulario-estudo').trigger('submit')
+    expect(pagina.text()).toContain('Direitos fundamentais')
+    expect(pagina.text()).toContain('Curso de Constitucional')
+    expect(pagina.text()).toContain('45min')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Registrar estudo'))!
+      .trigger('click')
+
+    expect(despachar).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'abrir-registro-rapido' }),
+    )
+  })
+
+  it('abre o registro rapido global ao entrar pela rota de novo estudo', async () => {
+    const despachar = vi.spyOn(window, 'dispatchEvent')
+
+    mount(EstudosPagina, {
+      props: { abrirRegistroRapidoAoEntrar: true },
+    })
     await flushPromises()
 
-    expect(chamadas.registrarEstudo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        identificadorDoTopico: 'topico-1',
-        identificadorDoMaterial: 'material-1',
-        duracaoEmMinutos: 90,
-      }),
+    expect(despachar).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'abrir-registro-rapido' }),
     )
+  })
+
+  it('filtra totais e grupos do historico por periodo', async () => {
+    const agora = Date.now()
+    const haDias = (quantidade: number) =>
+      new Date(agora - quantidade * 24 * 60 * 60 * 1000).toISOString()
+    chamadas.listarTodosOsEstudos.mockResolvedValue([
+      {
+        ...registro,
+        nomeDoTopico: 'Tópico recente',
+        dataHora: haDias(2),
+      },
+      {
+        ...registro,
+        identificador: 'estudo-2',
+        nomeDoTopico: 'Tópico intermediário',
+        dataHora: haDias(20),
+        situacao: 'CANCELADO',
+      },
+      {
+        ...registro,
+        identificador: 'estudo-3',
+        nomeDoTopico: 'Tópico antigo',
+        dataHora: haDias(40),
+        situacao: 'CORRIGIDO',
+      },
+    ])
+    const pagina = mount(EstudosPagina)
+    await flushPromises()
+
+    expect(pagina.text()).toContain('3 registros')
+
+    const filtroDeSeteDias = pagina
+      .findAll('button')
+      .find((botao) => botao.text() === '7 dias')!
+    await filtroDeSeteDias.trigger('click')
+
+    expect(filtroDeSeteDias.attributes('aria-pressed')).toBe('true')
+    expect(pagina.text()).toContain('1 registro')
+    expect(pagina.text()).toContain('Tópico recente')
+    expect(pagina.text()).not.toContain('Tópico intermediário')
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === '30 dias')!
+      .trigger('click')
+
+    expect(pagina.text()).toContain('2 registros')
+    expect(pagina.text()).toContain('Tópico intermediário')
+    expect(pagina.text()).toContain('Cancelado')
+    expect(pagina.text()).not.toContain('CANCELADO')
+    expect(pagina.text()).not.toContain('Tópico antigo')
   })
 
   it('corrige e cancela um registro ativo sem apaga-lo', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const pagina = mount(EstudosPagina)
+    const pagina = mount(EstudosPagina, {
+      global: { stubs: { Teleport: true } },
+    })
     await flushPromises()
 
     await pagina

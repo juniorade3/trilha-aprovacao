@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import BarraDeProgresso from '@/compartilhado/componentes/BarraDeProgresso.vue'
+import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import { obterDashboard, type Dashboard } from './apiDoDashboard'
 
 const dashboard = ref<Dashboard>()
@@ -15,6 +17,27 @@ const coberturaDeEstudo = computed(() => {
       dashboard.value.quantidadeDeTopicosExigidos) *
       100,
   )
+})
+
+const etapasDaJornada = computed(() => {
+  const dados = dashboard.value
+  const etapaAtual = !dados?.quantidadeDeTopicosExigidos
+    ? 0
+    : dados.quantidadeDeItensSemMapeamento > 0
+      ? 1
+      : coberturaDeEstudo.value < 70
+        ? 2
+        : 3
+  return [
+    { nome: 'Objetivo', detalhe: 'Concurso e cargo' },
+    { nome: 'Base do edital', detalhe: 'Estrutura e vínculos' },
+    { nome: 'Consolidação', detalhe: 'Estudo consistente' },
+    { nome: 'Reta final', detalhe: 'Cobertura avançada' },
+  ].map((etapa, indice) => ({
+    ...etapa,
+    situacao:
+      indice < etapaAtual ? 'concluida' : indice === etapaAtual ? 'atual' : '',
+  }))
 })
 
 async function carregar() {
@@ -67,13 +90,23 @@ function rotuloDosDias(dias?: number) {
   return `Faltam ${dias} dias`
 }
 
-onMounted(() => carregar())
-onBeforeUnmount(() => cancelamento?.abort())
+function abrirRegistroRapido() {
+  window.dispatchEvent(new CustomEvent('abrir-registro-rapido'))
+}
+
+onMounted(() => {
+  void carregar()
+  window.addEventListener('estudo-registrado', carregar)
+})
+onBeforeUnmount(() => {
+  cancelamento?.abort()
+  window.removeEventListener('estudo-registrado', carregar)
+})
 </script>
 
 <template>
-  <main class="painel-dashboard py-4 py-lg-5">
-    <div class="container">
+  <main class="painel-da-jornada">
+    <div class="pagina-da-jornada">
       <section
         v-if="carregando"
         class="dashboard-carregando"
@@ -84,30 +117,27 @@ onBeforeUnmount(() => cancelamento?.abort())
           <span class="placeholder col-2 rounded-pill"></span>
           <span class="placeholder col-7 d-block mt-3 placeholder-lg"></span>
         </div>
-        <div class="row g-3">
-          <div v-for="indice in 4" :key="indice" class="col-md-6 col-xl-3">
-            <div class="card border-0 shadow-sm p-4">
-              <span class="placeholder col-4 mb-3"></span>
-              <span class="placeholder col-8 placeholder-lg"></span>
-              <span class="placeholder col-6 mt-3"></span>
-            </div>
+        <div class="grade-de-resumo">
+          <div v-for="indice in 3" :key="indice" class="card p-4">
+            <span class="placeholder col-4 mb-3"></span>
+            <span class="placeholder col-8 placeholder-lg"></span>
+            <span class="placeholder col-6 mt-3"></span>
           </div>
         </div>
-        <span class="visually-hidden">Carregando seu painel</span>
       </section>
 
       <section
         v-else-if="erro"
-        class="estado-de-dashboard card border-0 shadow-sm mx-auto text-center"
+        class="estado-de-dashboard card mx-auto text-center"
         role="alert"
       >
         <span class="icone-de-estado icone-de-estado-erro mx-auto mb-4">
           <i class="bi bi-cloud-slash" aria-hidden="true"></i>
         </span>
-        <p class="text-uppercase fw-semibold text-danger mb-2">
+        <p class="sobretitulo-da-pagina text-danger mb-2">
           Conexão interrompida
         </p>
-        <h1 class="h2 mb-3">Seu painel não pôde ser carregado</h1>
+        <h1 class="titulo-editorial mb-3">Seu painel não pôde ser carregado</h1>
         <p class="text-secondary mb-4">{{ erro }}</p>
         <button
           class="btn btn-primary align-self-center px-4"
@@ -135,12 +165,8 @@ onBeforeUnmount(() => cancelamento?.abort())
           <span class="icone-de-estado mb-4">
             <i class="bi bi-compass" aria-hidden="true"></i>
           </span>
-          <p class="text-uppercase fw-semibold text-success mb-2">
-            Seu ponto de partida
-          </p>
-          <h1 class="display-5 fw-bold mb-3">
-            Comece escolhendo seu concurso ativo
-          </h1>
+          <p class="sobretitulo-da-pagina mb-2">Seu ponto de partida</p>
+          <h1 class="display-5 mb-3">Comece escolhendo seu concurso ativo</h1>
           <p class="lead text-secondary mb-4">
             O painel reúne provas, conteúdos e estudos do objetivo que está em
             foco. Cadastre um concurso ou ative um que já existe.
@@ -164,301 +190,202 @@ onBeforeUnmount(() => cancelamento?.abort())
       </section>
 
       <template v-else>
-        <section
-          class="cabecalho-do-dashboard mb-4 position-relative overflow-hidden"
+        <CabecalhoDaPagina
+          etiqueta="Sua jornada de hoje"
+          titulo="Você está avançando"
+          descricao="Mantenha o ritmo e siga firme até a prova. Consistência hoje, aprovação amanhã."
         >
-          <span
-            class="orbita-decorativa orbita-decorativa-um"
-            aria-hidden="true"
-          ></span>
-          <span
-            class="orbita-decorativa orbita-decorativa-dois"
-            aria-hidden="true"
-          ></span>
-          <div class="row g-4 align-items-center position-relative">
-            <div class="col-lg-8">
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <span class="selo-do-dashboard">
-                  <span class="ponto-ativo" aria-hidden="true"></span>
-                  Concurso ativo
-                </span>
-                <span
-                  class="badge rounded-pill text-bg-light text-primary px-3 py-2"
-                >
-                  {{ dashboard.concursoAtivo.situacao.replace(/_/g, ' ') }}
-                </span>
-              </div>
-              <h1 class="display-5 fw-bold mb-2">
-                {{ dashboard.concursoAtivo.nome }}
-              </h1>
-              <p class="lead text-white-50 mb-3">
+          <template #acoes>
+            <button
+              class="btn btn-primary"
+              type="button"
+              @click="abrirRegistroRapido"
+            >
+              <i class="bi bi-pencil-square me-2" aria-hidden="true"></i>
+              Registrar estudo
+            </button>
+            <RouterLink
+              class="btn btn-outline-primary"
+              :to="`/concursos/${dashboard.concursoAtivo.identificador}?foco=mapeamentos`"
+            >
+              <i class="bi bi-bar-chart me-2" aria-hidden="true"></i>
+              Ver lacunas
+            </RouterLink>
+          </template>
+        </CabecalhoDaPagina>
+
+        <section class="card resumo-principal-da-jornada">
+          <div class="objetivo-da-jornada">
+            <span class="icone-redondo-da-jornada">
+              <i class="bi bi-building" aria-hidden="true"></i>
+            </span>
+            <div>
+              <span class="rotulo-discreto">Concurso ativo</span>
+              <h2>{{ dashboard.concursoAtivo.nome }}</h2>
+              <p>
                 {{
-                  [dashboard.concursoAtivo.orgao, dashboard.concursoAtivo.banca]
-                    .filter(Boolean)
-                    .join(' · ') || 'Objetivo em construção'
+                  dashboard.concursoAtivo.nomeDoCargoSelecionado ||
+                  'Cargo ainda não selecionado'
                 }}
               </p>
-              <div class="d-flex flex-wrap gap-2">
-                <span
-                  v-if="dashboard.concursoAtivo.nomeDoCargoSelecionado"
-                  class="informacao-do-concurso"
-                >
-                  <i class="bi bi-person-badge" aria-hidden="true"></i>
-                  {{ dashboard.concursoAtivo.nomeDoCargoSelecionado }}
-                </span>
-                <RouterLink
-                  class="informacao-do-concurso informacao-do-concurso-link"
-                  :to="`/concursos/${dashboard.concursoAtivo.identificador}`"
-                >
-                  <i class="bi bi-sliders" aria-hidden="true"></i>
-                  Ajustar estrutura
-                </RouterLink>
-              </div>
+              <small v-if="dashboard.dataDaProximaProva">
+                <i class="bi bi-calendar3" aria-hidden="true"></i>
+                {{ formatarData(dashboard.dataDaProximaProva) }} ·
+                {{ rotuloDosDias(dashboard.diasAteAProva) }}
+              </small>
             </div>
-            <div class="col-lg-4">
-              <div class="cartao-da-prova">
-                <template v-if="dashboard.dataDaProximaProva">
-                  <span class="rotulo-claro">Próxima prova</span>
-                  <strong class="numero-da-prova">
-                    {{ dashboard.diasAteAProva }}
-                  </strong>
-                  <span class="texto-da-prova">{{
-                    rotuloDosDias(dashboard.diasAteAProva)
-                  }}</span>
-                  <span class="data-da-prova">
-                    <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>
-                    {{ formatarData(dashboard.dataDaProximaProva) }}
-                  </span>
-                </template>
-                <template v-else>
-                  <i
-                    class="bi bi-calendar2-plus fs-2 mb-3"
-                    aria-hidden="true"
-                  ></i>
-                  <strong class="h5">Data ainda não definida</strong>
-                  <span class="text-white-50"
-                    >Inclua a previsão na prova do cargo.</span
-                  >
-                </template>
-              </div>
+          </div>
+
+          <div class="medidor-da-jornada">
+            <p>
+              <strong>{{ dashboard.quantidadeDeTopicosComEstudo }}</strong>
+              de {{ dashboard.quantidadeDeTopicosExigidos }} tópicos com estudo
+            </p>
+            <div>
+              <BarraDeProgresso
+                :valor="coberturaDeEstudo"
+                rotulo="Cobertura dos tópicos exigidos"
+              />
+              <b>{{ coberturaDeEstudo }}%</b>
+            </div>
+            <small>
+              {{
+                Math.max(
+                  dashboard.quantidadeDeTopicosExigidos -
+                    dashboard.quantidadeDeTopicosComEstudo,
+                  0,
+                )
+              }}
+              tópicos ainda precisam de atenção
+            </small>
+          </div>
+
+          <div class="tempo-da-jornada">
+            <i class="bi bi-clock" aria-hidden="true"></i>
+            <div>
+              <strong>{{
+                formatarTempo(dashboard.tempoEstudadoNaSemanaEmMinutos)
+              }}</strong>
+              <span>estudadas nesta semana</span>
+            </div>
+          </div>
+
+          <div class="etapas-da-jornada" aria-label="Etapas da preparação">
+            <div
+              v-for="etapa in etapasDaJornada"
+              :key="etapa.nome"
+              :class="etapa.situacao"
+            >
+              <i>
+                <span v-if="etapa.situacao === 'concluida'">
+                  <i class="bi bi-check2" aria-hidden="true"></i>
+                </span>
+              </i>
+              <b>{{ etapa.nome }}</b>
+              <small>{{ etapa.detalhe }}</small>
             </div>
           </div>
         </section>
 
-        <section class="row g-3 mb-4" aria-label="Resumo objetivo">
-          <div class="col-md-6 col-xl-3">
-            <article class="cartao-de-indicador h-100">
-              <div class="icone-do-indicador icone-do-indicador-verde">
-                <i class="bi bi-check2-circle" aria-hidden="true"></i>
-              </div>
-              <span class="rotulo-do-indicador">Tópicos com estudo</span>
-              <div class="valor-do-indicador">
-                {{ dashboard.quantidadeDeTopicosComEstudo }}
-                <small>de {{ dashboard.quantidadeDeTopicosExigidos }}</small>
-              </div>
-              <div
-                class="progress progresso-objetivo mt-3"
-                role="progressbar"
-                aria-label="Cobertura objetiva de tópicos com estudo"
-                :aria-valuenow="coberturaDeEstudo"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                <div
-                  class="progress-bar"
-                  :style="{ width: `${coberturaDeEstudo}%` }"
-                ></div>
-              </div>
-              <span class="legenda-do-indicador"
-                >{{ coberturaDeEstudo }}% com registro ativo</span
-              >
-            </article>
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <article class="cartao-de-indicador h-100">
-              <div class="icone-do-indicador icone-do-indicador-azul">
-                <i class="bi bi-stopwatch" aria-hidden="true"></i>
-              </div>
-              <span class="rotulo-do-indicador">Tempo nesta semana</span>
-              <div class="valor-do-indicador">
-                {{ formatarTempo(dashboard.tempoEstudadoNaSemanaEmMinutos) }}
-              </div>
-              <span class="legenda-do-indicador"
-                >Somente estudos ativos da trilha</span
-              >
-            </article>
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <article class="cartao-de-indicador h-100">
-              <div class="icone-do-indicador icone-do-indicador-roxo">
-                <i class="bi bi-collection" aria-hidden="true"></i>
-              </div>
-              <span class="rotulo-do-indicador">Matérias na trilha</span>
-              <div class="valor-do-indicador">
-                {{ dashboard.quantidadeDeMaterias }}
-              </div>
-              <span class="legenda-do-indicador">Do cargo selecionado</span>
-            </article>
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <article class="cartao-de-indicador h-100">
-              <div class="icone-do-indicador icone-do-indicador-ambar">
-                <i class="bi bi-diagram-3" aria-hidden="true"></i>
-              </div>
-              <span class="rotulo-do-indicador">Itens a mapear</span>
-              <div class="valor-do-indicador">
+        <div class="grade-dos-destaques">
+          <RouterLink
+            class="card alerta-de-lacunas"
+            :to="`/concursos/${dashboard.concursoAtivo.identificador}?foco=mapeamentos`"
+          >
+            <span class="icone-do-alerta-de-lacuna">
+              <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+            </span>
+            <span>
+              <strong>
                 {{ dashboard.quantidadeDeItensSemMapeamento }}
-              </div>
-              <span class="legenda-do-indicador">
-                {{ dashboard.quantidadeDeItensMapeados }} já mapeado{{
-                  dashboard.quantidadeDeItensMapeados === 1 ? '' : 's'
+                {{
+                  dashboard.quantidadeDeItensSemMapeamento === 1
+                    ? 'item do edital'
+                    : 'itens do edital'
                 }}
-              </span>
-            </article>
-          </div>
-        </section>
+              </strong>
+              <b>
+                {{
+                  dashboard.quantidadeDeItensSemMapeamento
+                    ? 'ainda sem mapeamento'
+                    : 'com mapeamento concluído'
+                }}
+              </b>
+              <small v-if="dashboard.alertas[0]">
+                {{ dashboard.alertas[0].titulo }}
+              </small>
+            </span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </RouterLink>
 
-        <div class="row g-4 mb-4">
-          <section class="col-lg-7" aria-labelledby="titulo-atividade">
-            <div class="bloco-do-dashboard h-100">
-              <div class="cabecalho-do-bloco">
-                <div>
-                  <span class="subtitulo-do-bloco">Ritmo de preparação</span>
-                  <h2 id="titulo-atividade" class="h4 mb-0">
-                    Atividade recente
-                  </h2>
-                </div>
-                <RouterLink
-                  class="btn btn-sm btn-outline-primary"
-                  to="/estudos"
-                >
-                  Ver histórico
-                </RouterLink>
+          <article class="card atividade-da-jornada">
+            <header class="cabecalho-do-cartao-da-jornada">
+              <div>
+                <span class="rotulo-discreto">Últimos registros</span>
+                <h2>Atividade recente</h2>
               </div>
+              <RouterLink to="/estudos">
+                Ver histórico completo
+                <i class="bi bi-arrow-right" aria-hidden="true"></i>
+              </RouterLink>
+            </header>
+            <div
+              v-if="dashboard.atividadeRecente.length === 0"
+              class="estado-vazio-da-jornada"
+            >
+              Seu primeiro registro aparecerá aqui.
+            </div>
+            <div v-else class="lista-de-atividade-da-jornada">
               <div
-                v-if="dashboard.atividadeRecente.length === 0"
-                class="estado-vazio-do-bloco"
+                v-for="atividade in dashboard.atividadeRecente.slice(0, 3)"
+                :key="atividade.identificador"
               >
-                <span class="icone-vazio-menor">
-                  <i class="bi bi-journal-check" aria-hidden="true"></i>
+                <span class="mini-icone-da-jornada">
+                  <i class="bi bi-book" aria-hidden="true"></i>
                 </span>
-                <div>
-                  <h3 class="h6 mb-1">
-                    Sua linha do tempo começa no primeiro estudo
-                  </h3>
-                  <p class="text-secondary mb-0">
-                    Registre uma sessão em um tópico exigido pelo concurso.
-                  </p>
-                </div>
-              </div>
-              <ol v-else class="linha-do-tempo">
-                <li
-                  v-for="atividade in dashboard.atividadeRecente"
-                  :key="atividade.identificador"
-                  class="item-da-linha-do-tempo"
-                >
-                  <span class="marcador-da-linha" aria-hidden="true">
-                    <i class="bi bi-lightning-charge-fill"></i>
-                  </span>
-                  <div class="flex-grow-1">
-                    <div class="d-flex flex-wrap justify-content-between gap-2">
-                      <h3 class="h6 mb-1">{{ atividade.nomeDoTopico }}</h3>
-                      <span class="duracao-da-atividade">
-                        {{ atividade.duracaoEmMinutos }} min
-                      </span>
-                    </div>
-                    <p class="text-secondary small mb-0">
-                      {{ formatarDataHora(atividade.dataHora) }}
-                      <template v-if="atividade.tituloDoMaterial">
-                        · {{ atividade.tituloDoMaterial }}
-                      </template>
-                    </p>
-                  </div>
-                </li>
-              </ol>
-            </div>
-          </section>
-
-          <section class="col-lg-5" aria-labelledby="titulo-alertas">
-            <div class="bloco-do-dashboard h-100">
-              <div class="cabecalho-do-bloco">
-                <div>
-                  <span class="subtitulo-do-bloco">Qualidade da estrutura</span>
-                  <h2 id="titulo-alertas" class="h4 mb-0">Pontos de atenção</h2>
-                </div>
-                <span class="contador-de-alertas">
-                  {{ dashboard.alertas.length }}
-                </span>
-              </div>
-              <div v-if="dashboard.alertas.length === 0" class="estado-pronto">
-                <span class="icone-pronto">
-                  <i class="bi bi-shield-check" aria-hidden="true"></i>
-                </span>
-                <h3 class="h5 mt-3">Trilha consistente</h3>
-                <p class="text-secondary mb-0">
-                  Nenhuma pendência estrutural foi encontrada para este
-                  concurso.
+                <p>
+                  <b>{{ atividade.nomeDoTopico }}</b>
+                  <small>
+                    {{ atividade.tituloDoMaterial || 'Sem material' }} ·
+                    {{ formatarTempo(atividade.duracaoEmMinutos) }}
+                  </small>
                 </p>
-              </div>
-              <div v-else class="vstack gap-3">
-                <article
-                  v-for="alerta in dashboard.alertas"
-                  :key="alerta.codigo"
-                  class="cartao-de-alerta"
-                >
-                  <span class="icone-do-alerta">
-                    <i class="bi bi-exclamation-diamond" aria-hidden="true"></i>
-                  </span>
-                  <div>
-                    <h3 class="h6 mb-1">{{ alerta.titulo }}</h3>
-                    <p class="small text-secondary mb-0">
-                      {{ alerta.mensagem }}
-                    </p>
-                  </div>
-                </article>
+                <time>{{ formatarDataHora(atividade.dataHora) }}</time>
               </div>
             </div>
-          </section>
+          </article>
         </div>
 
-        <section class="atalhos-do-dashboard" aria-labelledby="titulo-atalhos">
-          <div>
-            <span class="subtitulo-do-bloco">Continue avançando</span>
-            <h2 id="titulo-atalhos" class="h4 mb-0">Ações rápidas</h2>
-          </div>
-          <div class="grade-de-atalhos">
-            <RouterLink class="atalho-do-dashboard" to="/estudos">
-              <span class="icone-do-atalho"
-                ><i class="bi bi-play-fill"></i
-              ></span>
-              <span
-                ><strong>Registrar estudo</strong
-                ><small>Atualize seu ritmo</small></span
-              >
-              <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </RouterLink>
-            <RouterLink class="atalho-do-dashboard" to="/materiais">
-              <span class="icone-do-atalho"><i class="bi bi-book"></i></span>
-              <span
-                ><strong>Organizar materiais</strong
-                ><small>Amplie a cobertura</small></span
-              >
-              <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </RouterLink>
-            <RouterLink
-              class="atalho-do-dashboard"
-              :to="`/concursos/${dashboard.concursoAtivo.identificador}`"
-            >
-              <span class="icone-do-atalho"
-                ><i class="bi bi-list-check"></i
-              ></span>
-              <span
-                ><strong>Revisar edital</strong
-                ><small>Mapeie as pendências</small></span
-              >
-              <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </RouterLink>
-          </div>
+        <section class="grade-de-resumo" aria-label="Resumo da trilha">
+          <article class="card indicador-resumido">
+            <span class="mini-icone-da-jornada">
+              <i class="bi bi-book" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>{{ dashboard.quantidadeDeMaterias }}</strong>
+              <small>matérias na trilha ativa</small>
+            </div>
+          </article>
+          <article class="card indicador-resumido">
+            <span class="mini-icone-da-jornada">
+              <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>{{ dashboard.quantidadeDeItensMapeados }}</strong>
+              <small>itens oficiais mapeados</small>
+            </div>
+          </article>
+          <article class="card indicador-resumido">
+            <span class="mini-icone-da-jornada">
+              <i class="bi bi-stopwatch" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>{{
+                formatarTempo(dashboard.tempoEstudadoNaSemanaEmMinutos)
+              }}</strong>
+              <small>tempo real nesta semana</small>
+            </div>
+          </article>
         </section>
       </template>
     </div>

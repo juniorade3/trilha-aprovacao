@@ -77,7 +77,10 @@ describe('ConcursosPagina', () => {
     expect(
       pagina.get('a[href="/concursos/concurso-1"]').attributes('href'),
     ).toBe('/concursos/concurso-1')
-    await pagina.get('button.btn-outline-success').trigger('click')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tornar ativo')!
+      .trigger('click')
     await flushPromises()
 
     expect(chamadas.ativarConcurso).toHaveBeenCalledWith('concurso-1')

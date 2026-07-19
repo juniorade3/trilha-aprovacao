@@ -15,7 +15,6 @@ import ConcursoDetalhePagina from '@/modulos/concursos/ConcursoDetalhePagina.vue
 import ConcursoNovoPagina from '@/modulos/concursos/ConcursoNovoPagina.vue'
 import ConcursosPagina from '@/modulos/concursos/ConcursosPagina.vue'
 import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
-import MateriaDetalhePagina from '@/modulos/materias/MateriaDetalhePagina.vue'
 import MateriaisDeEstudoPagina from '@/modulos/estudos/MateriaisDeEstudoPagina.vue'
 import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
 
@@ -41,6 +40,8 @@ export async function protegerRotas(
 
 const roteador = createRouter({
   history: createWebHistory(),
+  scrollBehavior: (_destino, _origem, posicaoSalva) =>
+    posicaoSalva ?? { top: 0 },
   routes: [
     {
       path: '/',
@@ -76,11 +77,13 @@ const roteador = createRouter({
           path: 'estudos/novo',
           name: 'estudo-novo',
           component: EstudosPagina,
+          props: { abrirRegistroRapidoAoEntrar: true },
         },
         {
           path: 'materias/:identificador',
           name: 'materia-detalhe',
-          component: MateriaDetalhePagina,
+          component: MateriasPagina,
+          props: true,
         },
       ],
     },

@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
+import type { Materia, Topico } from '@/modulos/materias/apiDeConteudos'
 import {
   alterarCargo,
   alterarConcurso,
@@ -54,7 +56,6 @@ import {
   type ItemDoEdital,
   type MapeamentoDeItem,
 } from './apiDeConteudoProgramatico'
-import type { Materia, Topico } from '@/modulos/materias/apiDeConteudos'
 
 const rota = useRoute()
 const roteador = useRouter()
@@ -73,7 +74,48 @@ const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
 const secaoAberta = ref('edital')
+const gavetaDeMapeamentoAberta = ref(false)
+const gavetaDaEstruturaAberta = ref(false)
+const abaDoConcurso = ref<'visao' | 'conteudo'>(
+  rota.query.foco === 'mapeamentos' ? 'conteudo' : 'visao',
+)
+const identificadorDaMateriaSelecionada = ref('')
 const cancelamento = new AbortController()
+
+const rotulosDaSituacao: Record<string, string> = {
+  PLANEJADO: 'Planejado',
+  EDITAL_PUBLICADO: 'Edital publicado',
+  INSCRICOES_ABERTAS: 'Inscrições abertas',
+  EM_ANDAMENTO: 'Em andamento',
+  ENCERRADO: 'Encerrado',
+  SUSPENSO: 'Suspenso',
+  CANCELADO: 'Cancelado',
+  ARQUIVADO: 'Arquivado',
+}
+const rotulosDoNivel: Record<string, string> = {
+  FUNDAMENTAL: 'Ensino fundamental',
+  MEDIO: 'Ensino médio',
+  TECNICO: 'Ensino técnico',
+  SUPERIOR: 'Ensino superior',
+  NAO_INFORMADO: 'Não informado',
+}
+const rotulosDoTipoDeProva: Record<string, string> = {
+  OBJETIVA: 'Objetiva',
+  DISCURSIVA: 'Discursiva',
+  PRATICA: 'Prática',
+  TITULOS: 'Títulos',
+  OUTRA: 'Outra',
+}
+const rotulosDoCarater: Record<string, string> = {
+  ELIMINATORIO: 'Eliminatória',
+  CLASSIFICATORIO: 'Classificatória',
+  ELIMINATORIO_E_CLASSIFICATORIO: 'Eliminatória e classificatória',
+  NAO_INFORMADO: 'Não informado',
+}
+
+function rotuloDoDominio(valor: string, rotulos: Record<string, string>) {
+  return rotulos[valor] ?? valor.toLocaleLowerCase('pt-BR')
+}
 
 const concursoArquivado = computed(
   () => concurso.value?.situacao === 'ARQUIVADO',
@@ -86,6 +128,89 @@ const todasAsMateriasDaProva = computed(() =>
 const todosOsItens = computed(() =>
   Object.values(itensPorMateriaDaProva).flat(),
 )
+const itensSemMapeamento = computed(() =>
+  todosOsItens.value.filter(
+    (item) => (mapeamentosPorItem[item.identificador] ?? []).length === 0,
+  ),
+)
+const editalPrincipal = computed(() =>
+  editais.value.find((edital) => edital.principal),
+)
+const cargoSelecionado = computed(() =>
+  cargos.value.find((cargo) => cargo.selecionado),
+)
+const materiaDaProvaSelecionada = computed(() =>
+  todasAsMateriasDaProva.value.find(
+    (materia) =>
+      materia.identificador === identificadorDaMateriaSelecionada.value,
+  ),
+)
+const itensDaMateriaSelecionada = computed(() =>
+  [
+    ...(itensPorMateriaDaProva[identificadorDaMateriaSelecionada.value] ?? []),
+  ].sort(
+    (primeiro, segundo) =>
+      primeiro.ordem - segundo.ordem ||
+      primeiro.descricaoOriginal.localeCompare(segundo.descricaoOriginal),
+  ),
+)
+const percentualDeMapeamento = computed(() =>
+  todosOsItens.value.length
+    ? Math.round(
+        ((todosOsItens.value.length - itensSemMapeamento.value.length) /
+          todosOsItens.value.length) *
+          100,
+      )
+    : 0,
+)
+const estruturaInicialCompleta = computed(
+  () =>
+    Boolean(editalPrincipal.value) &&
+    Boolean(cargoSelecionado.value) &&
+    todasAsProvas.value.length > 0 &&
+    todosOsGrupos.value.length > 0 &&
+    todasAsMateriasDaProva.value.length > 0,
+)
+const proximoPasso = computed(() => {
+  if (!estruturaInicialCompleta.value)
+    return {
+      etiqueta: 'Estrutura inicial',
+      titulo: 'Complete a estrutura do concurso',
+      descricao:
+        'Cadastre edital, cargo, prova, grupos e matérias no contexto correto.',
+      acao: 'estrutura' as const,
+      rotuloDaAcao: 'Continuar estrutura',
+    }
+  if (todosOsItens.value.length === 0)
+    return {
+      etiqueta: 'Conteúdo programático',
+      titulo: 'Transcreva os itens oficiais do edital',
+      descricao:
+        'A redação oficial conecta a estrutura da prova ao seu catálogo pessoal.',
+      acao: 'item' as const,
+      rotuloDaAcao: 'Adicionar primeiro item',
+    }
+  if (itensSemMapeamento.value.length > 0)
+    return {
+      etiqueta: 'Próximo passo recomendado',
+      titulo: 'Conclua o mapeamento do edital',
+      descricao: `${itensSemMapeamento.value.length} ${
+        itensSemMapeamento.value.length === 1
+          ? 'item ainda não está relacionado'
+          : 'itens ainda não estão relacionados'
+      } a tópicos do seu catálogo.`,
+      acao: 'mapeamento' as const,
+      rotuloDaAcao: 'Continuar mapeamento',
+    }
+  return {
+    etiqueta: 'Estrutura pronta',
+    titulo: 'Siga acompanhando sua jornada',
+    descricao:
+      'Os itens oficiais estão mapeados e o progresso será atualizado pelos estudos ativos.',
+    acao: 'dashboard' as const,
+    rotuloDaAcao: 'Ver visão geral',
+  }
+})
 
 const formularioConcurso = reactive<DadosDeConcurso>({
   nome: '',
@@ -155,6 +280,22 @@ const formularioMapeamento = reactive({
   identificadorDoTopico: '',
 })
 
+const itensParaSelecaoDoMapeamento = computed(() => {
+  const selecionado = todosOsItens.value.find(
+    (item) => item.identificador === formularioMapeamento.identificadorDoItem,
+  )
+  if (
+    selecionado &&
+    !itensSemMapeamento.value.some(
+      (item) => item.identificador === selecionado.identificador,
+    )
+  )
+    return [selecionado, ...itensSemMapeamento.value]
+  return itensSemMapeamento.value.length
+    ? itensSemMapeamento.value
+    : todosOsItens.value
+})
+
 const itemSelecionadoParaMapeamento = computed(() =>
   todosOsItens.value.find(
     (item) => item.identificador === formularioMapeamento.identificadorDoItem,
@@ -205,7 +346,7 @@ async function carregar() {
     erro.value =
       causa instanceof Error
         ? causa.message
-        : 'Nao foi possivel carregar o concurso.'
+        : 'Não foi possível carregar o concurso.'
   } finally {
     carregando.value = false
   }
@@ -294,6 +435,14 @@ async function carregarDescendentes(cargosAtuais: Cargo[]) {
     formularioItem.identificadorDoEdital = editais.value[0].identificador
   if (!formularioMapeamento.identificadorDoItem && itens[0])
     formularioMapeamento.identificadorDoItem = itens[0].identificador
+  if (
+    !materiasDaProva.some(
+      (materia) =>
+        materia.identificador === identificadorDaMateriaSelecionada.value,
+    )
+  )
+    identificadorDaMateriaSelecionada.value =
+      materiasDaProva[0]?.identificador ?? ''
 }
 
 function limparMapa(mapa: Record<string, unknown>) {
@@ -321,7 +470,7 @@ async function executar(acao: () => Promise<unknown>) {
     erro.value =
       causa instanceof Error
         ? causa.message
-        : 'Nao foi possivel concluir a operacao.'
+        : 'Não foi possível concluir a operação.'
     return false
   } finally {
     salvando.value = false
@@ -434,7 +583,9 @@ function editarProva(prova: Prova) {
     tipo: prova.tipo,
     carater: prova.carater,
     ordem: prova.ordem,
-    dataHoraPrevista: prova.dataHoraPrevista?.slice(0, 16) ?? '',
+    dataHoraPrevista: prova.dataHoraPrevista
+      ? dataHoraParaCampoLocal(prova.dataHoraPrevista)
+      : '',
     duracaoEmMinutos: prova.duracaoEmMinutos,
     quantidadeDeQuestoes: prova.quantidadeDeQuestoes,
     pontuacaoMaxima: prova.pontuacaoMaxima,
@@ -563,7 +714,7 @@ function editalDoItem(item: ItemDoEdital) {
   return (
     editais.value.find(
       (edital) => edital.identificador === item.identificadorDoEdital,
-    )?.titulo ?? 'Edital nao encontrado'
+    )?.titulo ?? 'Edital não encontrado'
   )
 }
 
@@ -591,6 +742,71 @@ function editarItem(item: ItemDoEdital) {
     ordem: item.ordem,
   })
   secaoAberta.value = 'item'
+  gavetaDaEstruturaAberta.value = true
+}
+
+function abrirMapeamento(item?: ItemDoEdital) {
+  const itemParaMapear =
+    item ?? itensSemMapeamento.value[0] ?? todosOsItens.value[0]
+  if (itemParaMapear) {
+    formularioMapeamento.identificadorDoItem = itemParaMapear.identificador
+    formularioMapeamento.identificadorDoTopico = ''
+  }
+  abaDoConcurso.value = 'conteudo'
+  gavetaDaEstruturaAberta.value = false
+  gavetaDeMapeamentoAberta.value = true
+}
+
+function abrirEdicaoDaEstrutura(secao = 'edital') {
+  secaoAberta.value = secao
+  gavetaDaEstruturaAberta.value = true
+}
+
+function executarProximoPasso() {
+  if (proximoPasso.value.acao === 'estrutura') {
+    abrirEdicaoDaEstrutura('edital')
+    return
+  }
+  if (proximoPasso.value.acao === 'item') {
+    abaDoConcurso.value = 'conteudo'
+    abrirCadastroDeItem()
+    return
+  }
+  if (proximoPasso.value.acao === 'mapeamento') {
+    abaDoConcurso.value = 'conteudo'
+    abrirMapeamento()
+    return
+  }
+  void roteador.push('/dashboard')
+}
+
+function abrirCadastroDeItem() {
+  limparItem()
+  if (materiaDaProvaSelecionada.value)
+    formularioItem.identificadorDaMateriaDaProva =
+      materiaDaProvaSelecionada.value.identificador
+  if (editalPrincipal.value)
+    formularioItem.identificadorDoEdital = editalPrincipal.value.identificador
+  abrirEdicaoDaEstrutura('item')
+}
+
+function nomeDaProvaDaMateria(materia: MateriaDaProva) {
+  const grupo = todosOsGrupos.value.find(
+    (item) => item.identificador === materia.identificadorDoGrupoDeConteudo,
+  )
+  return (
+    todasAsProvas.value.find(
+      (prova) => prova.identificador === grupo?.identificadorDaProva,
+    )?.nome ?? 'Prova'
+  )
+}
+
+function nomeDoGrupoDaMateria(materia: MateriaDaProva) {
+  return (
+    todosOsGrupos.value.find(
+      (grupo) => grupo.identificador === materia.identificadorDoGrupoDeConteudo,
+    )?.nome ?? 'Grupo de conteúdo'
+  )
 }
 
 function limparItem() {
@@ -626,7 +842,10 @@ async function salvarMapeamento() {
       formularioMapeamento.identificadorDoTopico,
     ),
   )
-  if (sucesso) formularioMapeamento.identificadorDoTopico = ''
+  if (sucesso) {
+    formularioMapeamento.identificadorDoTopico = ''
+    gavetaDeMapeamentoAberta.value = false
+  }
 }
 
 async function remover(rotulo: string, acao: () => Promise<void>) {
@@ -644,16 +863,30 @@ function dataHoraComFuso(valor?: string) {
   return valor ? new Date(valor).toISOString() : undefined
 }
 
+function dataHoraParaCampoLocal(valor: string) {
+  const data = new Date(valor)
+  data.setMinutes(data.getMinutes() - data.getTimezoneOffset())
+  return data.toISOString().slice(0, 16)
+}
+
+function formatarData(valor?: string) {
+  if (!valor) return 'Não definida'
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(`${valor}T12:00:00`))
+}
+
 function alternarSecao(secao: string) {
   secaoAberta.value = secaoAberta.value === secao ? '' : secao
 }
 
-onMounted(() => carregar())
+onMounted(async () => {
+  await carregar()
+  if (rota.query.foco === 'mapeamentos') abrirMapeamento()
+})
 onBeforeUnmount(() => cancelamento.abort())
 </script>
 
 <template>
-  <main class="container py-4 py-md-5">
+  <main class="pagina-da-jornada pagina-do-concurso">
     <button
       class="btn btn-link px-0 mb-3"
       type="button"
@@ -672,11 +905,11 @@ onBeforeUnmount(() => cancelamento.abort())
       {{ erro }}
     </p>
     <p
-      v-if="rota.query.novo === 'true'"
+      v-if="rota.query.novo === 'concluido'"
       class="alert alert-success"
       role="status"
     >
-      Concurso criado. Complete as proximas secoes no seu ritmo.
+      Concurso criado. Complete as próximas seções no seu ritmo.
     </p>
 
     <div v-if="carregando" class="text-center py-5" aria-live="polite">
@@ -687,23 +920,42 @@ onBeforeUnmount(() => cancelamento.abort())
     </div>
 
     <template v-else-if="concurso">
-      <header class="card card-body border-0 shadow-sm mb-4">
-        <div class="d-flex flex-wrap justify-content-between gap-3">
-          <div>
-            <div class="d-flex gap-2 mb-2">
-              <span class="badge text-bg-light">{{ concurso.situacao }}</span>
-              <span v-if="concurso.ativo" class="badge text-bg-success">
-                Ativo
-              </span>
-            </div>
-            <h1 class="mb-1">{{ concurso.nome }}</h1>
-            <p class="text-secondary mb-0">
-              {{ concurso.orgao || 'Orgao nao informado' }}
-              <span v-if="concurso.banca"> · {{ concurso.banca }}</span>
-            </p>
+      <header class="cabecalho-da-pagina">
+        <div>
+          <p class="sobretitulo-da-pagina">Seu objetivo ativo</p>
+          <div class="d-flex gap-2 my-2">
+            <span class="badge text-bg-light">
+              {{ rotuloDoDominio(concurso.situacao, rotulosDaSituacao) }}
+            </span>
+            <span v-if="concurso.ativo" class="selo-de-objetivo-ativo">
+              <i aria-hidden="true"></i>
+              Ativo
+            </span>
           </div>
+          <h1>{{ concurso.nome }}</h1>
+          <p>
+            {{ concurso.orgao || 'Órgão não informado' }}
+            <span v-if="concurso.banca"> · {{ concurso.banca }}</span>
+          </p>
+        </div>
+        <div class="acoes-do-cabecalho">
           <button
-            class="btn btn-outline-secondary align-self-start"
+            class="btn btn-outline-primary"
+            type="button"
+            :disabled="todosOsItens.length === 0"
+            @click="abrirMapeamento()"
+          >
+            <i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>
+            Mapear itens
+            <span
+              v-if="itensSemMapeamento.length"
+              class="badge text-bg-warning ms-1"
+            >
+              {{ itensSemMapeamento.length }}
+            </span>
+          </button>
+          <button
+            class="btn btn-outline-secondary"
             type="button"
             :disabled="salvando"
             @click="alternarArquivamento"
@@ -711,187 +963,585 @@ onBeforeUnmount(() => cancelamento.abort())
             {{ concursoArquivado ? 'Restaurar concurso' : 'Arquivar concurso' }}
           </button>
         </div>
-        <p v-if="concursoArquivado" class="alert alert-warning mt-3 mb-0">
-          Restaure o concurso para alterar sua estrutura.
-        </p>
       </header>
 
-      <section class="card card-body border-0 shadow-sm mb-4">
-        <h2 class="h4">1. Dados gerais</h2>
-        <form @submit.prevent="salvarConcurso">
-          <fieldset :disabled="concursoArquivado || salvando">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label" for="detalhe-nome-concurso"
-                  >Nome</label
-                >
-                <input
-                  id="detalhe-nome-concurso"
-                  v-model="formularioConcurso.nome"
-                  class="form-control"
-                  required
-                />
-              </div>
-              <div class="col-md-3">
-                <label class="form-label" for="detalhe-orgao-concurso">
-                  Orgao
-                </label>
-                <input
-                  id="detalhe-orgao-concurso"
-                  v-model="formularioConcurso.orgao"
-                  class="form-control"
-                />
-              </div>
-              <div class="col-md-3">
-                <label class="form-label" for="detalhe-banca-concurso">
-                  Banca
-                </label>
-                <input
-                  id="detalhe-banca-concurso"
-                  v-model="formularioConcurso.banca"
-                  class="form-control"
-                />
-              </div>
-              <div class="col-md-4">
-                <label class="form-label" for="detalhe-situacao-concurso">
-                  Situacao
-                </label>
-                <select
-                  id="detalhe-situacao-concurso"
-                  v-model="formularioConcurso.situacao"
-                  class="form-select"
-                >
-                  <option value="PLANEJADO">Planejado</option>
-                  <option value="EDITAL_PUBLICADO">Edital publicado</option>
-                  <option value="INSCRICOES_ABERTAS">Inscricoes abertas</option>
-                  <option value="EM_ANDAMENTO">Em andamento</option>
-                  <option value="ENCERRADO">Encerrado</option>
-                  <option value="SUSPENSO">Suspenso</option>
-                  <option value="CANCELADO">Cancelado</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label" for="detalhe-data-concurso">
-                  Data principal
-                </label>
-                <input
-                  id="detalhe-data-concurso"
-                  v-model="formularioConcurso.dataPrevistaPrincipal"
-                  class="form-control"
-                  type="date"
-                />
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="detalhe-descricao-concurso">
-                  Descricao
-                </label>
-                <textarea
-                  id="detalhe-descricao-concurso"
-                  v-model="formularioConcurso.descricao"
-                  class="form-control"
-                  rows="3"
-                ></textarea>
-              </div>
-            </div>
-            <button class="btn btn-primary mt-3">Salvar dados gerais</button>
-          </fieldset>
-        </form>
+      <nav class="passos-do-concurso" aria-label="Etapas do concurso">
+        <button
+          type="button"
+          :class="{
+            concluido: Boolean(editalPrincipal && cargoSelecionado),
+            atual: !editalPrincipal || !cargoSelecionado,
+          }"
+          @click="abrirEdicaoDaEstrutura('edital')"
+        >
+          <i
+            v-if="editalPrincipal && cargoSelecionado"
+            class="bi bi-check2"
+            aria-hidden="true"
+          ></i>
+          <i v-else>1</i>
+          <span><b>1. Objetivo</b><small>Concurso, edital e cargo</small></span>
+        </button>
+        <button
+          type="button"
+          :class="{
+            concluido: estruturaInicialCompleta,
+            atual:
+              Boolean(editalPrincipal && cargoSelecionado) &&
+              !estruturaInicialCompleta,
+          }"
+          @click="abrirEdicaoDaEstrutura('prova')"
+        >
+          <i
+            v-if="estruturaInicialCompleta"
+            class="bi bi-check2"
+            aria-hidden="true"
+          ></i>
+          <i v-else>2</i>
+          <span
+            ><b>2. Estrutura da prova</b
+            ><small>Provas, grupos e matérias</small></span
+          >
+        </button>
+        <button
+          type="button"
+          :class="{
+            concluido:
+              todosOsItens.length > 0 && itensSemMapeamento.length === 0,
+            atual:
+              estruturaInicialCompleta &&
+              (todosOsItens.length === 0 || itensSemMapeamento.length > 0),
+          }"
+          @click="abaDoConcurso = 'conteudo'"
+        >
+          <i
+            v-if="todosOsItens.length > 0 && itensSemMapeamento.length === 0"
+            class="bi bi-check2"
+            aria-hidden="true"
+          ></i>
+          <i v-else>3</i>
+          <span>
+            <b>3. Conteúdo programático</b>
+            <small>{{ itensSemMapeamento.length }} itens sem mapeamento</small>
+          </span>
+        </button>
+        <RouterLink
+          to="/dashboard"
+          :class="{
+            atual: todosOsItens.length > 0 && itensSemMapeamento.length === 0,
+          }"
+        >
+          <i>4</i>
+          <span
+            ><b>4. Revisar e acompanhar</b><small>Voltar à jornada</small></span
+          >
+        </RouterLink>
+      </nav>
+
+      <section v-if="concursoArquivado" class="alert alert-warning">
+        Restaure o concurso para alterar sua estrutura.
       </section>
 
-      <div class="row g-4">
-        <section class="col-xl-7">
-          <div class="card card-body border-0 shadow-sm mb-4">
-            <h2 class="h4">2. Editais</h2>
-            <p v-if="editais.length === 0" class="estado-vazio-compacto">
-              Nenhum edital cadastrado.
-            </p>
-            <article
-              v-for="edital in editais"
-              :key="edital.identificador"
-              class="item-da-estrutura"
+      <nav class="abas-do-concurso" aria-label="Visualização do concurso">
+        <button
+          type="button"
+          :class="{ ativo: abaDoConcurso === 'visao' }"
+          :aria-current="abaDoConcurso === 'visao' ? 'page' : undefined"
+          @click="abaDoConcurso = 'visao'"
+        >
+          Visão do concurso
+        </button>
+        <button
+          type="button"
+          :class="{ ativo: abaDoConcurso === 'conteudo' }"
+          :aria-current="abaDoConcurso === 'conteudo' ? 'page' : undefined"
+          @click="abaDoConcurso = 'conteudo'"
+        >
+          Conteúdo programático
+          <span>{{ itensSemMapeamento.length }}</span>
+        </button>
+      </nav>
+
+      <section
+        v-if="abaDoConcurso === 'visao'"
+        class="grade-da-visao-do-concurso"
+      >
+        <article class="card proximo-passo-do-concurso">
+          <p class="sobretitulo-da-pagina">{{ proximoPasso.etiqueta }}</p>
+          <h2 class="titulo-editorial">{{ proximoPasso.titulo }}</h2>
+          <p>{{ proximoPasso.descricao }}</p>
+          <button
+            class="btn btn-primary align-self-start"
+            type="button"
+            @click="executarProximoPasso"
+          >
+            {{ proximoPasso.rotuloDaAcao }}
+            <i class="bi bi-arrow-right ms-2" aria-hidden="true"></i>
+          </button>
+        </article>
+
+        <article class="card dados-resumidos-do-concurso">
+          <header class="cabecalho-do-cartao-da-jornada">
+            <div>
+              <span class="rotulo-discreto">Dados principais</span>
+              <h2>Seu objetivo</h2>
+            </div>
+            <button
+              class="botao-de-icone"
+              type="button"
+              aria-label="Editar dados principais"
+              @click="abrirEdicaoDaEstrutura('dados')"
             >
+              <i class="bi bi-pencil" aria-hidden="true"></i>
+            </button>
+          </header>
+          <dl>
+            <div>
+              <dt>Órgão</dt>
+              <dd>{{ concurso.orgao || 'Não informado' }}</dd>
+            </div>
+            <div>
+              <dt>Banca</dt>
+              <dd>{{ concurso.banca || 'Não informada' }}</dd>
+            </div>
+            <div>
+              <dt>Prova prevista</dt>
+              <dd>{{ formatarData(concurso.dataPrevistaPrincipal) }}</dd>
+            </div>
+            <div>
+              <dt>Cargo</dt>
+              <dd>{{ cargoSelecionado?.nome || 'Não selecionado' }}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="card estrutura-consolidada-do-concurso">
+          <header class="cabecalho-do-cartao-da-jornada">
+            <div>
+              <span class="rotulo-discreto">Estrutura consolidada</span>
+              <h2>Como o concurso está organizado</h2>
+            </div>
+            <button
+              class="link-da-jornada"
+              type="button"
+              @click="abrirEdicaoDaEstrutura()"
+            >
+              Editar estrutura
+              <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="arvore-resumida-do-concurso">
+            <div>
+              <span><i class="bi bi-file-earmark-text"></i></span>
+              <p>
+                <b>{{ editalPrincipal?.titulo || 'Edital pendente' }}</b>
+                <small>
+                  {{
+                    editalPrincipal
+                      ? 'Edital principal'
+                      : 'Cadastre o edital principal'
+                  }}
+                </small>
+              </p>
+            </div>
+            <div>
+              <span><i class="bi bi-bullseye"></i></span>
+              <p>
+                <b>{{ cargoSelecionado?.nome || 'Cargo pendente' }}</b>
+                <small>
+                  {{
+                    cargoSelecionado
+                      ? 'Cargo selecionado'
+                      : 'Selecione o cargo em foco'
+                  }}
+                </small>
+              </p>
+            </div>
+            <div>
+              <span><i class="bi bi-layers"></i></span>
+              <p>
+                <b>
+                  {{ todasAsProvas.length }}
+                  {{ todasAsProvas.length === 1 ? 'prova' : 'provas' }}
+                </b>
+                <small>
+                  {{ todosOsGrupos.length }} grupos ·
+                  {{ todasAsMateriasDaProva.length }} matérias vinculadas
+                </small>
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card distribuicao-do-conteudo-oficial">
+          <span class="rotulo-discreto">Cobertura do edital</span>
+          <h2 class="titulo-editorial">Conteúdo por situação</h2>
+          <div
+            class="anel-de-mapeamento"
+            :style="{ '--valor-do-anel': `${percentualDeMapeamento}%` }"
+          >
+            <span>
+              <strong>{{ percentualDeMapeamento }}%</strong>
+              <small>mapeado</small>
+            </span>
+          </div>
+          <ul>
+            <li>
+              <i class="mapeado"></i>
+              <span>Itens mapeados</span>
+              <b>{{ todosOsItens.length - itensSemMapeamento.length }}</b>
+            </li>
+            <li>
+              <i class="pendente"></i>
+              <span>Sem mapeamento</span>
+              <b>{{ itensSemMapeamento.length }}</b>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section
+        v-else
+        class="conteudo-programatico-do-concurso"
+        aria-label="Conteúdo programático"
+      >
+        <aside class="card navegador-do-conteudo-programatico">
+          <span class="rotulo-discreto">Estrutura da prova</span>
+          <h2 class="titulo-editorial">Matérias vinculadas</h2>
+          <div
+            v-if="todasAsMateriasDaProva.length === 0"
+            class="estado-vazio-compacto"
+          >
+            Vincule uma matéria à estrutura da prova para cadastrar itens.
+          </div>
+          <button
+            v-for="materia in todasAsMateriasDaProva"
+            :key="materia.identificador"
+            type="button"
+            :class="{
+              ativo:
+                materia.identificador === identificadorDaMateriaSelecionada,
+            }"
+            @click="identificadorDaMateriaSelecionada = materia.identificador"
+          >
+            <span>
+              <b>{{ materia.nomeDaMateria }}</b>
+              <small>
+                {{ nomeDaProvaDaMateria(materia) }} ·
+                {{ nomeDoGrupoDaMateria(materia) }}
+              </small>
+            </span>
+            <em>
+              {{
+                (itensPorMateriaDaProva[materia.identificador] ?? []).filter(
+                  (item) =>
+                    (mapeamentosPorItem[item.identificador] ?? []).length === 0,
+                ).length
+              }}
+              pendências
+            </em>
+          </button>
+          <button
+            class="btn btn-outline-primary mt-3"
+            type="button"
+            @click="abrirEdicaoDaEstrutura('materia')"
+          >
+            Editar estrutura
+          </button>
+        </aside>
+
+        <article class="card itens-oficiais-do-concurso">
+          <header class="cabecalho-do-cartao-da-jornada">
+            <div>
+              <span class="rotulo-discreto">
+                {{ materiaDaProvaSelecionada?.nomeDaMateria || 'Matéria' }}
+              </span>
+              <h2>Itens do edital</h2>
+              <p v-if="materiaDaProvaSelecionada">
+                {{ itensDaMateriaSelecionada.length }} itens oficiais nesta
+                matéria.
+              </p>
+            </div>
+            <button
+              class="btn btn-outline-primary"
+              type="button"
+              :disabled="!materiaDaProvaSelecionada || concursoArquivado"
+              @click="abrirCadastroDeItem"
+            >
+              <i class="bi bi-plus-lg me-2" aria-hidden="true"></i>
+              Adicionar item
+            </button>
+          </header>
+
+          <div v-if="!materiaDaProvaSelecionada" class="estado-do-catalogo">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            <strong>Nenhuma matéria selecionada</strong>
+            <span>Complete a estrutura da prova para continuar.</span>
+          </div>
+          <div
+            v-else-if="itensDaMateriaSelecionada.length === 0"
+            class="estado-do-catalogo"
+          >
+            <i class="bi bi-file-earmark-plus" aria-hidden="true"></i>
+            <strong>Nenhum item oficial cadastrado</strong>
+            <span
+              >Transcreva o primeiro item preservando a redação oficial.</span
+            >
+          </div>
+          <div v-else class="lista-de-itens-oficiais">
+            <article
+              v-for="item in itensDaMateriaSelecionada"
+              :key="item.identificador"
+              :class="{
+                mapeado:
+                  (mapeamentosPorItem[item.identificador] ?? []).length > 0,
+                pendente:
+                  (mapeamentosPorItem[item.identificador] ?? []).length === 0,
+              }"
+            >
+              <span class="estado-do-item-oficial" aria-hidden="true">
+                <i
+                  v-if="
+                    (mapeamentosPorItem[item.identificador] ?? []).length > 0
+                  "
+                  class="bi bi-check2"
+                ></i>
+                <template v-else>!</template>
+              </span>
               <div>
-                <strong>{{ edital.titulo }}</strong>
-                <span
-                  v-if="edital.principal"
-                  class="badge text-bg-success ms-2"
+                <h3>{{ item.descricaoOriginal }}</h3>
+                <div
+                  v-if="
+                    (mapeamentosPorItem[item.identificador] ?? []).length > 0
+                  "
+                  class="mapeamentos-do-item-oficial"
                 >
-                  Principal
-                </span>
-                <p class="small text-secondary mb-0">
-                  {{ edital.numero || 'Sem numero' }}
-                  <span v-if="edital.ano"> · {{ edital.ano }}</span>
-                </p>
+                  <span
+                    v-for="mapeamento in mapeamentosPorItem[
+                      item.identificador
+                    ] ?? []"
+                    :key="mapeamento.identificador"
+                  >
+                    Mapeado para: {{ mapeamento.nomeDoTopico }}
+                    <button
+                      type="button"
+                      :disabled="concursoArquivado || salvando"
+                      :aria-label="`Remover vínculo com ${mapeamento.nomeDoTopico}`"
+                      @click="
+                        executar(() =>
+                          excluirMapeamentoDoItem(
+                            item.identificador,
+                            mapeamento.identificadorDoTopicoDaMateria,
+                          ),
+                        )
+                      "
+                    >
+                      Remover vínculo
+                    </button>
+                  </span>
+                </div>
+                <small v-else>
+                  Este item ainda não conta para a cobertura do edital.
+                </small>
               </div>
-              <div class="acoes-da-estrutura">
+              <div class="acoes-do-item-oficial">
                 <button
-                  class="btn btn-outline-success btn-sm"
-                  :disabled="concursoArquivado || edital.principal"
-                  @click="
-                    executar(() => definirEditalPrincipal(edital.identificador))
-                  "
+                  class="botao-de-icone"
+                  type="button"
+                  :disabled="concursoArquivado"
+                  :aria-label="`Editar item ${item.descricaoOriginal}`"
+                  @click="editarItem(item)"
                 >
-                  Principal
+                  <i class="bi bi-pencil" aria-hidden="true"></i>
                 </button>
                 <button
-                  class="btn btn-outline-primary btn-sm"
-                  :disabled="concursoArquivado"
-                  @click="editarEdital(edital)"
-                >
-                  Editar
-                </button>
-                <button
-                  class="btn btn-outline-danger btn-sm"
-                  :disabled="concursoArquivado"
-                  @click="
-                    remover(`o edital ${edital.titulo}`, () =>
-                      excluirEdital(edital.identificador),
-                    )
+                  v-if="
+                    (mapeamentosPorItem[item.identificador] ?? []).length === 0
                   "
+                  class="link-da-jornada"
+                  type="button"
+                  :disabled="concursoArquivado"
+                  @click="abrirMapeamento(item)"
                 >
-                  Excluir
+                  Mapear agora
                 </button>
               </div>
             </article>
           </div>
+        </article>
+      </section>
 
-          <div class="card card-body border-0 shadow-sm">
-            <h2 class="h4">Estrutura hierarquica</h2>
-            <p v-if="cargos.length === 0" class="estado-vazio-compacto">
-              3. Adicione um cargo para iniciar a arvore.
-            </p>
-            <article
-              v-for="cargo in cargos"
-              :key="cargo.identificador"
-              class="ramo-da-estrutura"
+      <GavetaLateral
+        v-if="gavetaDaEstruturaAberta"
+        etiqueta="Edição guiada"
+        titulo="Estrutura do concurso"
+        descricao="Edite cada nível dentro do seu contexto, sem perder a visão geral."
+        larga
+        @fechar="gavetaDaEstruturaAberta = false"
+      >
+        <section
+          class="card card-body border-0 shadow-sm mb-4 dados-gerais-do-concurso"
+        >
+          <div class="cabecalho-do-cartao-contextual">
+            <div>
+              <p class="sobretitulo-da-pagina">Etapa 1</p>
+              <h2 class="h4 titulo-editorial mb-0">Dados gerais do objetivo</h2>
+            </div>
+            <button
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              @click="secaoAberta = secaoAberta === 'dados' ? '' : 'dados'"
             >
-              <div class="item-da-estrutura">
+              <i class="bi bi-pencil me-1" aria-hidden="true"></i>
+              {{ secaoAberta === 'dados' ? 'Fechar edição' : 'Editar' }}
+            </button>
+          </div>
+          <dl
+            v-if="secaoAberta !== 'dados'"
+            class="resumo-dos-dados-do-concurso"
+          >
+            <div>
+              <dt>Órgão</dt>
+              <dd>{{ concurso.orgao || 'Não informado' }}</dd>
+            </div>
+            <div>
+              <dt>Banca</dt>
+              <dd>{{ concurso.banca || 'Não informada' }}</dd>
+            </div>
+            <div>
+              <dt>Data principal</dt>
+              <dd>{{ formatarData(concurso.dataPrevistaPrincipal) }}</dd>
+            </div>
+            <div>
+              <dt>Situação</dt>
+              <dd>
+                {{ rotuloDoDominio(concurso.situacao, rotulosDaSituacao) }}
+              </dd>
+            </div>
+          </dl>
+          <form v-else class="mt-3" @submit.prevent="salvarConcurso">
+            <fieldset :disabled="concursoArquivado || salvando">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="detalhe-nome-concurso"
+                    >Nome</label
+                  >
+                  <input
+                    id="detalhe-nome-concurso"
+                    v-model="formularioConcurso.nome"
+                    class="form-control"
+                    required
+                  />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="detalhe-orgao-concurso">
+                    Órgão
+                  </label>
+                  <input
+                    id="detalhe-orgao-concurso"
+                    v-model="formularioConcurso.orgao"
+                    class="form-control"
+                  />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="detalhe-banca-concurso">
+                    Banca
+                  </label>
+                  <input
+                    id="detalhe-banca-concurso"
+                    v-model="formularioConcurso.banca"
+                    class="form-control"
+                  />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="detalhe-situacao-concurso">
+                    Situação
+                  </label>
+                  <select
+                    id="detalhe-situacao-concurso"
+                    v-model="formularioConcurso.situacao"
+                    class="form-select"
+                  >
+                    <option value="PLANEJADO">Planejado</option>
+                    <option value="EDITAL_PUBLICADO">Edital publicado</option>
+                    <option value="INSCRICOES_ABERTAS">
+                      Inscrições abertas
+                    </option>
+                    <option value="EM_ANDAMENTO">Em andamento</option>
+                    <option value="ENCERRADO">Encerrado</option>
+                    <option value="SUSPENSO">Suspenso</option>
+                    <option value="CANCELADO">Cancelado</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="detalhe-data-concurso">
+                    Data principal
+                  </label>
+                  <input
+                    id="detalhe-data-concurso"
+                    v-model="formularioConcurso.dataPrevistaPrincipal"
+                    class="form-control"
+                    type="date"
+                  />
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="detalhe-descricao-concurso">
+                    Descrição
+                  </label>
+                  <textarea
+                    id="detalhe-descricao-concurso"
+                    v-model="formularioConcurso.descricao"
+                    class="form-control"
+                    rows="3"
+                  ></textarea>
+                </div>
+              </div>
+              <button class="btn btn-primary mt-3">Salvar dados gerais</button>
+            </fieldset>
+          </form>
+        </section>
+
+        <div class="row g-4">
+          <section class="col-xl-7">
+            <div class="card card-body border-0 shadow-sm mb-4">
+              <h2 class="h4">2. Editais</h2>
+              <p v-if="editais.length === 0" class="estado-vazio-compacto">
+                Nenhum edital cadastrado.
+              </p>
+              <article
+                v-for="edital in editais"
+                :key="edital.identificador"
+                class="item-da-estrutura"
+              >
                 <div>
-                  <strong>3. {{ cargo.nome }}</strong>
+                  <strong>{{ edital.titulo }}</strong>
                   <span
-                    v-if="cargo.selecionado"
+                    v-if="edital.principal"
                     class="badge text-bg-success ms-2"
                   >
-                    Selecionado
+                    Principal
                   </span>
                   <p class="small text-secondary mb-0">
-                    {{ cargo.nivelDeEscolaridade }} · ordem {{ cargo.ordem }}
+                    {{ edital.numero || 'Sem número' }}
+                    <span v-if="edital.ano"> · {{ edital.ano }}</span>
                   </p>
                 </div>
                 <div class="acoes-da-estrutura">
                   <button
                     class="btn btn-outline-success btn-sm"
-                    :disabled="concursoArquivado || cargo.selecionado"
+                    :disabled="concursoArquivado || edital.principal"
                     @click="
-                      executar(() => selecionarCargo(cargo.identificador))
+                      executar(() =>
+                        definirEditalPrincipal(edital.identificador),
+                      )
                     "
                   >
-                    Selecionar
+                    Principal
                   </button>
                   <button
                     class="btn btn-outline-primary btn-sm"
                     :disabled="concursoArquivado"
-                    @click="editarCargo(cargo)"
+                    @click="editarEdital(edital)"
                   >
                     Editar
                   </button>
@@ -899,39 +1549,60 @@ onBeforeUnmount(() => cancelamento.abort())
                     class="btn btn-outline-danger btn-sm"
                     :disabled="concursoArquivado"
                     @click="
-                      remover(`o cargo ${cargo.nome}`, () =>
-                        excluirCargo(cargo.identificador),
+                      remover(`o edital ${edital.titulo}`, () =>
+                        excluirEdital(edital.identificador),
                       )
                     "
                   >
                     Excluir
                   </button>
                 </div>
-              </div>
+              </article>
+            </div>
 
-              <div
-                v-if="(provasPorCargo[cargo.identificador] ?? []).length === 0"
-                class="estado-vazio-compacto ms-3"
-              >
-                4. Nenhuma prova neste cargo.
-              </div>
+            <div class="card card-body border-0 shadow-sm">
+              <h2 class="h4">Estrutura hierárquica</h2>
+              <p v-if="cargos.length === 0" class="estado-vazio-compacto">
+                3. Adicione um cargo para iniciar a árvore.
+              </p>
               <article
-                v-for="prova in provasPorCargo[cargo.identificador] ?? []"
-                :key="prova.identificador"
-                class="ramo-da-estrutura ms-3"
+                v-for="cargo in cargos"
+                :key="cargo.identificador"
+                class="ramo-da-estrutura"
               >
                 <div class="item-da-estrutura">
                   <div>
-                    <strong>4. {{ prova.nome }}</strong>
+                    <strong>3. {{ cargo.nome }}</strong>
+                    <span
+                      v-if="cargo.selecionado"
+                      class="badge text-bg-success ms-2"
+                    >
+                      Selecionado
+                    </span>
                     <p class="small text-secondary mb-0">
-                      {{ prova.tipo }} · {{ prova.carater }}
+                      {{
+                        rotuloDoDominio(
+                          cargo.nivelDeEscolaridade,
+                          rotulosDoNivel,
+                        )
+                      }}
+                      · ordem {{ cargo.ordem }}
                     </p>
                   </div>
                   <div class="acoes-da-estrutura">
                     <button
+                      class="btn btn-outline-success btn-sm"
+                      :disabled="concursoArquivado || cargo.selecionado"
+                      @click="
+                        executar(() => selecionarCargo(cargo.identificador))
+                      "
+                    >
+                      Selecionar
+                    </button>
+                    <button
                       class="btn btn-outline-primary btn-sm"
                       :disabled="concursoArquivado"
-                      @click="editarProva(prova)"
+                      @click="editarCargo(cargo)"
                     >
                       Editar
                     </button>
@@ -939,8 +1610,8 @@ onBeforeUnmount(() => cancelamento.abort())
                       class="btn btn-outline-danger btn-sm"
                       :disabled="concursoArquivado"
                       @click="
-                        remover(`a prova ${prova.nome}`, () =>
-                          excluirProva(prova.identificador),
+                        remover(`o cargo ${cargo.nome}`, () =>
+                          excluirCargo(cargo.identificador),
                         )
                       "
                     >
@@ -949,23 +1620,33 @@ onBeforeUnmount(() => cancelamento.abort())
                   </div>
                 </div>
 
+                <div
+                  v-if="
+                    (provasPorCargo[cargo.identificador] ?? []).length === 0
+                  "
+                  class="estado-vazio-compacto ms-3"
+                >
+                  4. Nenhuma prova neste cargo.
+                </div>
                 <article
-                  v-for="grupo in gruposPorProva[prova.identificador] ?? []"
-                  :key="grupo.identificador"
+                  v-for="prova in provasPorCargo[cargo.identificador] ?? []"
+                  :key="prova.identificador"
                   class="ramo-da-estrutura ms-3"
                 >
                   <div class="item-da-estrutura">
                     <div>
-                      <strong>5. {{ grupo.nome }}</strong>
+                      <strong>4. {{ prova.nome }}</strong>
                       <p class="small text-secondary mb-0">
-                        Ordem {{ grupo.ordem }}
+                        {{ rotuloDoDominio(prova.tipo, rotulosDoTipoDeProva) }}
+                        ·
+                        {{ rotuloDoDominio(prova.carater, rotulosDoCarater) }}
                       </p>
                     </div>
                     <div class="acoes-da-estrutura">
                       <button
                         class="btn btn-outline-primary btn-sm"
                         :disabled="concursoArquivado"
-                        @click="editarGrupo(grupo)"
+                        @click="editarProva(prova)"
                       >
                         Editar
                       </button>
@@ -973,8 +1654,8 @@ onBeforeUnmount(() => cancelamento.abort())
                         class="btn btn-outline-danger btn-sm"
                         :disabled="concursoArquivado"
                         @click="
-                          remover(`o grupo ${grupo.nome}`, () =>
-                            excluirGrupo(grupo.identificador),
+                          remover(`a prova ${prova.nome}`, () =>
+                            excluirProva(prova.identificador),
                           )
                         "
                       >
@@ -983,35 +1664,23 @@ onBeforeUnmount(() => cancelamento.abort())
                     </div>
                   </div>
 
-                  <div
-                    v-if="
-                      (materiasPorGrupo[grupo.identificador] ?? []).length === 0
-                    "
-                    class="estado-vazio-compacto ms-3"
-                  >
-                    6. Nenhuma materia neste grupo.
-                  </div>
                   <article
-                    v-for="materia in materiasPorGrupo[grupo.identificador] ??
-                    []"
-                    :key="materia.identificador"
+                    v-for="grupo in gruposPorProva[prova.identificador] ?? []"
+                    :key="grupo.identificador"
                     class="ramo-da-estrutura ms-3"
                   >
                     <div class="item-da-estrutura">
                       <div>
-                        <strong>6. {{ materia.nomeDaMateria }}</strong>
+                        <strong>5. {{ grupo.nome }}</strong>
                         <p class="small text-secondary mb-0">
-                          Ordem {{ materia.ordem }}
-                          <span v-if="materia.peso">
-                            · peso {{ materia.peso }}</span
-                          >
+                          Ordem {{ grupo.ordem }}
                         </p>
                       </div>
                       <div class="acoes-da-estrutura">
                         <button
                           class="btn btn-outline-primary btn-sm"
                           :disabled="concursoArquivado"
-                          @click="editarMateria(materia)"
+                          @click="editarGrupo(grupo)"
                         >
                           Editar
                         </button>
@@ -1019,8 +1688,8 @@ onBeforeUnmount(() => cancelamento.abort())
                           class="btn btn-outline-danger btn-sm"
                           :disabled="concursoArquivado"
                           @click="
-                            remover(`a materia ${materia.nomeDaMateria}`, () =>
-                              excluirMateriaDaProva(materia.identificador),
+                            remover(`o grupo ${grupo.nome}`, () =>
+                              excluirGrupo(grupo.identificador),
                             )
                           "
                         >
@@ -1029,901 +1698,1001 @@ onBeforeUnmount(() => cancelamento.abort())
                       </div>
                     </div>
 
-                    <p
+                    <div
                       v-if="
-                        (itensPorMateriaDaProva[materia.identificador] ?? [])
-                          .length === 0
+                        (materiasPorGrupo[grupo.identificador] ?? []).length ===
+                        0
                       "
                       class="estado-vazio-compacto ms-3"
                     >
-                      7. Nenhum item oficial cadastrado.
-                    </p>
+                      6. Nenhuma materia neste grupo.
+                    </div>
                     <article
-                      v-for="item in itensPorMateriaDaProva[
-                        materia.identificador
-                      ] ?? []"
-                      :key="item.identificador"
-                      class="item-do-edital"
-                      :style="{
-                        marginLeft: `${
-                          nivelDoItem(
-                            item,
-                            itensPorMateriaDaProva[materia.identificador] ?? [],
-                          ) * 1.25
-                        }rem`,
-                      }"
+                      v-for="materia in materiasPorGrupo[grupo.identificador] ??
+                      []"
+                      :key="materia.identificador"
+                      class="ramo-da-estrutura ms-3"
                     >
                       <div class="item-da-estrutura">
                         <div>
-                          <strong>7. {{ item.descricaoOriginal }}</strong>
-                          <p class="small text-secondary mb-1">
-                            {{ editalDoItem(item) }} · ordem {{ item.ordem }}
-                          </p>
-                          <p
-                            v-if="
-                              (mapeamentosPorItem[item.identificador] ?? [])
-                                .length === 0
-                            "
-                            class="small text-secondary mb-0"
-                          >
-                            Sem mapeamento para topico.
-                          </p>
-                          <ul
-                            v-else
-                            class="lista-de-mapeamentos small mb-0"
-                            aria-label="Topicos mapeados"
-                          >
-                            <li
-                              v-for="mapeamento in mapeamentosPorItem[
-                                item.identificador
-                              ] ?? []"
-                              :key="mapeamento.identificador"
+                          <strong>6. {{ materia.nomeDaMateria }}</strong>
+                          <p class="small text-secondary mb-0">
+                            Ordem {{ materia.ordem }}
+                            <span v-if="materia.peso">
+                              · peso {{ materia.peso }}</span
                             >
-                              <span class="badge text-bg-success me-1">
-                                Confirmado
-                              </span>
-                              {{ mapeamento.nomeDoTopico }}
-                              <button
-                                class="btn btn-link btn-sm text-danger"
-                                type="button"
-                                :disabled="concursoArquivado"
-                                :aria-label="`Remover mapeamento com ${mapeamento.nomeDoTopico}`"
-                                @click="
-                                  remover(
-                                    `o mapeamento com ${mapeamento.nomeDoTopico}`,
-                                    () =>
-                                      excluirMapeamentoDoItem(
-                                        item.identificador,
-                                        mapeamento.identificadorDoTopicoDaMateria,
-                                      ),
-                                  )
-                                "
-                              >
-                                Remover vinculo
-                              </button>
-                            </li>
-                          </ul>
+                          </p>
                         </div>
                         <div class="acoes-da-estrutura">
                           <button
                             class="btn btn-outline-primary btn-sm"
                             :disabled="concursoArquivado"
-                            @click="editarItem(item)"
+                            @click="editarMateria(materia)"
                           >
-                            Editar item
+                            Editar
                           </button>
                           <button
                             class="btn btn-outline-danger btn-sm"
                             :disabled="concursoArquivado"
                             @click="
-                              remover('o item do edital', () =>
-                                excluirItemDoEdital(item.identificador),
+                              remover(
+                                `a materia ${materia.nomeDaMateria}`,
+                                () =>
+                                  excluirMateriaDaProva(materia.identificador),
                               )
                             "
                           >
-                            Excluir item
+                            Excluir
                           </button>
                         </div>
                       </div>
+
+                      <p
+                        v-if="
+                          (itensPorMateriaDaProva[materia.identificador] ?? [])
+                            .length === 0
+                        "
+                        class="estado-vazio-compacto ms-3"
+                      >
+                        7. Nenhum item oficial cadastrado.
+                      </p>
+                      <article
+                        v-for="item in itensPorMateriaDaProva[
+                          materia.identificador
+                        ] ?? []"
+                        :key="item.identificador"
+                        class="item-do-edital"
+                        :style="{
+                          marginLeft: `${
+                            nivelDoItem(
+                              item,
+                              itensPorMateriaDaProva[materia.identificador] ??
+                                [],
+                            ) * 1.25
+                          }rem`,
+                        }"
+                      >
+                        <div class="item-da-estrutura">
+                          <div>
+                            <strong>7. {{ item.descricaoOriginal }}</strong>
+                            <p class="small text-secondary mb-1">
+                              {{ editalDoItem(item) }} · ordem {{ item.ordem }}
+                            </p>
+                            <p
+                              v-if="
+                                (mapeamentosPorItem[item.identificador] ?? [])
+                                  .length === 0
+                              "
+                              class="small text-secondary mb-0"
+                            >
+                              Sem mapeamento para tópico.
+                            </p>
+                            <ul
+                              v-else
+                              class="lista-de-mapeamentos small mb-0"
+                              aria-label="Topicos mapeados"
+                            >
+                              <li
+                                v-for="mapeamento in mapeamentosPorItem[
+                                  item.identificador
+                                ] ?? []"
+                                :key="mapeamento.identificador"
+                              >
+                                <span class="badge text-bg-success me-1">
+                                  Confirmado
+                                </span>
+                                {{ mapeamento.nomeDoTopico }}
+                                <button
+                                  class="btn btn-link btn-sm text-danger"
+                                  type="button"
+                                  :disabled="concursoArquivado"
+                                  :aria-label="`Remover mapeamento com ${mapeamento.nomeDoTopico}`"
+                                  @click="
+                                    remover(
+                                      `o mapeamento com ${mapeamento.nomeDoTopico}`,
+                                      () =>
+                                        excluirMapeamentoDoItem(
+                                          item.identificador,
+                                          mapeamento.identificadorDoTopicoDaMateria,
+                                        ),
+                                    )
+                                  "
+                                >
+                                  Remover vinculo
+                                </button>
+                              </li>
+                            </ul>
+                          </div>
+                          <div class="acoes-da-estrutura">
+                            <button
+                              class="btn btn-primary btn-sm"
+                              type="button"
+                              :disabled="concursoArquivado"
+                              @click="abrirMapeamento(item)"
+                            >
+                              {{
+                                (mapeamentosPorItem[item.identificador] ?? [])
+                                  .length
+                                  ? 'Adicionar vínculo'
+                                  : 'Mapear tópico'
+                              }}
+                            </button>
+                            <button
+                              class="btn btn-outline-primary btn-sm"
+                              :disabled="concursoArquivado"
+                              @click="editarItem(item)"
+                            >
+                              Editar item
+                            </button>
+                            <button
+                              class="btn btn-outline-danger btn-sm"
+                              :disabled="concursoArquivado"
+                              @click="
+                                remover('o item do edital', () =>
+                                  excluirItemDoEdital(item.identificador),
+                                )
+                              "
+                            >
+                              Excluir item
+                            </button>
+                          </div>
+                        </div>
+                      </article>
                     </article>
                   </article>
                 </article>
               </article>
-            </article>
-          </div>
-        </section>
-
-        <aside class="col-xl-5">
-          <div id="formularios-da-estrutura" class="accordion shadow-sm">
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'edital' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'edital'"
-                  aria-controls="formulario-edital"
-                  @click="alternarSecao('edital')"
-                >
-                  {{ formularioEdital.identificador ? 'Editar' : 'Adicionar' }}
-                  edital
-                </button>
-              </h2>
-              <div
-                id="formulario-edital"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'edital' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarEdital">
-                  <fieldset :disabled="concursoArquivado || salvando">
-                    <label class="form-label" for="titulo-edital">Titulo</label>
-                    <input
-                      id="titulo-edital"
-                      v-model="formularioEdital.titulo"
-                      class="form-control mb-2"
-                      required
-                    />
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label" for="numero-edital">
-                          Numero
-                        </label>
-                        <input
-                          id="numero-edital"
-                          v-model="formularioEdital.numero"
-                          class="form-control"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="ano-edital">Ano</label>
-                        <input
-                          id="ano-edital"
-                          v-model.number="formularioEdital.ano"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                    </div>
-                    <label class="form-label mt-2" for="url-edital">
-                      Endereco do documento
-                    </label>
-                    <input
-                      id="url-edital"
-                      v-model="formularioEdital.enderecoDoDocumento"
-                      class="form-control mb-3"
-                      type="url"
-                    />
-                    <label class="form-label" for="data-edital">
-                      Data de publicacao
-                    </label>
-                    <input
-                      id="data-edital"
-                      v-model="formularioEdital.dataDePublicacao"
-                      class="form-control mb-2"
-                      type="date"
-                    />
-                    <label class="form-label" for="descricao-edital">
-                      Descricao
-                    </label>
-                    <textarea
-                      id="descricao-edital"
-                      v-model="formularioEdital.descricao"
-                      class="form-control mb-3"
-                      rows="2"
-                    ></textarea>
-                    <button class="btn btn-primary">Salvar edital</button>
-                    <button
-                      v-if="formularioEdital.identificador"
-                      class="btn btn-link"
-                      type="button"
-                      @click="limparEdital"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
-              </div>
             </div>
+          </section>
 
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'cargo' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'cargo'"
-                  aria-controls="formulario-cargo"
-                  @click="alternarSecao('cargo')"
-                >
-                  {{ formularioCargo.identificador ? 'Editar' : 'Adicionar' }}
-                  cargo
-                </button>
-              </h2>
-              <div
-                id="formulario-cargo"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'cargo' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarCargo">
-                  <fieldset :disabled="concursoArquivado || salvando">
-                    <label class="form-label" for="nome-cargo">Nome</label>
-                    <input
-                      id="nome-cargo"
-                      v-model="formularioCargo.nome"
-                      class="form-control mb-2"
-                      required
-                    />
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label" for="area-cargo">Area</label>
-                        <input
-                          id="area-cargo"
-                          v-model="formularioCargo.area"
-                          class="form-control"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="especialidade-cargo">
-                          Especialidade
-                        </label>
-                        <input
-                          id="especialidade-cargo"
-                          v-model="formularioCargo.especialidade"
-                          class="form-control"
-                        />
-                      </div>
-                    </div>
-                    <label class="form-label" for="nivel-cargo">
-                      Nivel de escolaridade
-                    </label>
-                    <select
-                      id="nivel-cargo"
-                      v-model="formularioCargo.nivelDeEscolaridade"
-                      class="form-select mb-2"
-                    >
-                      <option value="NAO_INFORMADO">Nao informado</option>
-                      <option value="FUNDAMENTAL">Fundamental</option>
-                      <option value="MEDIO">Medio</option>
-                      <option value="TECNICO">Tecnico</option>
-                      <option value="SUPERIOR">Superior</option>
-                    </select>
-                    <label class="form-label" for="ordem-cargo">Ordem</label>
-                    <input
-                      id="ordem-cargo"
-                      v-model.number="formularioCargo.ordem"
-                      class="form-control mb-3"
-                      type="number"
-                      min="1"
-                      required
-                    />
-                    <button class="btn btn-primary">Salvar cargo</button>
-                    <button
-                      v-if="formularioCargo.identificador"
-                      class="btn btn-link"
-                      type="button"
-                      @click="limparCargo"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'prova' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'prova'"
-                  aria-controls="formulario-prova"
-                  @click="alternarSecao('prova')"
-                >
-                  {{ formularioProva.identificador ? 'Editar' : 'Adicionar' }}
-                  prova
-                </button>
-              </h2>
-              <div
-                id="formulario-prova"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'prova' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarProva">
-                  <fieldset
-                    :disabled="
-                      concursoArquivado || salvando || cargos.length === 0
-                    "
+          <aside class="col-xl-5">
+            <div id="formularios-da-estrutura" class="accordion shadow-sm">
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'edital' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'edital'"
+                    aria-controls="formulario-edital"
+                    @click="alternarSecao('edital')"
                   >
-                    <label class="form-label" for="cargo-da-prova">Cargo</label>
-                    <select
-                      id="cargo-da-prova"
-                      v-model="formularioProva.identificadorDoCargo"
-                      class="form-select mb-2"
-                      required
-                    >
-                      <option
-                        v-for="cargo in cargos"
-                        :key="cargo.identificador"
-                        :value="cargo.identificador"
-                      >
-                        {{ cargo.nome }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="nome-prova">Nome</label>
-                    <input
-                      id="nome-prova"
-                      v-model="formularioProva.nome"
-                      class="form-control mb-2"
-                      required
-                    />
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label" for="tipo-prova">Tipo</label>
-                        <select
-                          id="tipo-prova"
-                          v-model="formularioProva.tipo"
-                          class="form-select"
-                        >
-                          <option value="OBJETIVA">Objetiva</option>
-                          <option value="DISCURSIVA">Discursiva</option>
-                          <option value="PRATICA">Pratica</option>
-                          <option value="TITULOS">Titulos</option>
-                          <option value="OUTRA">Outra</option>
-                        </select>
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="ordem-prova"
-                          >Ordem</label
-                        >
-                        <input
-                          id="ordem-prova"
-                          v-model.number="formularioProva.ordem"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                    </div>
-                    <label class="form-label mt-2" for="carater-prova">
-                      Carater
-                    </label>
-                    <select
-                      id="carater-prova"
-                      v-model="formularioProva.carater"
-                      class="form-select mb-3"
-                    >
-                      <option value="NAO_INFORMADO">Nao informado</option>
-                      <option value="ELIMINATORIO">Eliminatorio</option>
-                      <option value="CLASSIFICATORIO">Classificatorio</option>
-                      <option value="ELIMINATORIO_E_CLASSIFICATORIO">
-                        Eliminatorio e classificatorio
-                      </option>
-                    </select>
-                    <label class="form-label mt-2" for="data-prova">
-                      Data e hora prevista
-                    </label>
-                    <input
-                      id="data-prova"
-                      v-model="formularioProva.dataHoraPrevista"
-                      class="form-control mb-2"
-                      type="datetime-local"
-                    />
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label" for="duracao-prova">
-                          Duracao em minutos
-                        </label>
-                        <input
-                          id="duracao-prova"
-                          v-model.number="formularioProva.duracaoEmMinutos"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="questoes-prova">
-                          Questoes
-                        </label>
-                        <input
-                          id="questoes-prova"
-                          v-model.number="formularioProva.quantidadeDeQuestoes"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="maxima-prova">
-                          Pontuacao maxima
-                        </label>
-                        <input
-                          id="maxima-prova"
-                          v-model.number="formularioProva.pontuacaoMaxima"
-                          class="form-control"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="minima-prova">
-                          Pontuacao minima
-                        </label>
-                        <input
-                          id="minima-prova"
-                          v-model.number="formularioProva.pontuacaoMinima"
-                          class="form-control"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-                    <button class="btn btn-primary">Salvar prova</button>
-                    <button
-                      v-if="formularioProva.identificador"
-                      class="btn btn-link"
-                      type="button"
-                      @click="limparProva"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'grupo' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'grupo'"
-                  aria-controls="formulario-grupo"
-                  @click="alternarSecao('grupo')"
+                    {{
+                      formularioEdital.identificador ? 'Editar' : 'Adicionar'
+                    }}
+                    edital
+                  </button>
+                </h2>
+                <div
+                  id="formulario-edital"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'edital' }"
                 >
-                  {{ formularioGrupo.identificador ? 'Editar' : 'Adicionar' }}
-                  grupo
-                </button>
-              </h2>
-              <div
-                id="formulario-grupo"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'grupo' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarGrupo">
-                  <fieldset
-                    :disabled="
-                      concursoArquivado ||
-                      salvando ||
-                      todasAsProvas.length === 0
-                    "
-                  >
-                    <label class="form-label" for="prova-do-grupo">Prova</label>
-                    <select
-                      id="prova-do-grupo"
-                      v-model="formularioGrupo.identificadorDaProva"
-                      class="form-select mb-2"
-                      required
-                    >
-                      <option
-                        v-for="prova in todasAsProvas"
-                        :key="prova.identificador"
-                        :value="prova.identificador"
+                  <form class="accordion-body" @submit.prevent="salvarEdital">
+                    <fieldset :disabled="concursoArquivado || salvando">
+                      <label class="form-label" for="titulo-edital"
+                        >Titulo</label
                       >
-                        {{ prova.nome }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="nome-grupo">Nome</label>
-                    <input
-                      id="nome-grupo"
-                      v-model="formularioGrupo.nome"
-                      class="form-control mb-2"
-                      required
-                    />
-                    <label class="form-label" for="ordem-grupo">Ordem</label>
-                    <input
-                      id="ordem-grupo"
-                      v-model.number="formularioGrupo.ordem"
-                      class="form-control mb-3"
-                      type="number"
-                      min="1"
-                    />
-                    <div class="row g-2 mb-3">
-                      <div class="col-4">
-                        <label class="form-label" for="questoes-grupo">
-                          Questoes
-                        </label>
-                        <input
-                          id="questoes-grupo"
-                          v-model.number="formularioGrupo.quantidadeDeQuestoes"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
+                      <input
+                        id="titulo-edital"
+                        v-model="formularioEdital.titulo"
+                        class="form-control mb-2"
+                        required
+                      />
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <label class="form-label" for="numero-edital">
+                            Numero
+                          </label>
+                          <input
+                            id="numero-edital"
+                            v-model="formularioEdital.numero"
+                            class="form-control"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="ano-edital">Ano</label>
+                          <input
+                            id="ano-edital"
+                            v-model.number="formularioEdital.ano"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
                       </div>
-                      <div class="col-4">
-                        <label class="form-label" for="maxima-grupo">
-                          Maxima
-                        </label>
-                        <input
-                          id="maxima-grupo"
-                          v-model.number="formularioGrupo.pontuacaoMaxima"
-                          class="form-control"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                        />
-                      </div>
-                      <div class="col-4">
-                        <label class="form-label" for="minima-grupo">
-                          Minima
-                        </label>
-                        <input
-                          id="minima-grupo"
-                          v-model.number="formularioGrupo.pontuacaoMinima"
-                          class="form-control"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-                    <button class="btn btn-primary">Salvar grupo</button>
-                    <button
-                      v-if="formularioGrupo.identificador"
-                      class="btn btn-link"
-                      type="button"
-                      @click="limparGrupo"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
+                      <label class="form-label mt-2" for="url-edital">
+                        Endereco do documento
+                      </label>
+                      <input
+                        id="url-edital"
+                        v-model="formularioEdital.enderecoDoDocumento"
+                        class="form-control mb-3"
+                        type="url"
+                      />
+                      <label class="form-label" for="data-edital">
+                        Data de publicacao
+                      </label>
+                      <input
+                        id="data-edital"
+                        v-model="formularioEdital.dataDePublicacao"
+                        class="form-control mb-2"
+                        type="date"
+                      />
+                      <label class="form-label" for="descricao-edital">
+                        Descricao
+                      </label>
+                      <textarea
+                        id="descricao-edital"
+                        v-model="formularioEdital.descricao"
+                        class="form-control mb-3"
+                        rows="2"
+                      ></textarea>
+                      <button class="btn btn-primary">Salvar edital</button>
+                      <button
+                        v-if="formularioEdital.identificador"
+                        class="btn btn-link"
+                        type="button"
+                        @click="limparEdital"
+                      >
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
               </div>
-            </div>
 
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'materia' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'materia'"
-                  aria-controls="formulario-materia-da-prova"
-                  @click="alternarSecao('materia')"
-                >
-                  {{ formularioMateria.identificador ? 'Editar' : 'Adicionar' }}
-                  materia
-                </button>
-              </h2>
-              <div
-                id="formulario-materia-da-prova"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'materia' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarMateria">
-                  <fieldset
-                    :disabled="
-                      concursoArquivado ||
-                      salvando ||
-                      todosOsGrupos.length === 0 ||
-                      materiasDisponiveis.length === 0
-                    "
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'cargo' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'cargo'"
+                    aria-controls="formulario-cargo"
+                    @click="alternarSecao('cargo')"
                   >
-                    <label class="form-label" for="grupo-da-materia"
-                      >Grupo</label
-                    >
-                    <select
-                      id="grupo-da-materia"
-                      v-model="formularioMateria.identificadorDoGrupo"
-                      class="form-select mb-2"
-                      required
-                    >
-                      <option
-                        v-for="grupo in todosOsGrupos"
-                        :key="grupo.identificador"
-                        :value="grupo.identificador"
+                    {{ formularioCargo.identificador ? 'Editar' : 'Adicionar' }}
+                    cargo
+                  </button>
+                </h2>
+                <div
+                  id="formulario-cargo"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'cargo' }"
+                >
+                  <form class="accordion-body" @submit.prevent="salvarCargo">
+                    <fieldset :disabled="concursoArquivado || salvando">
+                      <label class="form-label" for="nome-cargo">Nome</label>
+                      <input
+                        id="nome-cargo"
+                        v-model="formularioCargo.nome"
+                        class="form-control mb-2"
+                        required
+                      />
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <label class="form-label" for="area-cargo"
+                            >Area</label
+                          >
+                          <input
+                            id="area-cargo"
+                            v-model="formularioCargo.area"
+                            class="form-control"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="especialidade-cargo">
+                            Especialidade
+                          </label>
+                          <input
+                            id="especialidade-cargo"
+                            v-model="formularioCargo.especialidade"
+                            class="form-control"
+                          />
+                        </div>
+                      </div>
+                      <label class="form-label" for="nivel-cargo">
+                        Nivel de escolaridade
+                      </label>
+                      <select
+                        id="nivel-cargo"
+                        v-model="formularioCargo.nivelDeEscolaridade"
+                        class="form-select mb-2"
                       >
-                        {{ grupo.nome }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="materia-do-grupo">
-                      Materia do catalogo
-                    </label>
-                    <select
-                      id="materia-do-grupo"
-                      v-model="formularioMateria.identificadorDaMateria"
-                      class="form-select mb-2"
-                      :disabled="Boolean(formularioMateria.identificador)"
-                      required
-                    >
-                      <option value="" disabled>Selecione</option>
-                      <option
-                        v-for="materia in materiasDisponiveis"
-                        :key="materia.identificador"
-                        :value="materia.identificador"
+                        <option value="NAO_INFORMADO">Não informado</option>
+                        <option value="FUNDAMENTAL">Fundamental</option>
+                        <option value="MEDIO">Medio</option>
+                        <option value="TECNICO">Tecnico</option>
+                        <option value="SUPERIOR">Superior</option>
+                      </select>
+                      <label class="form-label" for="ordem-cargo">Ordem</label>
+                      <input
+                        id="ordem-cargo"
+                        v-model.number="formularioCargo.ordem"
+                        class="form-control mb-3"
+                        type="number"
+                        min="1"
+                        required
+                      />
+                      <button class="btn btn-primary">Salvar cargo</button>
+                      <button
+                        v-if="formularioCargo.identificador"
+                        class="btn btn-link"
+                        type="button"
+                        @click="limparCargo"
                       >
-                        {{ materia.nome }}
-                      </option>
-                    </select>
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label" for="ordem-materia">
-                          Ordem
-                        </label>
-                        <input
-                          id="ordem-materia"
-                          v-model.number="formularioMateria.ordem"
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="peso-materia"
-                          >Peso</label
-                        >
-                        <input
-                          id="peso-materia"
-                          v-model.number="formularioMateria.peso"
-                          class="form-control"
-                          type="number"
-                          min="0.0001"
-                          step="0.0001"
-                        />
-                      </div>
-                    </div>
-                    <div class="row g-2 mt-1">
-                      <div class="col-6">
-                        <label class="form-label" for="questoes-materia">
-                          Questoes
-                        </label>
-                        <input
-                          id="questoes-materia"
-                          v-model.number="
-                            formularioMateria.quantidadeDeQuestoes
-                          "
-                          class="form-control"
-                          type="number"
-                          min="1"
-                        />
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label" for="pontuacao-materia">
-                          Pontuacao maxima
-                        </label>
-                        <input
-                          id="pontuacao-materia"
-                          v-model.number="formularioMateria.pontuacaoMaxima"
-                          class="form-control"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-                    <button class="btn btn-primary mt-3">Salvar materia</button>
-                    <button
-                      v-if="formularioMateria.identificador"
-                      class="btn btn-link mt-3"
-                      type="button"
-                      @click="limparMateria"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
               </div>
-            </div>
 
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'item' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'item'"
-                  aria-controls="formulario-item-do-edital"
-                  @click="alternarSecao('item')"
-                >
-                  {{ formularioItem.identificador ? 'Editar' : 'Adicionar' }}
-                  item oficial
-                </button>
-              </h2>
-              <div
-                id="formulario-item-do-edital"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'item' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarItem">
-                  <fieldset
-                    :disabled="
-                      concursoArquivado ||
-                      salvando ||
-                      todasAsMateriasDaProva.length === 0 ||
-                      editais.length === 0
-                    "
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'prova' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'prova'"
+                    aria-controls="formulario-prova"
+                    @click="alternarSecao('prova')"
                   >
-                    <label class="form-label" for="materia-do-item">
-                      Materia da prova
-                    </label>
-                    <select
-                      id="materia-do-item"
-                      v-model="formularioItem.identificadorDaMateriaDaProva"
-                      class="form-select mb-2"
-                      :disabled="Boolean(formularioItem.identificador)"
-                      required
-                      @change="formularioItem.identificadorDoItemPai = ''"
-                    >
-                      <option
-                        v-for="materia in todasAsMateriasDaProva"
-                        :key="materia.identificador"
-                        :value="materia.identificador"
-                      >
-                        {{ materia.nomeDaMateria }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="edital-do-item">
-                      Edital
-                    </label>
-                    <select
-                      id="edital-do-item"
-                      v-model="formularioItem.identificadorDoEdital"
-                      class="form-select mb-2"
-                      :disabled="Boolean(formularioItem.identificador)"
-                      required
-                      @change="formularioItem.identificadorDoItemPai = ''"
-                    >
-                      <option
-                        v-for="edital in editais"
-                        :key="edital.identificador"
-                        :value="edital.identificador"
-                      >
-                        {{ edital.titulo }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="descricao-original">
-                      Redacao original
-                    </label>
-                    <textarea
-                      id="descricao-original"
-                      v-model="formularioItem.descricaoOriginal"
-                      class="form-control mb-2"
-                      rows="4"
-                      required
-                      aria-describedby="ajuda-redacao-original"
-                    ></textarea>
-                    <p id="ajuda-redacao-original" class="form-text">
-                      Transcreva o texto oficial sem resumir ou normalizar.
-                    </p>
-                    <label class="form-label" for="pai-do-item">
-                      Item-pai, opcional
-                    </label>
-                    <select
-                      id="pai-do-item"
-                      v-model="formularioItem.identificadorDoItemPai"
-                      class="form-select mb-2"
-                    >
-                      <option value="">Item raiz</option>
-                      <option
-                        v-for="item in paisDisponiveisParaOItem"
-                        :key="item.identificador"
-                        :value="item.identificador"
-                      >
-                        {{ item.descricaoOriginal }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="ordem-item">Ordem</label>
-                    <input
-                      id="ordem-item"
-                      v-model.number="formularioItem.ordem"
-                      class="form-control"
-                      type="number"
-                      min="1"
-                      required
-                    />
-                    <button class="btn btn-primary mt-3">Salvar item</button>
-                    <button
-                      v-if="formularioItem.identificador"
-                      class="btn btn-link mt-3"
-                      type="button"
-                      @click="limparItem"
-                    >
-                      Cancelar
-                    </button>
-                  </fieldset>
-                </form>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button
-                  class="accordion-button"
-                  :class="{ collapsed: secaoAberta !== 'mapeamento' }"
-                  type="button"
-                  :aria-expanded="secaoAberta === 'mapeamento'"
-                  aria-controls="formulario-mapeamento"
-                  @click="alternarSecao('mapeamento')"
+                    {{ formularioProva.identificador ? 'Editar' : 'Adicionar' }}
+                    prova
+                  </button>
+                </h2>
+                <div
+                  id="formulario-prova"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'prova' }"
                 >
-                  Mapear item para topico
-                </button>
-              </h2>
-              <div
-                id="formulario-mapeamento"
-                class="accordion-collapse collapse"
-                :class="{ show: secaoAberta === 'mapeamento' }"
-              >
-                <form class="accordion-body" @submit.prevent="salvarMapeamento">
-                  <fieldset
-                    :disabled="
-                      concursoArquivado || salvando || todosOsItens.length === 0
-                    "
-                  >
-                    <label class="form-label" for="item-do-mapeamento">
-                      Item oficial
-                    </label>
-                    <select
-                      id="item-do-mapeamento"
-                      v-model="formularioMapeamento.identificadorDoItem"
-                      class="form-select mb-2"
-                      required
-                      @change="formularioMapeamento.identificadorDoTopico = ''"
-                    >
-                      <option
-                        v-for="item in todosOsItens"
-                        :key="item.identificador"
-                        :value="item.identificador"
-                      >
-                        {{ item.descricaoOriginal }}
-                      </option>
-                    </select>
-                    <label class="form-label" for="topico-do-mapeamento">
-                      Topico da mesma materia
-                    </label>
-                    <select
-                      id="topico-do-mapeamento"
-                      v-model="formularioMapeamento.identificadorDoTopico"
-                      class="form-select"
-                      :disabled="topicosParaMapeamento.length === 0"
-                      required
-                    >
-                      <option value="" disabled>Selecione</option>
-                      <option
-                        v-for="topico in topicosParaMapeamento"
-                        :key="topico.identificador"
-                        :value="topico.identificador"
-                      >
-                        {{ topico.nome }}
-                      </option>
-                    </select>
-                    <p
-                      v-if="
-                        formularioMapeamento.identificadorDoItem &&
-                        topicosParaMapeamento.length === 0
+                  <form class="accordion-body" @submit.prevent="salvarProva">
+                    <fieldset
+                      :disabled="
+                        concursoArquivado || salvando || cargos.length === 0
                       "
-                      class="form-text"
                     >
-                      A materia deste item ainda nao possui topicos ativos.
-                    </p>
-                    <button
-                      class="btn btn-primary mt-3"
-                      :disabled="topicosParaMapeamento.length === 0"
+                      <label class="form-label" for="cargo-da-prova"
+                        >Cargo</label
+                      >
+                      <select
+                        id="cargo-da-prova"
+                        v-model="formularioProva.identificadorDoCargo"
+                        class="form-select mb-2"
+                        required
+                      >
+                        <option
+                          v-for="cargo in cargos"
+                          :key="cargo.identificador"
+                          :value="cargo.identificador"
+                        >
+                          {{ cargo.nome }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="nome-prova">Nome</label>
+                      <input
+                        id="nome-prova"
+                        v-model="formularioProva.nome"
+                        class="form-control mb-2"
+                        required
+                      />
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <label class="form-label" for="tipo-prova"
+                            >Tipo</label
+                          >
+                          <select
+                            id="tipo-prova"
+                            v-model="formularioProva.tipo"
+                            class="form-select"
+                          >
+                            <option value="OBJETIVA">Objetiva</option>
+                            <option value="DISCURSIVA">Discursiva</option>
+                            <option value="PRATICA">Prática</option>
+                            <option value="TITULOS">Títulos</option>
+                            <option value="OUTRA">Outra</option>
+                          </select>
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="ordem-prova"
+                            >Ordem</label
+                          >
+                          <input
+                            id="ordem-prova"
+                            v-model.number="formularioProva.ordem"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                      </div>
+                      <label class="form-label mt-2" for="carater-prova">
+                        Caráter
+                      </label>
+                      <select
+                        id="carater-prova"
+                        v-model="formularioProva.carater"
+                        class="form-select mb-3"
+                      >
+                        <option value="NAO_INFORMADO">Não informado</option>
+                        <option value="ELIMINATORIO">Eliminatório</option>
+                        <option value="CLASSIFICATORIO">Classificatório</option>
+                        <option value="ELIMINATORIO_E_CLASSIFICATORIO">
+                          Eliminatório e classificatório
+                        </option>
+                      </select>
+                      <label class="form-label mt-2" for="data-prova">
+                        Data e hora prevista
+                      </label>
+                      <input
+                        id="data-prova"
+                        v-model="formularioProva.dataHoraPrevista"
+                        class="form-control mb-2"
+                        type="datetime-local"
+                      />
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <label class="form-label" for="duracao-prova">
+                            Duração em minutos
+                          </label>
+                          <input
+                            id="duracao-prova"
+                            v-model.number="formularioProva.duracaoEmMinutos"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="questoes-prova">
+                            Questoes
+                          </label>
+                          <input
+                            id="questoes-prova"
+                            v-model.number="
+                              formularioProva.quantidadeDeQuestoes
+                            "
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="maxima-prova">
+                            Pontuacao maxima
+                          </label>
+                          <input
+                            id="maxima-prova"
+                            v-model.number="formularioProva.pontuacaoMaxima"
+                            class="form-control"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="minima-prova">
+                            Pontuacao minima
+                          </label>
+                          <input
+                            id="minima-prova"
+                            v-model.number="formularioProva.pontuacaoMinima"
+                            class="form-control"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                      <button class="btn btn-primary">Salvar prova</button>
+                      <button
+                        v-if="formularioProva.identificador"
+                        class="btn btn-link"
+                        type="button"
+                        @click="limparProva"
+                      >
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
+              </div>
+
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'grupo' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'grupo'"
+                    aria-controls="formulario-grupo"
+                    @click="alternarSecao('grupo')"
+                  >
+                    {{ formularioGrupo.identificador ? 'Editar' : 'Adicionar' }}
+                    grupo
+                  </button>
+                </h2>
+                <div
+                  id="formulario-grupo"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'grupo' }"
+                >
+                  <form class="accordion-body" @submit.prevent="salvarGrupo">
+                    <fieldset
+                      :disabled="
+                        concursoArquivado ||
+                        salvando ||
+                        todasAsProvas.length === 0
+                      "
                     >
-                      Confirmar mapeamento
-                    </button>
-                  </fieldset>
-                </form>
+                      <label class="form-label" for="prova-do-grupo"
+                        >Prova</label
+                      >
+                      <select
+                        id="prova-do-grupo"
+                        v-model="formularioGrupo.identificadorDaProva"
+                        class="form-select mb-2"
+                        required
+                      >
+                        <option
+                          v-for="prova in todasAsProvas"
+                          :key="prova.identificador"
+                          :value="prova.identificador"
+                        >
+                          {{ prova.nome }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="nome-grupo">Nome</label>
+                      <input
+                        id="nome-grupo"
+                        v-model="formularioGrupo.nome"
+                        class="form-control mb-2"
+                        required
+                      />
+                      <label class="form-label" for="ordem-grupo">Ordem</label>
+                      <input
+                        id="ordem-grupo"
+                        v-model.number="formularioGrupo.ordem"
+                        class="form-control mb-3"
+                        type="number"
+                        min="1"
+                      />
+                      <div class="row g-2 mb-3">
+                        <div class="col-4">
+                          <label class="form-label" for="questoes-grupo">
+                            Questoes
+                          </label>
+                          <input
+                            id="questoes-grupo"
+                            v-model.number="
+                              formularioGrupo.quantidadeDeQuestoes
+                            "
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                        <div class="col-4">
+                          <label class="form-label" for="maxima-grupo">
+                            Maxima
+                          </label>
+                          <input
+                            id="maxima-grupo"
+                            v-model.number="formularioGrupo.pontuacaoMaxima"
+                            class="form-control"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </div>
+                        <div class="col-4">
+                          <label class="form-label" for="minima-grupo">
+                            Minima
+                          </label>
+                          <input
+                            id="minima-grupo"
+                            v-model.number="formularioGrupo.pontuacaoMinima"
+                            class="form-control"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                      <button class="btn btn-primary">Salvar grupo</button>
+                      <button
+                        v-if="formularioGrupo.identificador"
+                        class="btn btn-link"
+                        type="button"
+                        @click="limparGrupo"
+                      >
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
+              </div>
+
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'materia' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'materia'"
+                    aria-controls="formulario-materia-da-prova"
+                    @click="alternarSecao('materia')"
+                  >
+                    {{
+                      formularioMateria.identificador ? 'Editar' : 'Adicionar'
+                    }}
+                    materia
+                  </button>
+                </h2>
+                <div
+                  id="formulario-materia-da-prova"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'materia' }"
+                >
+                  <form class="accordion-body" @submit.prevent="salvarMateria">
+                    <fieldset
+                      :disabled="
+                        concursoArquivado ||
+                        salvando ||
+                        todosOsGrupos.length === 0 ||
+                        materiasDisponiveis.length === 0
+                      "
+                    >
+                      <label class="form-label" for="grupo-da-materia"
+                        >Grupo</label
+                      >
+                      <select
+                        id="grupo-da-materia"
+                        v-model="formularioMateria.identificadorDoGrupo"
+                        class="form-select mb-2"
+                        required
+                      >
+                        <option
+                          v-for="grupo in todosOsGrupos"
+                          :key="grupo.identificador"
+                          :value="grupo.identificador"
+                        >
+                          {{ grupo.nome }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="materia-do-grupo">
+                        Materia do catalogo
+                      </label>
+                      <select
+                        id="materia-do-grupo"
+                        v-model="formularioMateria.identificadorDaMateria"
+                        class="form-select mb-2"
+                        :disabled="Boolean(formularioMateria.identificador)"
+                        required
+                      >
+                        <option value="" disabled>Selecione</option>
+                        <option
+                          v-for="materia in materiasDisponiveis"
+                          :key="materia.identificador"
+                          :value="materia.identificador"
+                        >
+                          {{ materia.nome }}
+                        </option>
+                      </select>
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <label class="form-label" for="ordem-materia">
+                            Ordem
+                          </label>
+                          <input
+                            id="ordem-materia"
+                            v-model.number="formularioMateria.ordem"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="peso-materia"
+                            >Peso</label
+                          >
+                          <input
+                            id="peso-materia"
+                            v-model.number="formularioMateria.peso"
+                            class="form-control"
+                            type="number"
+                            min="0.0001"
+                            step="0.0001"
+                          />
+                        </div>
+                      </div>
+                      <div class="row g-2 mt-1">
+                        <div class="col-6">
+                          <label class="form-label" for="questoes-materia">
+                            Questoes
+                          </label>
+                          <input
+                            id="questoes-materia"
+                            v-model.number="
+                              formularioMateria.quantidadeDeQuestoes
+                            "
+                            class="form-control"
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                        <div class="col-6">
+                          <label class="form-label" for="pontuacao-materia">
+                            Pontuacao maxima
+                          </label>
+                          <input
+                            id="pontuacao-materia"
+                            v-model.number="formularioMateria.pontuacaoMaxima"
+                            class="form-control"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                      <button class="btn btn-primary mt-3">
+                        Salvar materia
+                      </button>
+                      <button
+                        v-if="formularioMateria.identificador"
+                        class="btn btn-link mt-3"
+                        type="button"
+                        @click="limparMateria"
+                      >
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
+              </div>
+
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    :class="{ collapsed: secaoAberta !== 'item' }"
+                    type="button"
+                    :aria-expanded="secaoAberta === 'item'"
+                    aria-controls="formulario-item-do-edital"
+                    @click="alternarSecao('item')"
+                  >
+                    {{ formularioItem.identificador ? 'Editar' : 'Adicionar' }}
+                    item oficial
+                  </button>
+                </h2>
+                <div
+                  id="formulario-item-do-edital"
+                  class="accordion-collapse collapse"
+                  :class="{ show: secaoAberta === 'item' }"
+                >
+                  <form class="accordion-body" @submit.prevent="salvarItem">
+                    <fieldset
+                      :disabled="
+                        concursoArquivado ||
+                        salvando ||
+                        todasAsMateriasDaProva.length === 0 ||
+                        editais.length === 0
+                      "
+                    >
+                      <label class="form-label" for="materia-do-item">
+                        Materia da prova
+                      </label>
+                      <select
+                        id="materia-do-item"
+                        v-model="formularioItem.identificadorDaMateriaDaProva"
+                        class="form-select mb-2"
+                        :disabled="Boolean(formularioItem.identificador)"
+                        required
+                        @change="formularioItem.identificadorDoItemPai = ''"
+                      >
+                        <option
+                          v-for="materia in todasAsMateriasDaProva"
+                          :key="materia.identificador"
+                          :value="materia.identificador"
+                        >
+                          {{ materia.nomeDaMateria }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="edital-do-item">
+                        Edital
+                      </label>
+                      <select
+                        id="edital-do-item"
+                        v-model="formularioItem.identificadorDoEdital"
+                        class="form-select mb-2"
+                        :disabled="Boolean(formularioItem.identificador)"
+                        required
+                        @change="formularioItem.identificadorDoItemPai = ''"
+                      >
+                        <option
+                          v-for="edital in editais"
+                          :key="edital.identificador"
+                          :value="edital.identificador"
+                        >
+                          {{ edital.titulo }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="descricao-original">
+                        Redacao original
+                      </label>
+                      <textarea
+                        id="descricao-original"
+                        v-model="formularioItem.descricaoOriginal"
+                        class="form-control mb-2"
+                        rows="4"
+                        required
+                        aria-describedby="ajuda-redacao-original"
+                      ></textarea>
+                      <p id="ajuda-redacao-original" class="form-text">
+                        Transcreva o texto oficial sem resumir ou normalizar.
+                      </p>
+                      <label class="form-label" for="pai-do-item">
+                        Item-pai, opcional
+                      </label>
+                      <select
+                        id="pai-do-item"
+                        v-model="formularioItem.identificadorDoItemPai"
+                        class="form-select mb-2"
+                      >
+                        <option value="">Item raiz</option>
+                        <option
+                          v-for="item in paisDisponiveisParaOItem"
+                          :key="item.identificador"
+                          :value="item.identificador"
+                        >
+                          {{ item.descricaoOriginal }}
+                        </option>
+                      </select>
+                      <label class="form-label" for="ordem-item">Ordem</label>
+                      <input
+                        id="ordem-item"
+                        v-model.number="formularioItem.ordem"
+                        class="form-control"
+                        type="number"
+                        min="1"
+                        required
+                      />
+                      <button class="btn btn-primary mt-3">Salvar item</button>
+                      <button
+                        v-if="formularioItem.identificador"
+                        class="btn btn-link mt-3"
+                        type="button"
+                        @click="limparItem"
+                      >
+                        Cancelar
+                      </button>
+                    </fieldset>
+                  </form>
+                </div>
+              </div>
+
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button
+                    class="accordion-button"
+                    type="button"
+                    :aria-expanded="gavetaDeMapeamentoAberta"
+                    aria-controls="formulario-mapeamento"
+                    @click="abrirMapeamento()"
+                  >
+                    Mapear item para tópico em gaveta
+                  </button>
+                </h2>
               </div>
             </div>
-          </div>
-        </aside>
-      </div>
+          </aside>
+        </div>
+      </GavetaLateral>
     </template>
   </main>
+
+  <GavetaLateral
+    v-if="gavetaDeMapeamentoAberta"
+    etiqueta="Conteúdo programático"
+    :titulo="`${itensSemMapeamento.length} ${
+      itensSemMapeamento.length === 1
+        ? 'item sem mapeamento'
+        : 'itens sem mapeamento'
+    }`"
+    descricao="Relacione a redação oficial a um tópico da mesma matéria."
+    @fechar="gavetaDeMapeamentoAberta = false"
+  >
+    <div id="formulario-mapeamento">
+      <form @submit.prevent="salvarMapeamento">
+        <fieldset
+          :disabled="concursoArquivado || salvando || todosOsItens.length === 0"
+        >
+          <div class="formulario-da-aplicacao">
+            <label>
+              <span>Item oficial</span>
+              <select
+                id="item-do-mapeamento"
+                v-model="formularioMapeamento.identificadorDoItem"
+                required
+                @change="formularioMapeamento.identificadorDoTopico = ''"
+              >
+                <option
+                  v-for="item in itensParaSelecaoDoMapeamento"
+                  :key="item.identificador"
+                  :value="item.identificador"
+                >
+                  {{ item.descricaoOriginal }}
+                </option>
+              </select>
+            </label>
+            <div class="nota-contextual">
+              <i class="bi bi-shield-check" aria-hidden="true"></i>
+              <p>
+                <strong>A redação oficial será preservada.</strong>
+                <span>
+                  Esta ação cria somente o vínculo com o tópico pessoal.
+                </span>
+              </p>
+            </div>
+            <label>
+              <span>Tópico da mesma matéria</span>
+              <select
+                id="topico-do-mapeamento"
+                v-model="formularioMapeamento.identificadorDoTopico"
+                :disabled="topicosParaMapeamento.length === 0"
+                required
+              >
+                <option value="" disabled>Escolha um tópico</option>
+                <option
+                  v-for="topico in topicosParaMapeamento"
+                  :key="topico.identificador"
+                  :value="topico.identificador"
+                >
+                  {{ topico.nome }}
+                </option>
+              </select>
+            </label>
+            <p
+              v-if="
+                formularioMapeamento.identificadorDoItem &&
+                topicosParaMapeamento.length === 0
+              "
+              class="alert alert-warning"
+            >
+              A matéria deste item ainda não possui tópicos ativos.
+            </p>
+            <button
+              class="btn btn-primary"
+              :disabled="topicosParaMapeamento.length === 0"
+            >
+              <i class="bi bi-check2 me-2" aria-hidden="true"></i>
+              {{ salvando ? 'Mapeando...' : 'Confirmar mapeamento' }}
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+  </GavetaLateral>
 </template>

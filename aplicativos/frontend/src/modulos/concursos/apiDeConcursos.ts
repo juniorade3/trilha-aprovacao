@@ -1,4 +1,5 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
+import { listarTodasAsMaterias } from '@/modulos/materias/apiDeConteudos'
 
 import type {
   Materia,
@@ -332,13 +333,15 @@ export const excluirMateriaDaProva = (identificador: string) =>
     method: 'DELETE',
   })
 
-export function listarMateriasDisponiveis(sinal?: AbortSignal) {
-  const parametros = new URLSearchParams({
-    incluirArquivadas: 'false',
-    pagina: '0',
-    tamanho: '100',
-  })
-  return requisitar<RespostaPaginada<Materia>>(`/v1/materias?${parametros}`, {
-    signal: sinal,
-  })
+export async function listarMateriasDisponiveis(
+  sinal?: AbortSignal,
+): Promise<RespostaPaginada<Materia>> {
+  const itens = await listarTodasAsMaterias('', false, sinal)
+  return {
+    itens,
+    pagina: 0,
+    tamanho: itens.length,
+    totalDeItens: itens.length,
+    totalDePaginas: itens.length ? 1 : 0,
+  }
 }

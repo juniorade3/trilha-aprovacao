@@ -1,4 +1,5 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
+import { listarTodosOsTopicos } from '@/modulos/materias/apiDeConteudos'
 
 import type {
   RespostaPaginada,
@@ -79,13 +80,16 @@ export const excluirMapeamentoDoItem = (item: string, topico: string) =>
     method: 'DELETE',
   })
 
-export function listarTopicosDisponiveis(materia: string, sinal?: AbortSignal) {
-  const parametros = new URLSearchParams({
-    incluirArquivados: 'false',
-    tamanho: '100',
-  })
-  return requisitar<RespostaPaginada<Topico>>(
-    `/v1/materias/${materia}/topicos?${parametros}`,
-    { signal: sinal },
-  )
+export async function listarTopicosDisponiveis(
+  materia: string,
+  sinal?: AbortSignal,
+): Promise<RespostaPaginada<Topico>> {
+  const itens = await listarTodosOsTopicos(materia, false, sinal)
+  return {
+    itens,
+    pagina: 0,
+    tamanho: itens.length,
+    totalDeItens: itens.length,
+    totalDePaginas: itens.length ? 1 : 0,
+  }
 }
