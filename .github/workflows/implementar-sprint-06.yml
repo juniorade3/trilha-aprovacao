@@ -1,3 +1,4 @@
+# Execucao unica para materializar e validar a Sprint 06.
 name: Implementar Sprint 06
 
 on:
@@ -31,19 +32,11 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
           def escrever(caminho, conteudo):
               arquivo = Path(caminho)
               arquivo.parent.mkdir(parents=True, exist_ok=True)
               arquivo.write_text(conteudo.strip() + '\n')
-
-          def substituir(caminho, antigo, novo):
-              arquivo = Path(caminho)
-              texto = arquivo.read_text()
-              if antigo not in texto:
-                  raise SystemExit(f'Trecho nao encontrado em {caminho}: {antigo[:80]}')
-              arquivo.write_text(texto.replace(antigo, novo))
 
           escrever('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/dominio/ExecucaoDoBloco.java', r'''
           package br.com.trilhaaprovacao.planejamento.dominio;
@@ -74,7 +67,6 @@ jobs:
                   Objects.requireNonNull(criadoEm);
                   Objects.requireNonNull(atualizadoEm);
                   observacao = textoOpcional(observacao, 2000);
-
                   if (encerradaEm == null) {
                       if (duracaoExecutadaEmMinutos != null || resultado != null
                               || observacao != null || identificadorDoRegistroDeEstudo != null) {
@@ -235,10 +227,8 @@ jobs:
           public interface RepositorioDeExecucoesDeBloco
                   extends JpaRepository<ExecucaoDoBlocoPersistida, UUID> {
               Optional<ExecucaoDoBlocoPersistida> findByIdentificadorDoBloco(UUID bloco);
-
               Optional<ExecucaoDoBlocoPersistida>
                       findByIdentificadorDoUsuarioAndEncerradaEmIsNull(UUID usuario);
-
               Optional<ExecucaoDoBlocoPersistida>
                       findByIdentificadorAndIdentificadorDoUsuario(UUID identificador, UUID usuario);
           }
@@ -256,12 +246,10 @@ jobs:
                   BlocoDeEstudo bloco,
                   ExecucaoDoBloco execucao,
                   RegistroDeEstudo estudo) {
-
               public ResultadoDaExecucaoDoBloco {
                   Objects.requireNonNull(bloco);
                   Objects.requireNonNull(execucao);
               }
-
               public ResultadoDaExecucaoDoBloco(BlocoDeEstudo bloco, ExecucaoDoBloco execucao) {
                   this(bloco, execucao, null);
               }
@@ -280,7 +268,6 @@ jobs:
                   UUID identificadorDoTopico,
                   OffsetDateTime dataHora,
                   int duracaoEmMinutos) {
-
               static RespostaResumidaDoRegistroDeEstudo de(RegistroDeEstudo estudo) {
                   if (estudo == null) return null;
                   return new RespostaResumidaDoRegistroDeEstudo(estudo.identificador(),
@@ -299,7 +286,6 @@ jobs:
                   RespostaDeBlocoDeEstudo bloco,
                   RespostaDeExecucaoDoBloco execucao,
                   RespostaResumidaDoRegistroDeEstudo estudo) {
-
               public static RespostaDaExecucaoDoBloco de(ResultadoDaExecucaoDoBloco resultado) {
                   return new RespostaDaExecucaoDoBloco(
                           RespostaDeBlocoDeEstudo.de(resultado.bloco()),
@@ -329,7 +315,6 @@ jobs:
                   OffsetDateTime criadoEm,
                   OffsetDateTime atualizadoEm,
                   long versao) {
-
               public static RespostaDeExecucaoDoBloco de(ExecucaoDoBloco execucao) {
                   return new RespostaDeExecucaoDoBloco(execucao.identificador(),
                           execucao.identificadorDoBloco(), execucao.iniciadaEm(),
@@ -359,19 +344,15 @@ jobs:
 
           escrever('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/RequisicaoDeRegistroNoHistorico.java', r'''
           package br.com.trilhaaprovacao.planejamento.api;
-
           import java.util.UUID;
-
           public record RequisicaoDeRegistroNoHistorico(UUID identificadorDoTopico) {
           }
           ''')
 
           escrever('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/RespostaDeTopicoParaRegistro.java', r'''
           package br.com.trilhaaprovacao.planejamento.api;
-
           import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;
           import java.util.UUID;
-
           public record RespostaDeTopicoParaRegistro(UUID identificador, String nome) {
               static RespostaDeTopicoParaRegistro de(TopicoDaMateria topico) {
                   return new RespostaDeTopicoParaRegistro(topico.identificador(), topico.nome());
@@ -382,43 +363,27 @@ jobs:
           escrever('aplicativos/backend/src/main/resources/db/migration/V9__vincula_execucoes_a_registros_de_estudo.sql', r'''
           ALTER TABLE execucoes_de_bloco
               ADD COLUMN registro_de_estudo_id UUID;
-
           ALTER TABLE execucoes_de_bloco
               ADD CONSTRAINT fk_execucoes_registro_de_estudo
               FOREIGN KEY (registro_de_estudo_id)
               REFERENCES registros_de_estudo (identificador);
-
           ALTER TABLE execucoes_de_bloco
               ADD CONSTRAINT uk_execucoes_registro_de_estudo
               UNIQUE (registro_de_estudo_id);
-
           CREATE INDEX idx_execucoes_registro_de_estudo
               ON execucoes_de_bloco (registro_de_estudo_id)
               WHERE registro_de_estudo_id IS NOT NULL;
           ''')
 
-          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/aplicacao/ServicoDePlanejamento.java'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
-          texto = texto.replace(
-              'import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;\n',
-              'import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;\nimport br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;\nimport br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;\n'
-          )
-          texto = texto.replace(
-              '    private final ServicoDeTopicos topicos;\n',
-              '    private final ServicoDeTopicos topicos;\n    private final ServicoDeMateriaisEEstudos estudos;\n'
-          )
-          texto = texto.replace(
-              '            RepositorioDeExecucoesDeBloco execucoes,\n            ServicoDeMaterias materias,\n            ServicoDeTopicos topicos) {',
-              '            RepositorioDeExecucoesDeBloco execucoes,\n            ServicoDeMaterias materias,\n            ServicoDeTopicos topicos,\n            ServicoDeMateriaisEEstudos estudos) {'
-          )
-          texto = texto.replace(
-              '        this.topicos = topicos;\n    }',
-              '        this.topicos = topicos;\n        this.estudos = estudos;\n    }', 1
-          )
+          caminho = Path('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/aplicacao/ServicoDePlanejamento.java')
+          texto = caminho.read_text()
+          texto = texto.replace('import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;\n', 'import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;\nimport br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;\nimport br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;\n')
+          texto = texto.replace('    private final ServicoDeTopicos topicos;\n', '    private final ServicoDeTopicos topicos;\n    private final ServicoDeMateriaisEEstudos estudos;\n')
+          texto = texto.replace('            ServicoDeMaterias materias,\n            ServicoDeTopicos topicos) {', '            ServicoDeMaterias materias,\n            ServicoDeTopicos topicos,\n            ServicoDeMateriaisEEstudos estudos) {')
+          texto = texto.replace('        this.topicos = topicos;\n    }', '        this.topicos = topicos;\n        this.estudos = estudos;\n    }', 1)
           inicio = texto.index('    @Transactional\n    public ResultadoDaExecucaoDoBloco concluirBloco')
           fim = texto.index('    private void validarConjuntoDeDias', inicio)
-          novo = r'''    @Transactional
+          novo = '''    @Transactional
               public ResultadoDaExecucaoDoBloco concluirBloco(UUID usuario, UUID bloco,
                       int duracao, String observacao, UUID identificadorDoTopico) {
                   return finalizarBloco(usuario, bloco, ResultadoDaExecucao.CONCLUIDO,
@@ -447,13 +412,13 @@ jobs:
 
               @Transactional(readOnly = true)
               public ResultadoDaExecucaoDoBloco obterExecucaoDoBloco(UUID usuario, UUID bloco) {
-                  BlocoDeEstudoPersistido blocoPersistido = blocoPersistido(usuario, bloco);
+                  BlocoDeEstudoPersistido encontrado = blocoPersistido(usuario, bloco);
                   ExecucaoDoBlocoPersistida execucao = execucoes.findByIdentificadorDoBloco(bloco)
                           .filter(item -> item.paraDominio().identificadorDoUsuario().equals(usuario))
                           .orElseThrow(() -> new RecursoNaoEncontrado(
                                   "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA",
                                   "Execucao do bloco nao encontrada."));
-                  return resultadoDaExecucao(usuario, blocoPersistido, execucao);
+                  return resultadoDaExecucao(usuario, encontrado, execucao);
               }
 
               @Transactional(readOnly = true)
@@ -614,20 +579,15 @@ jobs:
               }
 
           '''
-          texto = texto[:inicio] + novo + texto[fim:]
-          arquivo.write_text(texto)
+          caminho.write_text(texto[:inicio] + novo + texto[fim:])
 
-          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/ControladorDeBlocosDeEstudo.java'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
+          caminho = Path('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/ControladorDeBlocosDeEstudo.java')
+          texto = caminho.read_text()
           texto = texto.replace('import java.net.URI;\n', 'import java.net.URI;\nimport java.util.List;\n')
           texto = texto.replace('import org.springframework.web.bind.annotation.DeleteMapping;\n', 'import org.springframework.web.bind.annotation.DeleteMapping;\nimport org.springframework.web.bind.annotation.GetMapping;\n')
-          texto = texto.replace(
-              '                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));',
-              '                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),\n                requisicao.identificadorDoTopico()));'
-          )
+          texto = texto.replace('                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));', '                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),\n                requisicao.identificadorDoTopico()));')
           marcador = '\n    @PostMapping("/blocos-de-estudo/{identificador}/conclusao")'
-          extras = r'''
+          extras = '''
               @GetMapping("/blocos-de-estudo/{identificador}/execucao")
               public RespostaDaExecucaoDoBloco obterExecucao(
                       @PathVariable UUID identificador, Authentication autenticacao) {
@@ -645,8 +605,7 @@ jobs:
 
           '''
           texto = texto.replace(marcador, '\n' + extras + marcador)
-          antes_fim = '\n}'
-          metodo = r'''
+          metodo = '''
               @PostMapping("/execucoes-de-bloco/{identificador}/registro-de-estudo")
               public RespostaDaExecucaoDoBloco registrarNoHistorico(
                       @PathVariable UUID identificador,
@@ -657,13 +616,12 @@ jobs:
                           usuarioAtual.obter(autenticacao), identificador, topico));
               }
           '''
-          texto = texto.rsplit(antes_fim, 1)[0] + '\n' + metodo + antes_fim
-          arquivo.write_text(texto)
+          texto = texto.rsplit('\n}', 1)[0] + '\n' + metodo + '\n}'
+          caminho.write_text(texto)
 
-          caminho = 'aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/dominio/ExecucaoDoBlocoTest.java'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
-          teste = r'''
+          caminho = Path('aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/dominio/ExecucaoDoBlocoTest.java')
+          texto = caminho.read_text()
+          teste = '''
               @Test
               void deveVincularUmUnicoRegistroDeEstudo() {
                   ExecucaoDoBloco encerrada = ExecucaoDoBloco.iniciar(
@@ -672,10 +630,8 @@ jobs:
                           .encerrar(ResultadoDaExecucao.CONCLUIDO, 10, null,
                                   OffsetDateTime.now());
                   UUID registro = UUID.randomUUID();
-
                   ExecucaoDoBloco vinculada = encerrada.vincularRegistroDeEstudo(
                           registro, OffsetDateTime.now());
-
                   assertEquals(registro, vinculada.identificadorDoRegistroDeEstudo());
                   assertEquals(vinculada, vinculada.vincularRegistroDeEstudo(
                           registro, OffsetDateTime.now()));
@@ -685,55 +641,26 @@ jobs:
               }
 
           '''
-          texto = texto.replace('    private BlocoDeEstudo blocoPlanejado() {', teste + '    private BlocoDeEstudo blocoPlanejado() {')
-          arquivo.write_text(texto)
+          caminho.write_text(texto.replace('    private BlocoDeEstudo blocoPlanejado() {', teste + '    private BlocoDeEstudo blocoPlanejado() {'))
 
-          caminho = 'aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
-          texto = texto.replace(
-              '  observacao?: string\n  criadoEm: string',
-              '  observacao?: string\n  identificadorDoRegistroDeEstudo?: string\n  criadoEm: string'
-          )
-          texto = texto.replace(
-              'export interface ResultadoDaExecucaoDoBloco {\n  bloco: BlocoDeEstudo\n  execucao: ExecucaoDoBloco\n}',
-              '''export interface RegistroDeEstudoDaExecucao {\n  identificador: string\n  identificadorDoTopico: string\n  dataHora: string\n  duracaoEmMinutos: number\n}\n\nexport interface TopicoParaRegistro {\n  identificador: string\n  nome: string\n}\n\nexport interface ResultadoDaExecucaoDoBloco {\n  bloco: BlocoDeEstudo\n  execucao: ExecucaoDoBloco\n  estudo?: RegistroDeEstudoDaExecucao\n}'''
-          )
-          texto = texto.replace(
-              '  observacao?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {',
-              '  observacao?: string,\n  identificadorDoTopico?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', 1
-          )
-          texto = texto.replace(
-              'body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),',
-              'body: JSON.stringify({\n        duracaoExecutadaEmMinutos,\n        observacao,\n        identificadorDoTopico,\n      }),', 1
-          )
+          caminho = Path('aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts')
+          texto = caminho.read_text()
+          texto = texto.replace('  observacao?: string\n  criadoEm: string', '  observacao?: string\n  identificadorDoRegistroDeEstudo?: string\n  criadoEm: string')
+          texto = texto.replace('export interface ResultadoDaExecucaoDoBloco {\n  bloco: BlocoDeEstudo\n  execucao: ExecucaoDoBloco\n}', '''export interface RegistroDeEstudoDaExecucao {\n  identificador: string\n  identificadorDoTopico: string\n  dataHora: string\n  duracaoEmMinutos: number\n}\n\nexport interface TopicoParaRegistro {\n  identificador: string\n  nome: string\n}\n\nexport interface ResultadoDaExecucaoDoBloco {\n  bloco: BlocoDeEstudo\n  execucao: ExecucaoDoBloco\n  estudo?: RegistroDeEstudoDaExecucao\n}''')
+          texto = texto.replace('  observacao?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', '  observacao?: string,\n  identificadorDoTopico?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', 1)
+          texto = texto.replace('body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),', 'body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao, identificadorDoTopico }),', 1)
           pos = texto.index('export function interromperBloco(')
           prefixo, sufixo = texto[:pos], texto[pos:]
-          sufixo = sufixo.replace(
-              '  observacao?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {',
-              '  observacao?: string,\n  identificadorDoTopico?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', 1
-          )
-          sufixo = sufixo.replace(
-              'body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),',
-              'body: JSON.stringify({\n        duracaoExecutadaEmMinutos,\n        observacao,\n        identificadorDoTopico,\n      }),', 1
-          )
+          sufixo = sufixo.replace('  observacao?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', '  observacao?: string,\n  identificadorDoTopico?: string,\n): Promise<ResultadoDaExecucaoDoBloco> {', 1)
+          sufixo = sufixo.replace('body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),', 'body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao, identificadorDoTopico }),', 1)
           texto = prefixo + sufixo
-          marcador = '\nexport function alterarDisponibilidades('
-          funcoes = r'''
-          export function obterExecucaoDoBloco(
-            identificadorDoBloco: string,
-          ): Promise<ResultadoDaExecucaoDoBloco> {
-            return requisitar<ResultadoDaExecucaoDoBloco>(
-              `/v1/blocos-de-estudo/${identificadorDoBloco}/execucao`,
-            )
+          funcoes = '''
+          export function obterExecucaoDoBloco(identificadorDoBloco: string): Promise<ResultadoDaExecucaoDoBloco> {
+            return requisitar<ResultadoDaExecucaoDoBloco>(`/v1/blocos-de-estudo/${identificadorDoBloco}/execucao`)
           }
 
-          export function listarTopicosParaRegistro(
-            identificadorDoBloco: string,
-          ): Promise<TopicoParaRegistro[]> {
-            return requisitar<TopicoParaRegistro[]>(
-              `/v1/blocos-de-estudo/${identificadorDoBloco}/topicos-para-registro`,
-            )
+          export function listarTopicosParaRegistro(identificadorDoBloco: string): Promise<TopicoParaRegistro[]> {
+            return requisitar<TopicoParaRegistro[]>(`/v1/blocos-de-estudo/${identificadorDoBloco}/topicos-para-registro`)
           }
 
           export function registrarExecucaoNoHistorico(
@@ -742,53 +669,24 @@ jobs:
           ): Promise<ResultadoDaExecucaoDoBloco> {
             return requisitar<ResultadoDaExecucaoDoBloco>(
               `/v1/execucoes-de-bloco/${identificadorDaExecucao}/registro-de-estudo`,
-              {
-                method: 'POST',
-                body: JSON.stringify({ identificadorDoTopico }),
-              },
+              { method: 'POST', body: JSON.stringify({ identificadorDoTopico }) },
             )
           }
           '''
-          texto = texto.replace(marcador, '\n' + funcoes + marcador)
-          arquivo.write_text(texto)
+          texto = texto.replace('\nexport function alterarDisponibilidades(', '\n' + funcoes + '\nexport function alterarDisponibilidades(')
+          caminho.write_text(texto)
 
-          caminho = 'aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
-          texto = texto.replace(
-              '  interromperBloco,\n  obterExecucaoEmAndamento,',
-              '  interromperBloco,\n  listarTopicosParaRegistro,\n  obterExecucaoDoBloco,\n  obterExecucaoEmAndamento,\n  registrarExecucaoNoHistorico,'
-          )
-          texto = texto.replace(
-              '  type ResultadoDaExecucaoDoBloco,\n',
-              '  type ResultadoDaExecucaoDoBloco,\n  type TopicoParaRegistro,\n'
-          )
-          texto = texto.replace(
-              "const observacaoDaExecucao = ref('')\n",
-              "const observacaoDaExecucao = ref('')\nconst topicosParaRegistro = ref<TopicoParaRegistro[]>([])\nconst identificadorDoTopico = ref('')\nconst ultimoResultado = ref<ResultadoDaExecucaoDoBloco>()\nconst execucoesRealizadas = ref<Record<string, ResultadoDaExecucaoDoBloco>>({})\nconst blocoParaHistorico = ref<BlocoDeEstudo>()\nconst registrandoHistorico = ref(false)\n"
-          )
-          texto = texto.replace(
-              '    } catch (causa) {\n      if (causa instanceof ErroDaApi && causa.status === 404)\n        execucaoAtual.value = undefined\n      else throw causa\n    }',
-              '''    } catch (causa) {\n      if (causa instanceof ErroDaApi && causa.status === 404)\n        execucaoAtual.value = undefined\n      else throw causa\n    }\n    const pares = await Promise.all(\n      planejamento.value.realizados.map(async (bloco) => {\n        try {\n          return [bloco.identificador, await obterExecucaoDoBloco(bloco.identificador)] as const\n        } catch {\n          return undefined\n        }\n      }),\n    )\n    execucoesRealizadas.value = Object.fromEntries(\n      pares.filter((par): par is readonly [string, ResultadoDaExecucaoDoBloco] => !!par),\n    )'''
-          )
-          texto = texto.replace(
-              "function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {\n  acaoDeFinalizacao.value = acao",
-              "async function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {\n  acaoDeFinalizacao.value = acao\n  topicosParaRegistro.value = []\n  identificadorDoTopico.value = ''\n  const bloco = execucaoAtual.value?.bloco\n  if (bloco?.identificadorDaMateria && !bloco.identificadorDoTopico) {\n    topicosParaRegistro.value = await listarTopicosParaRegistro(bloco.identificador)\n  }"
-          )
-          texto = texto.replace(
-              '    if (acaoDeFinalizacao.value === \'CONCLUIR\')\n      await concluirBloco(',
-              '    let resultado: ResultadoDaExecucaoDoBloco\n    if (acaoDeFinalizacao.value === \'CONCLUIR\')\n      resultado = await concluirBloco('
-          )
-          texto = texto.replace(
-              '        observacaoDaExecucao.value || undefined,\n      )\n    else\n      await interromperBloco(',
-              '        observacaoDaExecucao.value || undefined,\n        identificadorDoTopico.value || undefined,\n      )\n    else\n      resultado = await interromperBloco('
-          )
-          texto = texto.replace(
-              '        observacaoDaExecucao.value || undefined,\n      )\n    aviso.value =',
-              '        observacaoDaExecucao.value || undefined,\n        identificadorDoTopico.value || undefined,\n      )\n    ultimoResultado.value = resultado\n    aviso.value = resultado.estudo\n      ? \'Bloco finalizado e estudo registrado no Histórico.\'\n      :'
-          )
-          marcador = '\nonMounted(() => {'
-          funcoes = r'''
+          caminho = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue')
+          texto = caminho.read_text()
+          texto = texto.replace('  interromperBloco,\n  obterExecucaoEmAndamento,', '  interromperBloco,\n  listarTopicosParaRegistro,\n  obterExecucaoDoBloco,\n  obterExecucaoEmAndamento,\n  registrarExecucaoNoHistorico,')
+          texto = texto.replace('  type ResultadoDaExecucaoDoBloco,\n', '  type ResultadoDaExecucaoDoBloco,\n  type TopicoParaRegistro,\n')
+          texto = texto.replace("const observacaoDaExecucao = ref('')\n", "const observacaoDaExecucao = ref('')\nconst topicosParaRegistro = ref<TopicoParaRegistro[]>([])\nconst identificadorDoTopico = ref('')\nconst ultimoResultado = ref<ResultadoDaExecucaoDoBloco>()\nconst execucoesRealizadas = ref<Record<string, ResultadoDaExecucaoDoBloco>>({})\nconst blocoParaHistorico = ref<BlocoDeEstudo>()\nconst registrandoHistorico = ref(false)\n")
+          texto = texto.replace('    } catch (causa) {\n      if (causa instanceof ErroDaApi && causa.status === 404)\n        execucaoAtual.value = undefined\n      else throw causa\n    }', '''    } catch (causa) {\n      if (causa instanceof ErroDaApi && causa.status === 404)\n        execucaoAtual.value = undefined\n      else throw causa\n    }\n    const pares = await Promise.all(\n      planejamento.value.realizados.map(async (bloco) => {\n        try {\n          return [bloco.identificador, await obterExecucaoDoBloco(bloco.identificador)] as const\n        } catch {\n          return undefined\n        }\n      }),\n    )\n    execucoesRealizadas.value = Object.fromEntries(\n      pares.filter((par): par is readonly [string, ResultadoDaExecucaoDoBloco] => !!par),\n    )''')
+          texto = texto.replace("function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {\n  acaoDeFinalizacao.value = acao", "async function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {\n  acaoDeFinalizacao.value = acao\n  topicosParaRegistro.value = []\n  identificadorDoTopico.value = ''\n  const bloco = execucaoAtual.value?.bloco\n  if (bloco?.identificadorDaMateria && !bloco.identificadorDoTopico) {\n    topicosParaRegistro.value = await listarTopicosParaRegistro(bloco.identificador)\n  }")
+          texto = texto.replace("    if (acaoDeFinalizacao.value === 'CONCLUIR')\n      await concluirBloco(", "    let resultado: ResultadoDaExecucaoDoBloco\n    if (acaoDeFinalizacao.value === 'CONCLUIR')\n      resultado = await concluirBloco(")
+          texto = texto.replace('        observacaoDaExecucao.value || undefined,\n      )\n    else\n      await interromperBloco(', '        observacaoDaExecucao.value || undefined,\n        identificadorDoTopico.value || undefined,\n      )\n    else\n      resultado = await interromperBloco(')
+          texto = texto.replace("        observacaoDaExecucao.value || undefined,\n      )\n    aviso.value =", "        observacaoDaExecucao.value || undefined,\n        identificadorDoTopico.value || undefined,\n      )\n    ultimoResultado.value = resultado\n    aviso.value = resultado.estudo\n      ? 'Bloco finalizado e estudo registrado no Histórico.'\n      :")
+          funcoes = '''
           async function abrirRegistroNoHistorico(bloco: BlocoDeEstudo) {
             blocoParaHistorico.value = bloco
             identificadorDoTopico.value = ''
@@ -811,37 +709,18 @@ jobs:
               blocoParaHistorico.value = undefined
               await carregar()
             } catch (causa) {
-              erro.value =
-                causa instanceof Error
-                  ? causa.message
-                  : 'Não foi possível registrar o estudo no Histórico.'
+              erro.value = causa instanceof Error ? causa.message : 'Não foi possível registrar o estudo no Histórico.'
             } finally {
               registrandoHistorico.value = false
             }
           }
           '''
-          texto = texto.replace(marcador, '\n' + funcoes + marcador)
-          texto = texto.replace(
-              '    <div v-if="aviso" class="alert alert-success" role="status">\n      {{ aviso }}\n    </div>',
-              '''    <div v-if="aviso" class="alert alert-success" role="status">\n      {{ aviso }}\n      <RouterLink v-if="ultimoResultado?.estudo" class="alert-link ms-2" to="/estudos">\n        Ver no Histórico\n      </RouterLink>\n    </div>'''
-          )
-          texto = texto.replace(
-              '              <strong>{{ bloco.titulo }}</strong\n              ><small>{{',
-              '''              <strong>{{ bloco.titulo }}</strong\n              ><small>{{'''
-          )
-          texto = texto.replace(
-              '              }}</small>\n            </div>\n          </li>',
-              '''              }}</small>\n            </div>\n            <button\n              v-if="\n                execucoesRealizadas[bloco.identificador] &&\n                !execucoesRealizadas[bloco.identificador].execucao\n                  .identificadorDoRegistroDeEstudo &&\n                (bloco.identificadorDoTopico || bloco.identificadorDaMateria)\n              "\n              class="btn btn-sm btn-outline-primary"\n              type="button"\n              @click="abrirRegistroNoHistorico(bloco)"\n            >\n              Registrar no Histórico\n            </button>\n          </li>''', 1
-          )
-          texto = texto.replace(
-              '      descricao="Nesta sprint, a execução ainda não cria automaticamente um registro no Histórico de estudos."',
-              '      descricao="Ao concluir, o estudo será registrado no Histórico quando houver um tópico."'
-          )
-          texto = texto.replace(
-              '      <div class="mb-3">\n        <label class="form-label" for="duracao-executada"',
-              '''      <div v-if="execucaoAtual.bloco.identificadorDoTopico" class="alert alert-info">\n        O tópico planejado será usado no Histórico.\n      </div>\n      <div\n        v-else-if="execucaoAtual.bloco.identificadorDaMateria"\n        class="mb-3"\n      >\n        <label class="form-label" for="topico-da-execucao">Tópico estudado</label>\n        <select\n          id="topico-da-execucao"\n          v-model="identificadorDoTopico"\n          class="form-select"\n        >\n          <option value="">Concluir sem registrar no Histórico</option>\n          <option\n            v-for="topico in topicosParaRegistro"\n            :key="topico.identificador"\n            :value="topico.identificador"\n          >\n            {{ topico.nome }}\n          </option>\n        </select>\n      </div>\n      <div v-else class="alert alert-secondary">\n        Esta atividade livre será concluída sem registro no Histórico.\n      </div>\n      <div class="mb-3">\n        <label class="form-label" for="duracao-executada"'''
-          )
-          segundo_modal = r'''
+          texto = texto.replace('\nonMounted(() => {', '\n' + funcoes + '\nonMounted(() => {')
+          texto = texto.replace('    <div v-if="aviso" class="alert alert-success" role="status">\n      {{ aviso }}\n    </div>', '''    <div v-if="aviso" class="alert alert-success" role="status">\n      {{ aviso }}\n      <RouterLink v-if="ultimoResultado?.estudo" class="alert-link ms-2" to="/estudos">\n        Ver no Histórico\n      </RouterLink>\n    </div>''')
+          texto = texto.replace('              }}</small>\n            </div>\n          </li>', '''              }}</small>\n            </div>\n            <button\n              v-if="\n                execucoesRealizadas[bloco.identificador] &&\n                !execucoesRealizadas[bloco.identificador].execucao.identificadorDoRegistroDeEstudo &&\n                (bloco.identificadorDoTopico || bloco.identificadorDaMateria)\n              "\n              class="btn btn-sm btn-outline-primary"\n              type="button"\n              @click="abrirRegistroNoHistorico(bloco)"\n            >\n              Registrar no Histórico\n            </button>\n          </li>''', 1)
+          texto = texto.replace('      descricao="Nesta sprint, a execução ainda não cria automaticamente um registro no Histórico de estudos."', '      descricao="Ao concluir, o estudo será registrado no Histórico quando houver um tópico."')
+          texto = texto.replace('      <div class="mb-3">\n        <label class="form-label" for="duracao-executada"', '''      <div v-if="execucaoAtual.bloco.identificadorDoTopico" class="alert alert-info">\n        O tópico planejado será usado no Histórico.\n      </div>\n      <div v-else-if="execucaoAtual.bloco.identificadorDaMateria" class="mb-3">\n        <label class="form-label" for="topico-da-execucao">Tópico estudado</label>\n        <select id="topico-da-execucao" v-model="identificadorDoTopico" class="form-select">\n          <option value="">Concluir sem registrar no Histórico</option>\n          <option v-for="topico in topicosParaRegistro" :key="topico.identificador" :value="topico.identificador">\n            {{ topico.nome }}\n          </option>\n        </select>\n      </div>\n      <div v-else class="alert alert-secondary">\n        Esta atividade livre será concluída sem registro no Histórico.\n      </div>\n      <div class="mb-3">\n        <label class="form-label" for="duracao-executada"''')
+          segundo_modal = '''
 
               <ModalDaAplicacao
                 v-if="blocoParaHistorico"
@@ -855,37 +734,19 @@ jobs:
                 </div>
                 <div v-else class="mb-3">
                   <label class="form-label" for="topico-do-historico">Tópico estudado</label>
-                  <select
-                    id="topico-do-historico"
-                    v-model="identificadorDoTopico"
-                    class="form-select"
-                    required
-                  >
+                  <select id="topico-do-historico" v-model="identificadorDoTopico" class="form-select" required>
                     <option value="" disabled>Selecione</option>
-                    <option
-                      v-for="topico in topicosParaRegistro"
-                      :key="topico.identificador"
-                      :value="topico.identificador"
-                    >
+                    <option v-for="topico in topicosParaRegistro" :key="topico.identificador" :value="topico.identificador">
                       {{ topico.nome }}
                     </option>
                   </select>
                 </div>
                 <template #rodape>
-                  <button
-                    class="btn btn-outline-secondary"
-                    type="button"
-                    @click="blocoParaHistorico = undefined"
-                  >
-                    Voltar
-                  </button>
+                  <button class="btn btn-outline-secondary" type="button" @click="blocoParaHistorico = undefined">Voltar</button>
                   <button
                     class="btn btn-primary"
                     type="button"
-                    :disabled="
-                      registrandoHistorico ||
-                      (!blocoParaHistorico.identificadorDoTopico && !identificadorDoTopico)
-                    "
+                    :disabled="registrandoHistorico || (!blocoParaHistorico.identificadorDoTopico && !identificadorDoTopico)"
                     @click="registrarNoHistorico"
                   >
                     Registrar no Histórico
@@ -894,28 +755,15 @@ jobs:
               </ModalDaAplicacao>
           '''
           texto = texto.replace('    </ModalDaAplicacao>\n  </main>', '    </ModalDaAplicacao>' + segundo_modal + '\n  </main>')
-          arquivo.write_text(texto)
+          caminho.write_text(texto)
 
-          caminho = 'aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.spec.ts'
-          arquivo = Path(caminho)
-          texto = arquivo.read_text()
-          texto = texto.replace(
-              '  interromperBloco: vi.fn(),\n',
-              '  interromperBloco: vi.fn(),\n  listarTopicosParaRegistro: vi.fn(),\n  obterExecucaoDoBloco: vi.fn(),\n  registrarExecucaoNoHistorico: vi.fn(),\n'
-          )
-          texto = texto.replace(
-              '  interromperBloco: chamadas.interromperBloco,\n',
-              '  interromperBloco: chamadas.interromperBloco,\n  listarTopicosParaRegistro: chamadas.listarTopicosParaRegistro,\n  obterExecucaoDoBloco: chamadas.obterExecucaoDoBloco,\n  registrarExecucaoNoHistorico: chamadas.registrarExecucaoNoHistorico,\n'
-          )
-          texto = texto.replace(
-              '    chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)\n',
-              '    chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)\n    chamadas.obterExecucaoDoBloco.mockRejectedValue(new Error(\'sem execucao\'))\n    chamadas.listarTopicosParaRegistro.mockResolvedValue([])\n'
-          )
-          texto = texto.replace(
-              "      undefined,\n    )",
-              "      undefined,\n      undefined,\n    )", 1
-          )
-          arquivo.write_text(texto)
+          caminho = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.spec.ts')
+          texto = caminho.read_text()
+          texto = texto.replace('  interromperBloco: vi.fn(),\n', '  interromperBloco: vi.fn(),\n  listarTopicosParaRegistro: vi.fn(),\n  obterExecucaoDoBloco: vi.fn(),\n  registrarExecucaoNoHistorico: vi.fn(),\n')
+          texto = texto.replace('  interromperBloco: chamadas.interromperBloco,\n', '  interromperBloco: chamadas.interromperBloco,\n  listarTopicosParaRegistro: chamadas.listarTopicosParaRegistro,\n  obterExecucaoDoBloco: chamadas.obterExecucaoDoBloco,\n  registrarExecucaoNoHistorico: chamadas.registrarExecucaoNoHistorico,\n')
+          texto = texto.replace('    chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)\n', "    chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)\n    chamadas.obterExecucaoDoBloco.mockRejectedValue(new Error('sem execucao'))\n    chamadas.listarTopicosParaRegistro.mockResolvedValue([])\n")
+          texto = texto.replace("      undefined,\n    )", "      undefined,\n      undefined,\n    )", 1)
+          caminho.write_text(texto)
 
           readme = Path('aplicativos/backend/src/main/resources/db/migration/README.md')
           readme.write_text(readme.read_text().rstrip() + '\n- V9 vincula execucoes finalizadas a registros de estudo.\n')
@@ -929,7 +777,6 @@ jobs:
           visão Hoje, cliente HTTP e testes.
 
           DECISÕES TOMADAS:
-
           - a ação de vínculo retorna sempre 200;
           - o registro usa material nulo, início da execução e duração realizada;
           - atividade livre continua válida sem estudo;
@@ -938,9 +785,7 @@ jobs:
           - a Sprint 06 foi criada sobre a branch da Sprint 05 porque o PR anterior ainda não estava na main.
 
           TESTES EXECUTADOS: consultar GitHub Actions do PR.
-
           PENDÊNCIAS: validação visual exploratória em 390, 768 e 1280 px.
-
           PRÓXIMA SPRINT: Sprint 07 — Edição e replanejamento, não iniciada.
           ''')
           PY
