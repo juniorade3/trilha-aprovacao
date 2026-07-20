@@ -4,7 +4,7 @@
 
 - branch: `feature/geracao-deterministica-sprint-03`
 - commit inicial: `88ee273f7fde560208699aa75481ca405181b5a6`
-- commit final: pendente de criação e publicação do PR
+- commit final da implementação: `819dd8a0c6d8f45aff4b1cd1ecced05dc29e7c7b`
 - migration final: `V12`
 
 ## Matriz
@@ -32,7 +32,7 @@
 | sessão expirada | APROVADO | logout 204, mutação 401 sem 500, aviso, redirecionamento e retorno à semana |
 | erro de rede e repetição | APROVADO | falha offline anunciada e repetição da prévia com durações 55/20 preservadas |
 | make verificar | APROVADO | 103 testes backend e 93 frontend; build, tipos, lint, formato e auditoria aprovados |
-| CI do PR | NÃO EXECUTADO | PR ainda não aberto |
+| CI do PR | APROVADO | GitHub Actions run `29754244410`: estrutura, backend/migrations/arquitetura e frontend verdes |
 
 ## Comandos executados
 
@@ -88,4 +88,4 @@ matriz correspondem às execuções finais bem-sucedidas.
 
 ## Pendências
 
-- Executar e registrar a CI depois da abertura do PR.
+Nenhuma pendência da Sprint 03.
