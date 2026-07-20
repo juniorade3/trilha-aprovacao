@@ -120,7 +120,10 @@ describe('PlanejamentoHojePagina', () => {
   it('inicia o proximo bloco', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.iniciarBloco.mockResolvedValue({
-      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
       execucao: {
         identificador: 'execucao-1',
         identificadorDoBloco: 'bloco-1',
@@ -135,13 +138,19 @@ describe('PlanejamentoHojePagina', () => {
     await pagina.get('.proximo-bloco-do-dia button').trigger('click')
     await flushPromises()
 
-    expect(chamadas.iniciarBloco).toHaveBeenCalledWith('bloco-1', expect.any(String))
+    expect(chamadas.iniciarBloco).toHaveBeenCalledWith(
+      'bloco-1',
+      expect.any(String),
+    )
   })
 
   it('recupera uma execucao aberta e mostra o cronometro', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.obterExecucaoEmAndamento.mockResolvedValue({
-      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
       execucao: {
         identificador: 'execucao-1',
         identificadorDoBloco: 'bloco-1',
@@ -161,7 +170,10 @@ describe('PlanejamentoHojePagina', () => {
   it('conclui uma execucao informando a duracao', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.obterExecucaoEmAndamento.mockResolvedValue({
-      bloco: { ...bloco('bloco-1', 'Primeiro bloco', 1), estado: 'EM_ANDAMENTO' },
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
       execucao: {
         identificador: 'execucao-1',
         identificadorDoBloco: 'bloco-1',
@@ -179,7 +191,11 @@ describe('PlanejamentoHojePagina', () => {
     await pagina.get('.rodape-do-modal .btn-primary').trigger('click')
     await flushPromises()
 
-    expect(chamadas.concluirBloco).toHaveBeenCalledWith('bloco-1', 15, undefined)
+    expect(chamadas.concluirBloco).toHaveBeenCalledWith(
+      'bloco-1',
+      15,
+      undefined,
+    )
   })
 
   it('separa blocos atrasados e permite inicia-los', async () => {
@@ -196,7 +212,10 @@ describe('PlanejamentoHojePagina', () => {
       realizados: [],
     })
     chamadas.iniciarBloco.mockResolvedValue({
-      bloco: { ...bloco('bloco-1', 'Bloco pendente', 1), estado: 'EM_ANDAMENTO' },
+      bloco: {
+        ...bloco('bloco-1', 'Bloco pendente', 1),
+        estado: 'EM_ANDAMENTO',
+      },
       execucao: {
         identificador: 'execucao-1',
         identificadorDoBloco: 'bloco-1',

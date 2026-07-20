@@ -1,10 +1,7 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 
 export type EstadoDoPlanoSemanal =
-  | 'RASCUNHO'
-  | 'ATIVO'
-  | 'ENCERRADO'
-  | 'CANCELADO'
+  'RASCUNHO' | 'ATIVO' | 'ENCERRADO' | 'CANCELADO'
 
 export interface DisponibilidadeDoDia {
   identificador: string
@@ -104,10 +101,7 @@ export interface DadosDoBlocoDeEstudo {
 }
 
 export type EstadoDoPlanejamentoDeHoje =
-  | 'SEM_PLANO'
-  | 'PLANO_EM_RASCUNHO'
-  | 'DIA_SEM_BLOCOS'
-  | 'DIA_PLANEJADO'
+  'SEM_PLANO' | 'PLANO_EM_RASCUNHO' | 'DIA_SEM_BLOCOS' | 'DIA_PLANEJADO'
 
 export interface PlanejamentoDeHoje {
   estado: EstadoDoPlanejamentoDeHoje
