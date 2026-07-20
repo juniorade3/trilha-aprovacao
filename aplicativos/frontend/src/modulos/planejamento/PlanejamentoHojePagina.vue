@@ -513,7 +513,7 @@ onBeforeUnmount(() => {
             <button
               v-if="
                 execucoesRealizadas[bloco.identificador] &&
-                !execucoesRealizadas[bloco.identificador].execucao
+                !execucoesRealizadas[bloco.identificador]?.execucao
                   .identificadorDoRegistroDeEstudo &&
                 (bloco.identificadorDoTopico || bloco.identificadorDaMateria)
               "
