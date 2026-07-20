@@ -21,6 +21,9 @@ import {
   ativarPlanoSemanal,
   criarPlanoSemanal,
   excluirBloco,
+  cancelarBloco,
+  encerrarPlanoSemanal,
+  cancelarPlanoSemanal,
   obterPlanoSemanal,
   reordenarBlocos,
   type BlocoDeEstudo,
@@ -280,9 +283,14 @@ async function confirmarExclusao() {
   excluindoBloco.value = true
   erro.value = ''
   try {
-    await excluirBloco(blocoParaExcluir.value.identificador)
+    if (plano.value?.estado === 'ATIVO') {
+      await cancelarBloco(blocoParaExcluir.value.identificador)
+      aviso.value = 'Bloco cancelado e ordem do dia atualizada.'
+    } else {
+      await excluirBloco(blocoParaExcluir.value.identificador)
+      aviso.value = 'Bloco excluído e ordem do dia atualizada.'
+    }
     await atualizarPlano()
-    aviso.value = 'Bloco excluído e ordem do dia atualizada.'
     blocoParaExcluir.value = undefined
   } catch (causa) {
     erro.value =
@@ -392,6 +400,29 @@ async function ativar() {
     confirmacaoDeAtivacaoAberta.value = false
   } finally {
     ativando.value = false
+  }
+}
+
+async function encerrarPlano() {
+  if (!plano.value) return
+  try {
+    plano.value = await encerrarPlanoSemanal(plano.value.identificador)
+    aviso.value =
+      'Semana encerrada. Blocos pendentes foram preservados como não realizados.'
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error ? causa.message : 'Não foi possível encerrar.'
+  }
+}
+
+async function cancelarPlano() {
+  if (!plano.value) return
+  try {
+    plano.value = await cancelarPlanoSemanal(plano.value.identificador)
+    aviso.value = 'Plano cancelado. Execuções e estudos foram preservados.'
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
   }
 }
 
@@ -540,7 +571,7 @@ watch(
             :class="
               plano.estado === 'ATIVO' ? 'text-bg-success' : 'text-bg-light'
             "
-            >{{ plano.estado === 'ATIVO' ? 'Ativo' : 'Rascunho' }}</strong
+            >{{ plano.estado }}</strong
           >
         </div>
         <div>
@@ -550,6 +581,22 @@ watch(
         <div>
           <span class="rotulo-do-resumo">Total planejado</span>
           <strong>{{ plano.totalDeMinutosPlanejados }} min</strong>
+        </div>
+        <div v-if="plano.estado === 'ATIVO'" class="d-flex gap-2">
+          <button
+            class="btn btn-outline-primary"
+            type="button"
+            @click="encerrarPlano"
+          >
+            Encerrar semana
+          </button>
+          <button
+            class="btn btn-outline-danger"
+            type="button"
+            @click="cancelarPlano"
+          >
+            Cancelar plano
+          </button>
         </div>
         <button
           v-if="plano.estado === 'RASCUNHO'"
@@ -562,7 +609,13 @@ watch(
         </button>
       </div>
 
-      <fieldset :disabled="salvando || plano.estado === 'ATIVO'">
+      <fieldset
+        :disabled="
+          salvando ||
+          plano.estado === 'ENCERRADO' ||
+          plano.estado === 'CANCELADO'
+        "
+      >
         <legend class="visually-hidden">Disponibilidade por dia</legend>
         <div class="grade-de-disponibilidades grade-dos-dias-planejados">
           <article
@@ -598,7 +651,7 @@ watch(
               <span>Disponível</span>
               <span class="campo-de-minutos">
                 <input
-                  v-if="plano.estado === 'RASCUNHO'"
+                  v-if="plano.estado === 'RASCUNHO' || plano.estado === 'ATIVO'"
                   :id="`disponibilidade-${data}`"
                   v-model.number="formulario[data]"
                   class="form-control"
@@ -699,9 +752,13 @@ watch(
         </div>
       </fieldset>
 
-      <div v-if="plano.estado === 'RASCUNHO'" class="acoes-da-disponibilidade">
+      <div
+        v-if="plano.estado === 'RASCUNHO' || plano.estado === 'ATIVO'"
+        class="acoes-da-disponibilidade"
+      >
         <p>
-          Você pode ajustar esses minutos enquanto o plano estiver em rascunho.
+          Você pode ajustar os minutos; em plano ativo, a carga ainda planejada
+          precisa caber.
         </p>
         <button class="btn btn-primary" type="submit" :disabled="salvando">
           <span
@@ -715,7 +772,10 @@ watch(
     </form>
 
     <EditorDeBloco
-      v-if="editorAberto && plano?.estado === 'RASCUNHO'"
+      v-if="
+        editorAberto &&
+        (plano?.estado === 'RASCUNHO' || plano?.estado === 'ATIVO')
+      "
       :bloco="blocoEmEdicao"
       :data-inicial="plano.dataInicial"
       :datas-da-semana="datasDaSemana"

@@ -65,6 +65,8 @@ export interface BlocoDeEstudo {
   horarioPrevisto?: string
   observacao?: string
   estado: EstadoDoBlocoDeEstudo
+  quantidadeDeReagendamentos: number
+  reagendadoEm?: string
   criadoEm: string
   atualizadoEm: string
   versao: number
@@ -299,6 +301,65 @@ export function reordenarBlocos(
     {
       method: 'PUT',
       body: JSON.stringify({ data, identificadoresOrdenados }),
+    },
+  )
+}
+
+export function reagendarBloco(
+  identificador: string,
+  data: string,
+  horarioPrevisto: string | undefined,
+  ordem: number,
+): Promise<BlocoDeEstudo> {
+  return requisitar<BlocoDeEstudo>(
+    `/v1/blocos-de-estudo/${identificador}/reagendamento`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ data, horarioPrevisto, ordem }),
+    },
+  )
+}
+
+export function cancelarBloco(identificador: string): Promise<BlocoDeEstudo> {
+  return requisitar<BlocoDeEstudo>(
+    `/v1/blocos-de-estudo/${identificador}/cancelamento`,
+    { method: 'POST' },
+  )
+}
+
+export function encerrarPlanoSemanal(
+  identificador: string,
+): Promise<PlanoSemanal> {
+  return requisitar<PlanoSemanal>(
+    `/v1/planos-semanais/${identificador}/encerramento`,
+    { method: 'POST' },
+  )
+}
+
+export function cancelarPlanoSemanal(
+  identificador: string,
+): Promise<PlanoSemanal> {
+  return requisitar<PlanoSemanal>(
+    `/v1/planos-semanais/${identificador}/cancelamento`,
+    { method: 'POST' },
+  )
+}
+
+export function corrigirExecucao(
+  identificador: string,
+  resultado: 'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO',
+  duracaoExecutadaEmMinutos: number,
+  observacao?: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/execucoes-de-bloco/${identificador}/correcao`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        resultado,
+        duracaoExecutadaEmMinutos,
+        observacao,
+      }),
     },
   )
 }

@@ -95,8 +95,9 @@ public class ServicoDePlanejamento {
                 .findByIdentificadorAndIdentificadorDoUsuario(identificadorDoPlano, usuario)
                 .orElseThrow(this::naoEncontrado);
         PlanoSemanal plano = planoPersistido.paraDominio();
-        exigirPlanoEditavel(plano);
+        exigirPlanoAjustavel(plano);
         validarConjuntoDeDias(plano, informadas);
+        validarCargaDoPlanoAtivo(plano, informadas);
         Map<LocalDate, DisponibilidadeInformada> porData = informadas.stream()
                 .collect(Collectors.toMap(DisponibilidadeInformada::data, item -> item));
         List<DisponibilidadeDoDiaPersistida> persistidas = disponibilidades
@@ -165,7 +166,7 @@ public class ServicoDePlanejamento {
         BlocoDeEstudoPersistido persistido = blocoPersistido(usuario, identificadorDoBloco);
         BlocoDeEstudo atual = persistido.paraDominio();
         PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();
-        exigirPlanoEditavel(plano);
+        exigirPlanoAjustavel(plano);
         validarDadosDoBloco(usuario, plano, dados);
         List<BlocoDeEstudoPersistido> origem = blocos
                 .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
@@ -192,6 +193,60 @@ public class ServicoDePlanejamento {
         destino.add(dados.ordem() - 1, persistido);
         if (!atual.data().equals(dados.data())) normalizarDia(origem, atual.data());
         normalizarDia(destino, dados.data());
+        blocos.flush();
+        return persistido.paraDominio();
+    }
+
+    @Transactional
+    public BlocoDeEstudo reagendarBloco(UUID usuario, UUID identificadorDoBloco,
+            LocalDate data, java.time.LocalTime horario, int ordem) {
+        BlocoDeEstudoPersistido persistido = blocoPersistido(usuario, identificadorDoBloco);
+        BlocoDeEstudo atual = persistido.paraDominio();
+        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();
+        exigirPlanoAjustavel(plano);
+        if (!plano.contem(data)) {
+            throw new RegraDeDominio("DATA_DO_BLOCO_INVALIDA",
+                    "O reagendamento deve permanecer na mesma semana.");
+        }
+        List<BlocoDeEstudoPersistido> origem = blocos
+                .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
+                        atual.identificadorDoPlano(), atual.data());
+        origem.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco));
+        List<BlocoDeEstudoPersistido> destino = atual.data().equals(data)
+                ? origem : blocos.findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
+                        atual.identificadorDoPlano(), data);
+        validarOrdemDeInsercao(ordem, destino.size());
+        BlocoDeEstudo reagendado;
+        try {
+            reagendado = atual.reagendar(data, horario, ordem);
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_REAGENDAVEL", excecao.getMessage());
+        }
+        persistido.atualizarDe(reagendado);
+        destino.add(ordem - 1, persistido);
+        if (!atual.data().equals(data)) normalizarDia(origem, atual.data());
+        normalizarDia(destino, data);
+        blocos.flush();
+        return persistido.paraDominio();
+    }
+
+    @Transactional
+    public BlocoDeEstudo cancelarBloco(UUID usuario, UUID identificadorDoBloco) {
+        BlocoDeEstudoPersistido persistido = blocoPersistido(usuario, identificadorDoBloco);
+        BlocoDeEstudo atual = persistido.paraDominio();
+        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();
+        exigirPlanoAjustavel(plano);
+        try {
+            persistido.atualizarDe(atual.cancelar());
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_CANCELAVEL", excecao.getMessage());
+        }
+        List<BlocoDeEstudoPersistido> restantes = blocos
+                .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
+                        atual.identificadorDoPlano(), atual.data());
+        restantes.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco)
+                || item.paraDominio().estado() != EstadoDoBlocoDeEstudo.PLANEJADO);
+        normalizarDia(restantes, atual.data());
         blocos.flush();
         return persistido.paraDominio();
     }
@@ -300,6 +355,73 @@ public class ServicoDePlanejamento {
         return finalizarBloco(usuario, bloco,
                 ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO, duracao,
                 observacao, identificadorDoTopico);
+    }
+
+    @Transactional
+    public ResultadoDaExecucaoDoBloco corrigirExecucao(UUID usuario, UUID identificador,
+            ResultadoDaExecucao resultado, int duracao, String observacao) {
+        ExecucaoDoBlocoPersistida persistida = execucoes
+                .findByIdentificadorAndIdentificadorDoUsuario(identificador, usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA", "Execucao do bloco nao encontrada."));
+        ExecucaoDoBloco atual = persistida.paraDominio();
+        if (atual.estaEmAndamento()) {
+            throw new ConflitoDeDominio("EXECUCAO_EM_ANDAMENTO_NAO_CORRIGIVEL",
+                    "Interrompa ou conclua a execução antes de corrigi-la.");
+        }
+        UUID novoRegistro = atual.identificadorDoRegistroDeEstudo();
+        RegistroDeEstudo estudo = null;
+        if (novoRegistro != null) {
+            RegistroDeEstudo anterior = estudos.obterEstudo(usuario, novoRegistro);
+            estudo = estudos.corrigirEstudo(usuario, anterior.identificador(),
+                    anterior.identificadorDoTopico(), anterior.identificadorDoMaterial(),
+                    atual.iniciadaEm(), duracao, observacao);
+            novoRegistro = estudo.identificador();
+        }
+        ExecucaoDoBloco corrigida = regra("EXECUCAO_DO_BLOCO_INVALIDA",
+                () -> atual.corrigir(resultado, duracao, observacao, novoRegistro, OffsetDateTime.now()));
+        persistida.atualizarDe(corrigida);
+        BlocoDeEstudoPersistido bloco = blocoPersistido(usuario, atual.identificadorDoBloco());
+        blocos.flush();
+        execucoes.flush();
+        return new ResultadoDaExecucaoDoBloco(bloco.paraDominio(), persistida.paraDominio(), estudo);
+    }
+
+    @Transactional
+    public ResultadoDoPlanoSemanal encerrarPlano(UUID usuario, UUID identificadorDoPlano) {
+        PlanoSemanalPersistido persistido = planoPersistido(usuario, identificadorDoPlano);
+        impedirEstadoFinalComExecucaoAberta(usuario, identificadorDoPlano);
+        PlanoSemanal encerrado;
+        try {
+            encerrado = persistido.paraDominio().encerrar();
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_ENCERRAVEL", excecao.getMessage());
+        }
+        persistido.atualizarDe(encerrado);
+        planos.flush();
+        return resultado(persistido.paraDominio());
+    }
+
+    @Transactional
+    public ResultadoDoPlanoSemanal cancelarPlano(UUID usuario, UUID identificadorDoPlano) {
+        PlanoSemanalPersistido persistido = planoPersistido(usuario, identificadorDoPlano);
+        impedirEstadoFinalComExecucaoAberta(usuario, identificadorDoPlano);
+        PlanoSemanal cancelado;
+        try {
+            cancelado = persistido.paraDominio().cancelar();
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_CANCELAVEL", excecao.getMessage());
+        }
+        for (BlocoDeEstudoPersistido bloco : blocos
+                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(identificadorDoPlano)) {
+            if (bloco.paraDominio().estado() == EstadoDoBlocoDeEstudo.PLANEJADO) {
+                bloco.atualizarDe(bloco.paraDominio().cancelar());
+            }
+        }
+        persistido.atualizarDe(cancelado);
+        blocos.flush();
+        planos.flush();
+        return resultado(persistido.paraDominio());
     }
 
     @Transactional(readOnly = true)
@@ -503,6 +625,37 @@ public class ServicoDePlanejamento {
         }
     }
 
+    private void validarCargaDoPlanoAtivo(PlanoSemanal plano,
+            List<DisponibilidadeInformada> informadas) {
+        if (!plano.estaAtivo()) return;
+        Map<LocalDate, Integer> carga = blocos
+                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano.identificador()).stream()
+                .map(BlocoDeEstudoPersistido::paraDominio)
+                .filter(item -> item.estado() == EstadoDoBlocoDeEstudo.PLANEJADO)
+                .collect(Collectors.groupingBy(BlocoDeEstudo::data,
+                        Collectors.summingInt(BlocoDeEstudo::duracaoPrevistaEmMinutos)));
+        for (DisponibilidadeInformada informada : informadas) {
+            int minima = carga.getOrDefault(informada.data(), 0);
+            if (informada.minutosDisponiveis() < minima) {
+                throw new ConflitoDeDominio("DISPONIBILIDADE_ABAIXO_DA_CARGA_PLANEJADA",
+                        "A disponibilidade de " + informada.data()
+                                + " deve ser de pelo menos " + minima + " minutos.");
+            }
+        }
+    }
+
+    private void impedirEstadoFinalComExecucaoAberta(UUID usuario, UUID plano) {
+        execucoes.findByIdentificadorDoUsuarioAndEncerradaEmIsNull(usuario)
+                .ifPresent(execucao -> {
+                    BlocoDeEstudo bloco = blocoPersistido(usuario,
+                            execucao.paraDominio().identificadorDoBloco()).paraDominio();
+                    if (bloco.identificadorDoPlano().equals(plano)) {
+                        throw new ConflitoDeDominio("PLANO_POSSUI_EXECUCAO_EM_ANDAMENTO",
+                                "Conclua ou interrompa o bloco em andamento.");
+                    }
+                });
+    }
+
     private void validarAtivacao(ResultadoDoPlanoSemanal resultado) {
         if (resultado.totalDeMinutosDisponiveis() == 0) {
             throw new RegraDeDominio("PLANO_SEMANAL_SEM_DISPONIBILIDADE",
@@ -606,6 +759,14 @@ public class ServicoDePlanejamento {
         return blocos.encontrarDoUsuario(bloco, usuario)
                 .orElseThrow(() -> new RecursoNaoEncontrado(
                         "BLOCO_DE_ESTUDO_NAO_ENCONTRADO", "Bloco de estudo nao encontrado."));
+    }
+
+    private void exigirPlanoAjustavel(PlanoSemanal plano) {
+        if (plano.estado() != EstadoDoPlanoSemanal.RASCUNHO
+                && plano.estado() != EstadoDoPlanoSemanal.ATIVO) {
+            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_EDITAVEL",
+                    "Somente plano em rascunho ou ativo permite ajustes.");
+        }
     }
 
     private void exigirPlanoEditavel(PlanoSemanal plano) {

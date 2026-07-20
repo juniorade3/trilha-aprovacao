@@ -85,6 +85,18 @@ public record ExecucaoDoBloco(
                 criadoEm, momento, versao);
     }
 
+    public ExecucaoDoBloco corrigir(ResultadoDaExecucao novoResultado, int novaDuracao,
+            String novaObservacao, UUID novoRegistro, OffsetDateTime momento) {
+        if (estaEmAndamento()) {
+            throw new IllegalStateException("Execução em andamento não pode ser corrigida.");
+        }
+        Objects.requireNonNull(novoResultado);
+        Objects.requireNonNull(momento);
+        return new ExecucaoDoBloco(identificador, identificadorDoUsuario,
+                identificadorDoBloco, iniciadaEm, encerradaEm, novaDuracao,
+                novoResultado, novaObservacao, novoRegistro, criadoEm, momento, versao);
+    }
+
     public boolean estaEmAndamento() {
         return encerradaEm == null;
     }

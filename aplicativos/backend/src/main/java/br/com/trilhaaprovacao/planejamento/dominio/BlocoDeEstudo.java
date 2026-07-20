@@ -19,6 +19,8 @@ public record BlocoDeEstudo(
         LocalTime horarioPrevisto,
         String observacao,
         EstadoDoBlocoDeEstudo estado,
+        int quantidadeDeReagendamentos,
+        OffsetDateTime reagendadoEm,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,
         long versao) {
@@ -41,6 +43,9 @@ public record BlocoDeEstudo(
         }
         observacao = textoOpcional(observacao, "Observacao", 2000);
         Objects.requireNonNull(estado);
+        if (quantidadeDeReagendamentos < 0) {
+            throw new IllegalArgumentException("Quantidade de reagendamentos invalida.");
+        }
         Objects.requireNonNull(criadoEm);
         Objects.requireNonNull(atualizadoEm);
     }
@@ -51,7 +56,7 @@ public record BlocoDeEstudo(
         OffsetDateTime agora = OffsetDateTime.now();
         return new BlocoDeEstudo(UUID.randomUUID(), plano, materia, topico,
                 titulo, tipo, data, duracao, ordem, horario, observacao,
-                EstadoDoBlocoDeEstudo.PLANEJADO, agora, agora, 0);
+                EstadoDoBlocoDeEstudo.PLANEJADO, 0, null, agora, agora, 0);
     }
 
     public BlocoDeEstudo alterarPlanejamento(UUID materia, UUID topico,
@@ -60,13 +65,28 @@ public record BlocoDeEstudo(
         exigirPlanejado();
         return new BlocoDeEstudo(identificador, identificadorDoPlano, materia, topico,
                 novoTitulo, tipo, novaData, novaDuracao, novaOrdem, horario,
-                novaObservacao, estado, criadoEm, OffsetDateTime.now(), versao);
+                novaObservacao, estado, quantidadeDeReagendamentos, reagendadoEm,
+                criadoEm, OffsetDateTime.now(), versao);
     }
 
     public BlocoDeEstudo moverPara(LocalDate novaData, int novaOrdem) {
         return alterarPlanejamento(identificadorDaMateria, identificadorDoTopico,
                 titulo, tipoDeAtividade, novaData, duracaoPrevistaEmMinutos,
                 novaOrdem, horarioPrevisto, observacao);
+    }
+
+    public BlocoDeEstudo reagendar(LocalDate novaData, LocalTime novoHorario, int novaOrdem) {
+        exigirPlanejado();
+        OffsetDateTime agora = OffsetDateTime.now();
+        return new BlocoDeEstudo(identificador, identificadorDoPlano,
+                identificadorDaMateria, identificadorDoTopico, titulo, tipoDeAtividade,
+                novaData, duracaoPrevistaEmMinutos, novaOrdem, novoHorario, observacao,
+                estado, quantidadeDeReagendamentos + 1, agora, criadoEm, agora, versao);
+    }
+
+    public BlocoDeEstudo cancelar() {
+        exigirPlanejado();
+        return comEstado(EstadoDoBlocoDeEstudo.CANCELADO);
     }
 
     public BlocoDeEstudo iniciar() {
@@ -100,7 +120,8 @@ public record BlocoDeEstudo(
         return new BlocoDeEstudo(identificador, identificadorDoPlano,
                 identificadorDaMateria, identificadorDoTopico, titulo,
                 tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
-                horarioPrevisto, observacao, novoEstado, criadoEm,
+                horarioPrevisto, observacao, novoEstado,
+                quantidadeDeReagendamentos, reagendadoEm, criadoEm,
                 OffsetDateTime.now(), versao);
     }
 

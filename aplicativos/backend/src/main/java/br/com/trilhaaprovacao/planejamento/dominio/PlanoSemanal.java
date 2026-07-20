@@ -59,6 +59,27 @@ public record PlanoSemanal(
                 EstadoDoPlanoSemanal.ATIVO, criadoEm, OffsetDateTime.now(), versao);
     }
 
+    public PlanoSemanal encerrar() {
+        if (estado == EstadoDoPlanoSemanal.ENCERRADO) return this;
+        if (estado != EstadoDoPlanoSemanal.ATIVO) {
+            throw new IllegalStateException("Somente plano ativo pode ser encerrado.");
+        }
+        return comEstado(EstadoDoPlanoSemanal.ENCERRADO);
+    }
+
+    public PlanoSemanal cancelar() {
+        if (estado == EstadoDoPlanoSemanal.CANCELADO) return this;
+        if (estado != EstadoDoPlanoSemanal.RASCUNHO && estado != EstadoDoPlanoSemanal.ATIVO) {
+            throw new IllegalStateException("O estado atual não permite cancelamento.");
+        }
+        return comEstado(EstadoDoPlanoSemanal.CANCELADO);
+    }
+
+    private PlanoSemanal comEstado(EstadoDoPlanoSemanal novoEstado) {
+        return new PlanoSemanal(identificador, identificadorDoUsuario, dataInicial,
+                novoEstado, criadoEm, OffsetDateTime.now(), versao);
+    }
+
     public boolean contem(LocalDate data) {
         return data != null && !data.isBefore(dataInicial) && !data.isAfter(dataFinal());
     }

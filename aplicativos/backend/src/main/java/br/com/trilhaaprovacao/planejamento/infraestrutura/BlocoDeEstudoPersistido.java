@@ -32,6 +32,9 @@ public class BlocoDeEstudoPersistido {
     @Column(name = "horario_previsto") private LocalTime horarioPrevisto;
     @Column(length = 2000) private String observacao;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private EstadoDoBlocoDeEstudo estado;
+    @Column(name = "quantidade_de_reagendamentos", nullable = false)
+    private int quantidadeDeReagendamentos;
+    @Column(name = "reagendado_em") private OffsetDateTime reagendadoEm;
     @Column(name = "criado_em", nullable = false) private OffsetDateTime criadoEm;
     @Column(name = "atualizado_em", nullable = false) private OffsetDateTime atualizadoEm;
     @Version private long versao;
@@ -57,6 +60,8 @@ public class BlocoDeEstudoPersistido {
         horarioPrevisto = bloco.horarioPrevisto();
         observacao = bloco.observacao();
         estado = bloco.estado();
+        quantidadeDeReagendamentos = bloco.quantidadeDeReagendamentos();
+        reagendadoEm = bloco.reagendadoEm();
         atualizadoEm = bloco.atualizadoEm();
     }
 
@@ -64,6 +69,7 @@ public class BlocoDeEstudoPersistido {
         return new BlocoDeEstudo(identificador, identificadorDoPlano,
                 identificadorDaMateria, identificadorDoTopico, titulo,
                 tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
-                horarioPrevisto, observacao, estado, criadoEm, atualizadoEm, versao);
+                horarioPrevisto, observacao, estado, quantidadeDeReagendamentos,
+                reagendadoEm, criadoEm, atualizadoEm, versao);
     }
 }
