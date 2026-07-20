@@ -15,15 +15,15 @@ A geração é determinística: as mesmas entradas devem produzir a mesma saída
 
 ## Linha de base observada
 
-Na revisão do repositório:
+Na consolidação da Geração Determinística:
 
 - o módulo `planejamento` já existe no backend e frontend;
-- o Planejamento Manual está implementado até a Sprint 07 na `main`;
-- a última migration observada é a `V10`;
+- o Planejamento Manual está concluído até a Sprint 08;
+- a Sprint 01 da Geração Determinística foi concluída na migration `V11`;
+- a Sprint 02 da Geração Determinística foi concluída na migration `V12`;
+- a Sprint 03 consolida o aceite sem criar nova regra de negócio ou migration;
 - já existem plano semanal, disponibilidade, blocos, execução, Hoje, Semana, reagendamento e integração com estudos;
 - o serviço principal atual é `ServicoDePlanejamento`.
-
-Antes de implementar, confirmar novamente o `HEAD`, a última migration e a conclusão da Sprint 08 do Planejamento Manual.
 
 ## Divisão compacta
 
@@ -98,5 +98,5 @@ Abrir semana em rascunho
 ## Local recomendado
 
 ```text
-documentacao/planejamento-geracao-deterministica/
+documentacao/planejamento-geracao-deterministica-compacto/
 ```

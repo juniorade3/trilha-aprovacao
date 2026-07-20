@@ -520,6 +520,7 @@ async function irParaSemanaAtual() {
 watch(
   () => rota.query.inicio,
   async (inicio) => {
+    geracaoAberta.value = false
     if (!inicioValido(inicio)) {
       await roteador.replace({
         path: '/planejamento/semana',
@@ -920,6 +921,7 @@ watch(
 
     <GavetaDeGeracaoDeterministica
       v-if="geracaoAberta && plano"
+      :key="plano.identificador"
       :identificador-do-plano="plano.identificador"
       :quantidade-de-blocos-gerados="quantidadeDeBlocosGerados"
       @fechar="geracaoAberta = false"

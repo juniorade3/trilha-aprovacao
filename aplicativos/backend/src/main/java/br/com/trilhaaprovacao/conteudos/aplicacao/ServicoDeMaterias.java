@@ -7,7 +7,10 @@ import br.com.trilhaaprovacao.conteudos.dominio.Materia;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.MateriaPersistida;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.RepositorioJpaDeMaterias;
 import br.com.trilhaaprovacao.conteudos.infraestrutura.RepositorioJpaDeTopicos;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -47,6 +50,23 @@ public class ServicoDeMaterias {
     @Transactional(readOnly = true)
     public Materia obter(UUID identificadorDoUsuario, UUID identificador) {
         return obterPersistida(identificadorDoUsuario, identificador).paraDominio();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, String> obterNomes(UUID identificadorDoUsuario,
+            Set<UUID> identificadores) {
+        if (identificadores == null || identificadores.isEmpty()) return Map.of();
+        Map<UUID, String> encontradas = materias
+                .findByIdentificadorDoUsuarioAndIdentificadorIn(
+                        identificadorDoUsuario, identificadores)
+                .stream()
+                .map(MateriaPersistida::paraDominio)
+                .collect(Collectors.toMap(Materia::identificador, Materia::nome));
+        if (encontradas.size() != identificadores.size()) {
+            throw new RecursoNaoEncontrado(
+                    "MATERIA_NAO_ENCONTRADA", "Materia nao encontrada.");
+        }
+        return Map.copyOf(encontradas);
     }
 
     @Transactional

@@ -2,6 +2,13 @@ package br.com.trilhaaprovacao.planejamento.api;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,9 +17,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.trilhaaprovacao.concursos.aplicacao.ConsultaDeMateriasElegiveisParaPlanejamento;
+import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +38,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -54,6 +69,8 @@ class PlanejamentoIntegracaoTest {
     @Autowired MockMvc api;
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate banco;
+    @MockitoSpyBean ConsultaDeMateriasElegiveisParaPlanejamento materiasElegiveis;
+    @MockitoSpyBean ServicoDeMaterias servicoDeMaterias;
 
     @BeforeEach
     void limparBanco() {
@@ -641,6 +658,206 @@ class PlanejamentoIntegracaoTest {
     }
 
     @Test
+    void deveConsultarElegibilidadeUmaVezECarregarNomesPreservadosEmLote()
+            throws Exception {
+        String email = "consultas.geracao@example.com";
+        MockHttpSession sessao = criarContaEEntrar(email);
+        String plano = criarPlano(sessao, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(260)))
+                .andExpect(status().isOk());
+        String materiaA = criarMateria(sessao, "Banco de dados");
+        String materiaB = criarMateria(sessao, "Redes");
+        String materiaC = criarMateria(sessao, "Seguranca");
+        String materiaManualA = criarMateria(sessao, "Materia manual A");
+        String materiaManualB = criarMateria(sessao, "Materia manual B");
+        criarEstruturaElegivel(email, List.of(materiaA, materiaB, materiaC), materiaA);
+        criarBloco(sessao, plano, "Manual A", SEGUNDA, 30, 1, materiaManualA, null);
+        criarBloco(sessao, plano, "Manual B", SEGUNDA, 30, 2, materiaManualB, null);
+        UUID usuario = banco.queryForObject(
+                "SELECT identificador FROM usuarios WHERE email = ?", UUID.class, email);
+
+        clearInvocations(materiasElegiveis, servicoDeMaterias);
+
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica/previa", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                                 "duracaoDoBlocoDeRevisaoEmMinutos":20}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias[0].blocosPreservados[0].nomeDaMateria")
+                        .value("Materia manual A"))
+                .andExpect(jsonPath("$.dias[0].blocosPreservados[1].nomeDaMateria")
+                        .value("Materia manual B"));
+
+        verify(materiasElegiveis, times(1)).consultar(usuario);
+        verify(servicoDeMaterias, atMost(1)).obterNomes(eq(usuario), any());
+        verify(servicoDeMaterias, never()).obter(eq(usuario), any(UUID.class));
+    }
+
+    @Test
+    void deveIsolarAsQuatroRotasDaGeracaoEntreUsuarios() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("isolamento.geracao.a@example.com");
+        String plano = criarPlano(sessaoA, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(170)))
+                .andExpect(status().isOk());
+        String materiaA = criarMateria(sessaoA, "Banco de dados");
+        String materiaB = criarMateria(sessaoA, "Redes");
+        String materiaC = criarMateria(sessaoA, "Seguranca");
+        criarEstruturaElegivel("isolamento.geracao.a@example.com",
+                List.of(materiaA, materiaB, materiaC), materiaA);
+        MockHttpSession sessaoB = criarContaEEntrar("isolamento.geracao.b@example.com");
+        String prioridades = """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"},
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"}
+                ]}
+                """.formatted(materiaA, materiaB, materiaC);
+        String configuracao = """
+                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                 "duracaoDoBlocoDeRevisaoEmMinutos":20}
+                """;
+
+        api.perform(get("/api/v1/planos-semanais/{id}/materias-para-geracao", plano)
+                        .session(sessaoB))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ENCONTRADO"));
+        api.perform(put("/api/v1/planos-semanais/{id}/prioridades-de-materias", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(prioridades))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ENCONTRADO"));
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica/previa", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracao))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ENCONTRADO"));
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ENCONTRADO"));
+
+        assertThatQuantidade("prioridades_de_materias_no_plano", 0);
+        assertThatQuantidade("blocos_de_estudo", 0);
+    }
+
+    @Test
+    void deveSerializarDuasAplicacoesConcorrentesSemDuplicarPosicoes()
+            throws Exception {
+        String email = "concorrencia.geracao@example.com";
+        MockHttpSession primeiraSessao = criarContaEEntrar(email);
+        MockHttpSession segundaSessao = entrar(email);
+        String plano = criarPlano(primeiraSessao, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(primeiraSessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(170)))
+                .andExpect(status().isOk());
+        String materiaA = criarMateria(primeiraSessao, "Banco de dados");
+        String materiaB = criarMateria(primeiraSessao, "Redes");
+        String materiaC = criarMateria(primeiraSessao, "Seguranca");
+        criarEstruturaElegivel(email, List.of(materiaA, materiaB, materiaC), materiaA);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(primeiraSessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosCriados").value(4));
+        String manual = criarBloco(primeiraSessao, plano, "Leitura manual",
+                SEGUNDA, 30, 1, null, null);
+        String ajustado = banco.queryForObject("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                  AND materia_id IS NOT NULL
+                ORDER BY ordem LIMIT 1
+                """, String.class, plano);
+        String materiaDoAjustado = banco.queryForObject("""
+                SELECT materia_id::text FROM blocos_de_estudo
+                WHERE identificador = ?::uuid
+                """, String.class, ajustado);
+        Integer ordemDoAjustado = banco.queryForObject("""
+                SELECT ordem FROM blocos_de_estudo WHERE identificador = ?::uuid
+                """, Integer.class, ajustado);
+        api.perform(put("/api/v1/blocos-de-estudo/{id}", ajustado)
+                        .session(primeiraSessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDoBloco("Ajustado antes da concorrencia", SEGUNDA, 45,
+                                ordemDoAjustado, materiaDoAjustado, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.origem").value("GERADO_AJUSTADO_MANUALMENTE"));
+        List<String> geradosPurosAnteriores = banco.queryForList("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                ORDER BY identificador
+                """, String.class, plano);
+
+        CountDownLatch prontas = new CountDownLatch(2);
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> primeira = executor.submit(() -> aplicarAposLargada(
+                    primeiraSessao, plano, prontas, largada));
+            Future<Integer> segunda = executor.submit(() -> aplicarAposLargada(
+                    segundaSessao, plano, prontas, largada));
+            org.assertj.core.api.Assertions.assertThat(
+                    prontas.await(5, TimeUnit.SECONDS)).isTrue();
+            largada.countDown();
+
+            org.assertj.core.api.Assertions.assertThat(List.of(
+                            primeira.get(15, TimeUnit.SECONDS),
+                            segunda.get(15, TimeUnit.SECONDS)))
+                    .containsExactly(200, 200);
+        } finally {
+            largada.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                """, Integer.class, plano)).isEqualTo(3);
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE identificador IN (?::uuid, ?::uuid)
+                  AND origem IN ('MANUAL', 'GERADO_AJUSTADO_MANUALMENTE')
+                """, Integer.class, manual, ajustado)).isEqualTo(2);
+        for (String geradoAnterior : geradosPurosAnteriores) {
+            org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                    SELECT count(*) FROM blocos_de_estudo
+                    WHERE identificador = ?::uuid
+                    """, Integer.class, geradoAnterior)).isZero();
+        }
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                """, Integer.class, plano)).isEqualTo(5);
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT data, ordem
+                    FROM blocos_de_estudo
+                    WHERE plano_id = ?::uuid
+                    GROUP BY data, ordem
+                    HAVING count(*) > 1
+                ) posicoes_duplicadas
+                """, Integer.class, plano)).isZero();
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND (origem IS NULL OR estado IS NULL OR ordem IS NULL)
+                """, Integer.class, plano)).isZero();
+    }
+
+    @Test
     void deveAplicarEditarERegenerarPreservandoBlocosManuaisEAjustados()
             throws Exception {
         MockHttpSession sessaoA = criarContaEEntrar("aplicacao.a@example.com");
@@ -796,12 +1013,28 @@ class PlanejamentoIntegracaoTest {
                                 {"nome":"Pessoa","email":"%s","senha":"senha-segura-123"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated());
+        return entrar(email);
+    }
+
+    private MockHttpSession entrar(String email) throws Exception {
         return (MockHttpSession) api.perform(post("/api/v1/autenticacao/login").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"%s","senha":"senha-segura-123"}
                                 """.formatted(email)))
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
+    }
+
+    private int aplicarAposLargada(MockHttpSession sessao, String plano,
+            CountDownLatch prontas, CountDownLatch largada) throws Exception {
+        prontas.countDown();
+        if (!largada.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("As aplicacoes concorrentes nao ficaram prontas.");
+        }
+        return api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andReturn().getResponse().getStatus();
     }
 
     private String criarPlano(MockHttpSession sessao, LocalDate inicio) throws Exception {

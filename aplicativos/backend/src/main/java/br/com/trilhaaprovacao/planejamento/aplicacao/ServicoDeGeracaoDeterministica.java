@@ -32,7 +32,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,14 +67,18 @@ public class ServicoDeGeracaoDeterministica {
     @Transactional(readOnly = true)
     public List<MateriaParaGeracao> listarMaterias(UUID usuario, UUID plano) {
         obterPlano(usuario, plano);
-        return montarMaterias(usuario, plano);
+        List<MateriaElegivelParaPlanejamento> elegiveis = materiasElegiveis.consultar(usuario);
+        return montarMaterias(plano, elegiveis);
     }
 
     @Transactional
     public List<MateriaParaGeracao> substituirPrioridades(UUID usuario, UUID plano,
             List<PrioridadeDeMateriaInformada> informadas) {
         exigirRascunho(obterPlano(usuario, plano).estado());
-        List<MateriaParaGeracao> elegiveis = montarMaterias(usuario, plano);
+        List<MateriaElegivelParaPlanejamento> materiasElegiveisDaOperacao =
+                materiasElegiveis.consultar(usuario);
+        List<MateriaParaGeracao> elegiveis = montarMaterias(
+                plano, materiasElegiveisDaOperacao);
         if (informadas == null || informadas.stream().anyMatch(item -> item == null
                 || item.identificadorDaMateria() == null || item.prioridade() == null)) {
             throw new RegraDeDominio("PRIORIDADES_INVALIDAS",
@@ -157,13 +160,13 @@ public class ServicoDeGeracaoDeterministica {
     private PreviaDaGeracaoDaSemana calcularPrevia(UUID usuario, UUID plano,
             ConfiguracaoDaGeracaoDeterministica configuracao,
             List<BlocoDeEstudoPersistido> blocosDoPlano) {
-        List<MateriaParaGeracao> materiasParaGeracao = montarMaterias(usuario, plano);
-        Map<UUID, MateriaElegivelParaPlanejamento> dadosElegiveis = materiasElegiveis
-                .consultar(usuario).stream().collect(Collectors.toMap(
+        List<MateriaElegivelParaPlanejamento> elegiveis = materiasElegiveis.consultar(usuario);
+        Map<UUID, MateriaElegivelParaPlanejamento> porIdentificador = elegiveis.stream()
+                .collect(Collectors.toMap(
                         MateriaElegivelParaPlanejamento::identificadorDaMateria, item -> item));
-        List<CandidatoDeMateriaParaGeracao> candidatos = materiasParaGeracao.stream()
+        List<CandidatoDeMateriaParaGeracao> candidatos = montarMaterias(plano, elegiveis).stream()
                 .map(item -> {
-                    MateriaElegivelParaPlanejamento dados = dadosElegiveis
+                    MateriaElegivelParaPlanejamento dados = porIdentificador
                             .get(item.identificadorDaMateria());
                     return new CandidatoDeMateriaParaGeracao(item.identificadorDaMateria(),
                             item.nome(), dados.nomeNormalizado(), item.ordemEstavel(),
@@ -171,14 +174,22 @@ public class ServicoDeGeracaoDeterministica {
                 }).toList();
         Map<UUID, String> nomes = new HashMap<>();
         candidatos.forEach(item -> nomes.put(item.identificadorDaMateria(), item.nome()));
-        List<BlocoPreservadoNaGeracao> preservados = blocosDoPlano.stream()
+        List<BlocoDeEstudo> blocosPreservados = blocosDoPlano.stream()
                 .map(BlocoDeEstudoPersistido::paraDominio)
                 .filter(item -> item.estado() != EstadoDoBlocoDeEstudo.CANCELADO)
                 .filter(item -> item.origem()
                         != OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE)
+                .toList();
+        Set<UUID> identificadoresSemNome = blocosPreservados.stream()
+                .map(BlocoDeEstudo::identificadorDaMateria)
+                .filter(java.util.Objects::nonNull)
+                .filter(item -> !nomes.containsKey(item))
+                .collect(Collectors.toSet());
+        nomes.putAll(materias.obterNomes(usuario, identificadoresSemNome));
+        List<BlocoPreservadoNaGeracao> preservados = blocosPreservados.stream()
                 .map(item -> new BlocoPreservadoNaGeracao(item.identificador(),
-                        item.identificadorDaMateria(), nomeDaMateria(usuario,
-                                item.identificadorDaMateria(), nomes), item.titulo(),
+                        item.identificadorDaMateria(), item.identificadorDaMateria() == null
+                                ? null : nomes.get(item.identificadorDaMateria()), item.titulo(),
                         item.tipoDeAtividade(), item.data(),
                         item.duracaoPrevistaEmMinutos(), item.ordem()))
                 .toList();
@@ -253,8 +264,8 @@ public class ServicoDeGeracaoDeterministica {
         return resumo.length() <= 2000 ? resumo : resumo.substring(0, 2000);
     }
 
-    private List<MateriaParaGeracao> montarMaterias(UUID usuario, UUID plano) {
-        List<MateriaElegivelParaPlanejamento> elegiveis = materiasElegiveis.consultar(usuario);
+    private List<MateriaParaGeracao> montarMaterias(UUID plano,
+            List<MateriaElegivelParaPlanejamento> elegiveis) {
         Map<UUID, PrioridadeDaMateriaNoPlano> registradas = prioridades
                 .findByIdentificadorDoPlano(plano).stream()
                 .map(PrioridadeDeMateriaNoPlanoPersistida::paraDominio)
@@ -264,12 +275,6 @@ public class ServicoDeGeracaoDeterministica {
                 item.identificadorDaMateria(), item.nome(), item.ordemEstavel(),
                 registradas.getOrDefault(item.identificadorDaMateria(),
                         PrioridadeDaMateriaNoPlano.NORMAL))).toList();
-    }
-
-    private String nomeDaMateria(UUID usuario, UUID identificador, Map<UUID, String> nomes) {
-        if (identificador == null) return null;
-        return nomes.computeIfAbsent(identificador,
-                chave -> materias.obter(usuario, chave).nome());
     }
 
     private br.com.trilhaaprovacao.planejamento.dominio.PlanoSemanal obterPlano(
@@ -286,4 +291,5 @@ public class ServicoDeGeracaoDeterministica {
                     "Somente plano em rascunho permite prioridades e previa.");
         }
     }
+
 }

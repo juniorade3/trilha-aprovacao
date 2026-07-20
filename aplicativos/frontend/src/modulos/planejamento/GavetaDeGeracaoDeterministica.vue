@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
@@ -33,6 +33,11 @@ const carregando = ref(true)
 const processando = ref(false)
 const erro = ref('')
 const confirmacaoDeRegeneracaoAberta = ref(false)
+const assinaturaDaPrevia = ref('')
+const assinaturaDasPrioridadesSalvas = ref('')
+const operacaoParaTentarNovamente = ref<
+  'CARREGAR_MATERIAS' | 'SALVAR_PRIORIDADES' | 'CALCULAR_PREVIA' | 'APLICAR'
+>()
 
 const rotulos: Record<PrioridadeDaMateriaNoPlano, string> = {
   ALTA: 'Alta',
@@ -41,18 +46,71 @@ const rotulos: Record<PrioridadeDaMateriaNoPlano, string> = {
   NAO_INCLUIR: 'Não incluir',
 }
 
+function prioridadesOrdenadas() {
+  return materias.value
+    .map((materia) => ({
+      identificadorDaMateria: materia.identificadorDaMateria,
+      prioridade: materia.prioridade,
+    }))
+    .sort((primeira, segunda) =>
+      primeira.identificadorDaMateria.localeCompare(
+        segunda.identificadorDaMateria,
+      ),
+    )
+}
+
+function criarAssinaturaDasPrioridades() {
+  return JSON.stringify(prioridadesOrdenadas())
+}
+
+function criarAssinaturaDaPrevia() {
+  return JSON.stringify({
+    duracaoPrincipal: Number(duracaoPrincipal.value),
+    duracaoDaRevisao: Number(duracaoDaRevisao.value),
+    prioridades: prioridadesOrdenadas(),
+  })
+}
+
+const prioridadesNaoSalvas = computed(
+  () =>
+    assinaturaDasPrioridadesSalvas.value !== criarAssinaturaDasPrioridades(),
+)
+
+const previaDesatualizada = computed(
+  () =>
+    Boolean(previa.value) &&
+    assinaturaDaPrevia.value !== criarAssinaturaDaPrevia(),
+)
+
+function limparErro() {
+  erro.value = ''
+  operacaoParaTentarNovamente.value = undefined
+}
+
+function registrarErro(
+  causa: unknown,
+  mensagemPadrao: string,
+  operacao:
+    'CARREGAR_MATERIAS' | 'SALVAR_PRIORIDADES' | 'CALCULAR_PREVIA' | 'APLICAR',
+) {
+  erro.value = causa instanceof Error ? causa.message : mensagemPadrao
+  operacaoParaTentarNovamente.value = operacao
+}
+
 async function carregarMaterias() {
   carregando.value = true
-  erro.value = ''
+  limparErro()
   try {
     materias.value = await listarMateriasParaGeracao(
       propriedades.identificadorDoPlano,
     )
+    assinaturaDasPrioridadesSalvas.value = criarAssinaturaDasPrioridades()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível carregar as matérias elegíveis.'
+    registrarErro(
+      causa,
+      'Não foi possível carregar as matérias elegíveis.',
+      'CARREGAR_MATERIAS',
+    )
   } finally {
     carregando.value = false
   }
@@ -60,7 +118,7 @@ async function carregarMaterias() {
 
 async function salvarPrioridades() {
   processando.value = true
-  erro.value = ''
+  limparErro()
   try {
     materias.value = await substituirPrioridadesDeMaterias(
       propriedades.identificadorDoPlano,
@@ -69,41 +127,57 @@ async function salvarPrioridades() {
         prioridade: materia.prioridade,
       })),
     )
-    previa.value = undefined
+    assinaturaDasPrioridadesSalvas.value = criarAssinaturaDasPrioridades()
     etapa.value = 'CONFIGURACAO'
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível salvar as prioridades.'
+    registrarErro(
+      causa,
+      'Não foi possível salvar as prioridades.',
+      'SALVAR_PRIORIDADES',
+    )
   } finally {
     processando.value = false
   }
 }
 
 async function calcularPrevia() {
+  if (prioridadesNaoSalvas.value) {
+    erro.value = 'Salve as prioridades antes de calcular uma nova prévia.'
+    operacaoParaTentarNovamente.value = undefined
+    return
+  }
   processando.value = true
-  erro.value = ''
+  limparErro()
+  const duracaoPrincipalSolicitada = Number(duracaoPrincipal.value)
+  const duracaoDaRevisaoSolicitada = Number(duracaoDaRevisao.value)
+  const assinaturaSolicitada = criarAssinaturaDaPrevia()
   try {
     previa.value = await gerarPreviaDeterministica(
       propriedades.identificadorDoPlano,
-      Number(duracaoPrincipal.value),
-      Number(duracaoDaRevisao.value),
+      duracaoPrincipalSolicitada,
+      duracaoDaRevisaoSolicitada,
     )
+    assinaturaDaPrevia.value = assinaturaSolicitada
     etapa.value = 'PREVIA'
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível calcular a prévia.'
+    registrarErro(
+      causa,
+      'Não foi possível calcular a prévia.',
+      'CALCULAR_PREVIA',
+    )
   } finally {
     processando.value = false
   }
 }
 
 async function aplicar(substituirBlocosGerados: boolean) {
+  if (!previa.value || previaDesatualizada.value) {
+    erro.value = 'Recalcule a prévia antes de aplicar.'
+    operacaoParaTentarNovamente.value = 'CALCULAR_PREVIA'
+    return
+  }
   processando.value = true
-  erro.value = ''
+  limparErro()
   try {
     const resultado = await aplicarGeracaoDeterministica(
       propriedades.identificadorDoPlano,
@@ -121,13 +195,30 @@ async function aplicar(substituirBlocosGerados: boolean) {
     ) {
       confirmacaoDeRegeneracaoAberta.value = true
     } else {
-      erro.value =
-        causa instanceof Error
-          ? causa.message
-          : 'Não foi possível aplicar a geração.'
+      confirmacaoDeRegeneracaoAberta.value = false
+      registrarErro(causa, 'Não foi possível aplicar a geração.', 'APLICAR')
     }
   } finally {
     processando.value = false
+  }
+}
+
+async function tentarNovamente() {
+  switch (operacaoParaTentarNovamente.value) {
+    case 'CARREGAR_MATERIAS':
+      await carregarMaterias()
+      break
+    case 'SALVAR_PRIORIDADES':
+      await salvarPrioridades()
+      break
+    case 'CALCULAR_PREVIA':
+      await calcularPrevia()
+      break
+    case 'APLICAR':
+      await aplicar(false)
+      break
+    default:
+      await carregarMaterias()
   }
 }
 
@@ -165,7 +256,10 @@ onMounted(carregarMaterias)
         class="etapa-da-geracao"
         :class="{ ativa: etapa === item }"
         type="button"
-        :disabled="item === 'PREVIA' && !previa"
+        :disabled="
+          (item === 'PREVIA' && !previa) ||
+          (item === 'CONFIGURACAO' && prioridadesNaoSalvas)
+        "
         @click="etapa = item"
       >
         {{
@@ -181,9 +275,10 @@ onMounted(carregarMaterias)
     <div v-if="erro" class="alert alert-danger" role="alert">
       {{ erro }}
       <button
+        v-if="operacaoParaTentarNovamente"
         class="btn btn-sm btn-outline-danger ms-2"
         type="button"
-        @click="carregarMaterias"
+        @click="tentarNovamente"
       >
         Tentar novamente
       </button>
@@ -296,6 +391,15 @@ onMounted(carregarMaterias)
         </button>
       </div>
       <div
+        v-if="previaDesatualizada"
+        class="alert alert-warning"
+        role="status"
+        aria-live="polite"
+      >
+        <strong>Prévia desatualizada.</strong> Prioridades ou durações mudaram.
+        Recalcule antes de aplicar.
+      </div>
+      <div
         v-for="aviso in previa.avisos"
         :key="aviso.codigo"
         class="alert alert-warning py-2"
@@ -363,10 +467,16 @@ onMounted(carregarMaterias)
         <button
           class="btn btn-primary"
           type="button"
-          :disabled="processando"
+          :disabled="processando || previaDesatualizada"
           @click="solicitarAplicacao"
         >
-          {{ processando ? 'Aplicando…' : 'Aplicar à semana' }}
+          {{
+            previaDesatualizada
+              ? 'Recalcular prévia'
+              : processando
+                ? 'Aplicando…'
+                : 'Aplicar à semana'
+          }}
         </button>
       </div>
     </section>
@@ -377,7 +487,11 @@ onMounted(carregarMaterias)
     titulo="Substituir geração anterior?"
     etiqueta="Confirmar regeneração"
     sobre-gaveta
-    :descricao="`${propriedades.quantidadeDeBlocosGerados} bloco(s) gerado(s) serão substituídos.`"
+    :descricao="
+      propriedades.quantidadeDeBlocosGerados > 0
+        ? `${propriedades.quantidadeDeBlocosGerados} bloco(s) gerado(s) serão substituídos.`
+        : 'O servidor encontrou uma geração anterior. Os blocos puramente gerados serão substituídos.'
+    "
     @fechar="confirmacaoDeRegeneracaoAberta = false"
   >
     <p class="mb-0">

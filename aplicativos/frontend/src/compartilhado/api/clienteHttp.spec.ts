@@ -55,6 +55,25 @@ describe('clienteHttp', () => {
     expect(aoExpirar).toHaveBeenCalledOnce()
   })
 
+  it('usa a mensagem padronizada quando a resposta de erro nao possui JSON', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(null, { status: 503 }),
+    )
+
+    await expect(requisitar('/v1/planejamento/semanas')).rejects.toEqual(
+      new ErroDaApi(503, 'Nao foi possivel concluir a operacao.'),
+    )
+  })
+
+  it('propaga erro de rede para o tratamento recuperavel da operacao', async () => {
+    const erroDeRede = new TypeError('Falha de rede.')
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(erroDeRede)
+
+    await expect(requisitar('/v1/planejamento/semanas')).rejects.toBe(
+      erroDeRede,
+    )
+  })
+
   it('permite cancelar uma requisicao em andamento', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       (_entrada, opcoes) =>

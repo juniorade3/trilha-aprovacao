@@ -13,6 +13,9 @@ vinculo. Materiais de estudo cobrem um ou mais topicos, e registros de estudo
 podem ser corrigidos ou cancelados com preservacao integral do historico. O
 dashboard do concurso ativo deriva medidas objetivas desses fatos e apresenta
 provas, cobertura de estudos, atividade recente e pendencias estruturais.
+O Planejamento Manual e a Geracao Deterministica estao implementados. A geracao
+permite definir prioridades, calcular uma previa explicavel, aplicar blocos em
+rascunho e regenerar preservando blocos manuais ou ajustados.
 O contrato OpenAPI documenta sessao, CSRF, grupos e erros; Swagger fica
 disponivel localmente, o perfil de producao o desabilita por padrao e a CI
 executa as mesmas portas de qualidade sem realizar deploy.

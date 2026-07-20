@@ -105,6 +105,23 @@ class DocumentacaoDaApiIntegracaoTest {
                 .isMissingNode()).isFalse();
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/responses/401")
                 .isMissingNode()).isFalse();
+
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1materias-para-geracao/get"),
+                null, "RespostaDeMateriasParaGeracao",
+                List.of("200", "401", "404", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1prioridades-de-materias/put"),
+                "RequisicaoDeAlteracaoDasPrioridades", "RespostaDeMateriasParaGeracao",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1geracao-deterministica~1previa/post"),
+                "RequisicaoDePreviaDaGeracao", "RespostaDaPreviaDaGeracao",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1geracao-deterministica/post"),
+                "RequisicaoDeAplicacaoDaGeracao", "RespostaDaAplicacaoDaGeracao",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
     }
 
     @Test
@@ -115,5 +132,40 @@ class DocumentacaoDaApiIntegracaoTest {
 
         api.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk());
+    }
+
+    private void validarOperacaoDaGeracao(JsonNode operacao, String esquemaDaRequisicao,
+            String esquemaDaResposta, List<String> respostasEsperadas) {
+        assertThat(operacao.isMissingNode()).isFalse();
+        assertThat(operacao.path("summary").asString()).isNotBlank();
+        assertThat(operacao.path("description").asString()).isNotBlank();
+        assertThat(operacao.path("tags").valueStream().map(JsonNode::asString))
+                .contains("Planejamento");
+        assertThat(operacao.at("/security/0/sessao").isMissingNode()).isFalse();
+
+        if (esquemaDaRequisicao == null) {
+            assertThat(operacao.path("requestBody").isMissingNode()).isTrue();
+            assertThat(operacao.at("/security/0/csrf").isMissingNode()).isTrue();
+        } else {
+            assertThat(operacao.at("/security/0/csrf").isMissingNode()).isFalse();
+            assertThat(operacao.at("/requestBody/content/application~1json/schema/$ref")
+                    .asString()).endsWith("/" + esquemaDaRequisicao);
+        }
+
+        assertThat(operacao.at("/responses/200/content").valueStream()
+                .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                .anyMatch(referencia -> referencia.endsWith("/" + esquemaDaResposta));
+        respostasEsperadas.forEach(codigo -> {
+            JsonNode resposta = operacao.at("/responses/" + codigo);
+            assertThat(resposta.isMissingNode())
+                    .as("resposta HTTP %s documentada", codigo)
+                    .isFalse();
+            if (!codigo.equals("200")) {
+                assertThat(resposta.path("content").valueStream()
+                        .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                        .as("resposta HTTP %s usa RespostaDeErro", codigo)
+                        .anyMatch(referencia -> referencia.endsWith("/RespostaDeErro"));
+            }
+        });
     }
 }
