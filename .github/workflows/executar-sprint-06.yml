@@ -41,6 +41,15 @@ jobs:
         run: |
           npm ci
           npm run formatar
+      - name: Versionar implementação
+        run: |
+          rm .github/workflows/implementar-sprint-06.yml
+          rm .github/workflows/executar-sprint-06.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: integra execucoes ao historico de estudos"
+          git push origin HEAD:feature/planejamento-sprint-06
       - name: Validar backend
         working-directory: aplicativos/backend
         run: ./mvnw --batch-mode --no-transfer-progress verify
@@ -53,12 +62,3 @@ jobs:
           npm run build
           npm run verificar-formatacao
           npm audit --audit-level=low
-      - name: Versionar implementação
-        run: |
-          rm .github/workflows/implementar-sprint-06.yml
-          rm .github/workflows/executar-sprint-06.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "feat: integra execucoes ao historico de estudos"
-          git push origin HEAD:feature/planejamento-sprint-06
