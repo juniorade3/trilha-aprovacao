@@ -6,6 +6,8 @@ import br.com.trilhaaprovacao.planejamento.aplicacao.DisponibilidadeInformada;
 import br.com.trilhaaprovacao.planejamento.aplicacao.PrioridadeDeMateriaInformada;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeGeracaoDeterministica;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
+import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeReplanejamento;
+import br.com.trilhaaprovacao.planejamento.aplicacao.ResultadoDaPreviaDoReplanejamento;
 import br.com.trilhaaprovacao.planejamento.dominio.ConfiguracaoDaGeracaoDeterministica;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -37,13 +39,16 @@ public class ControladorDePlanosSemanais {
     private final ServicoDePlanejamento servico;
     private final ServicoDeGeracaoDeterministica geracao;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
+    private final ServicoDeReplanejamento replanejamento;
 
     public ControladorDePlanosSemanais(ServicoDePlanejamento servico,
             ServicoDeGeracaoDeterministica geracao,
-            IdentidadeDoUsuarioAtual usuarioAtual) {
+            IdentidadeDoUsuarioAtual usuarioAtual,
+            ServicoDeReplanejamento replanejamento) {
         this.servico = servico;
         this.geracao = geracao;
         this.usuarioAtual = usuarioAtual;
+        this.replanejamento = replanejamento;
     }
 
     @PostMapping
@@ -189,6 +194,91 @@ public class ControladorDePlanosSemanais {
         return RespostaDaAplicacaoDaGeracao.de(geracao.aplicar(
                 usuarioAtual.obter(autenticacao), identificador, configuracao,
                 requisicao.substituirBlocosGerados()));
+    }
+
+    @PostMapping("/{identificador}/replanejamento/previa")
+    @Operation(summary = "Calcula a previa do replanejamento",
+            description = "Calcula deterministicamente as transferencias ate domingo sem escrita.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Previa calculada."),
+        @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Plano nao esta ativo.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422", description = "Data ou regra invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
+    public ResultadoDaPreviaDoReplanejamento gerarPreviaDoReplanejamento(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDaPreviaDoReplanejamento requisicao,
+            Authentication autenticacao) {
+        return replanejamento.gerarPrevia(usuarioAtual.obter(autenticacao), identificador,
+                requisicao.dataDeReferencia(),
+                requisicao.identificadoresDasPendenciasIgnoradas());
+    }
+
+    @PostMapping("/{identificador}/replanejamento")
+    @Operation(summary = "Aplica o replanejamento",
+            description = "Bloqueia, recalcula, confere a assinatura e aplica atomicamente.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Replanejamento aplicado."),
+        @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409",
+                description = "Plano inativo ou previa de replanejamento desatualizada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422",
+                description = "Confirmacao ausente ou nenhuma transferencia aplicavel.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
+    public RespostaDaAplicacaoDoReplanejamento aplicarReplanejamento(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeAplicacaoDoReplanejamento requisicao,
+            Authentication autenticacao) {
+        return RespostaDaAplicacaoDoReplanejamento.de(replanejamento.aplicar(
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.dataDeReferencia(),
+                requisicao.identificadoresDasPendenciasIgnoradas(),
+                requisicao.identificadoresDasConfirmacoesDoLimite(),
+                requisicao.assinaturaDaPrevia()));
+    }
+
+    @GetMapping("/{identificador}/historico-semanal")
+    @Operation(summary = "Consulta o historico objetivo da semana",
+            description = "Retorna snapshot, execucoes, cancelamentos, transferencias e resumo.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Historico consultado."),
+        @ApiResponse(responseCode = "400", description = "Parametro invalido.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Conflito de estado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422", description = "Data fora da semana.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
+    public RespostaDoHistoricoSemanal obterHistoricoSemanal(
+            @PathVariable UUID identificador,
+            @RequestParam LocalDate dataDeReferencia,
+            Authentication autenticacao) {
+        return RespostaDoHistoricoSemanal.de(replanejamento.obterHistorico(
+                usuarioAtual.obter(autenticacao), identificador, dataDeReferencia));
     }
 
     @PostMapping("/{identificador}/encerramento")

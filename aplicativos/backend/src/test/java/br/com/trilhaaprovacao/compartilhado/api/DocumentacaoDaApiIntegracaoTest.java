@@ -64,6 +64,9 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/prioridades-de-materias'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/geracao-deterministica/previa'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/geracao-deterministica'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/replanejamento/previa'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/replanejamento'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/historico-semanal'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{plano}/blocos'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].delete").exists())
@@ -121,6 +124,20 @@ class DocumentacaoDaApiIntegracaoTest {
         validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
                         + "{identificador}~1geracao-deterministica/post"),
                 "RequisicaoDeAplicacaoDaGeracao", "RespostaDaAplicacaoDaGeracao",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1replanejamento~1previa/post"),
+                "RequisicaoDaPreviaDoReplanejamento",
+                "ResultadoDaPreviaDoReplanejamento",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1replanejamento/post"),
+                "RequisicaoDeAplicacaoDoReplanejamento",
+                "RespostaDaAplicacaoDoReplanejamento",
+                List.of("200", "400", "401", "403", "404", "409", "422"));
+        validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
+                        + "{identificador}~1historico-semanal/get"),
+                null, "RespostaDoHistoricoSemanal",
                 List.of("200", "400", "401", "403", "404", "409", "422"));
     }
 

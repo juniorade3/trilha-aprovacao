@@ -14,3 +14,7 @@ As migrations versionadas acompanham as capacidades de dominio:
 O esquema e validado pelo Hibernate com `ddl-auto=validate`; nao ha criacao
 automatica de tabelas nem dados artificiais de demonstracao.
 - V9 vincula execucoes finalizadas a registros de estudo.
+- V10 registra reagendamentos de blocos.
+- V11 registra prioridades de materias por plano.
+- V12 registra origem e justificativa da geracao deterministica.
+- V13 registra snapshot original, replanejamentos, transferencias e fragmentos.

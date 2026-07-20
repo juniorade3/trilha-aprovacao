@@ -23,6 +23,9 @@ const chamadas = vi.hoisted(() => ({
   substituirPrioridadesDeMaterias: vi.fn(),
   gerarPreviaDeterministica: vi.fn(),
   aplicarGeracaoDeterministica: vi.fn(),
+  gerarPreviaDoReplanejamento: vi.fn(),
+  aplicarReplanejamento: vi.fn(),
+  obterHistoricoSemanal: vi.fn(),
   obterPlanoSemanal: vi.fn(),
   reordenarBlocos: vi.fn(),
 }))
@@ -44,6 +47,9 @@ vi.mock('./apiDePlanejamento', () => ({
   substituirPrioridadesDeMaterias: chamadas.substituirPrioridadesDeMaterias,
   gerarPreviaDeterministica: chamadas.gerarPreviaDeterministica,
   aplicarGeracaoDeterministica: chamadas.aplicarGeracaoDeterministica,
+  gerarPreviaDoReplanejamento: chamadas.gerarPreviaDoReplanejamento,
+  aplicarReplanejamento: chamadas.aplicarReplanejamento,
+  obterHistoricoSemanal: chamadas.obterHistoricoSemanal,
 }))
 
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
@@ -195,6 +201,42 @@ describe('PlanejamentoSemanaPagina', () => {
         quantidadeDeBlocosSubstituidos: 0,
         quantidadeDeBlocosPreservados: 0,
       },
+    })
+    chamadas.obterHistoricoSemanal.mockResolvedValue({
+      identificadorDoPlano: 'plano-1',
+      dataDeReferencia: inicio,
+      estadoDoPlano: 'RASCUNHO',
+      resumo: {
+        minutosPlanejados: 0,
+        minutosExecutados: 0,
+        minutosConcluidos: 0,
+        minutosInterrompidos: 0,
+        minutosPendentes: 0,
+        blocosConcluidos: 0,
+        blocosParciais: 0,
+        blocosNaoIniciados: 0,
+        blocosReagendados: 0,
+        taxaExecutadaSobrePlanejada: 0,
+      },
+      transferencias: [],
+      observacaoDoSnapshot: '',
+    })
+    chamadas.gerarPreviaDoReplanejamento.mockResolvedValue({
+      identificadorDoPlano: 'plano-1',
+      dataDeReferencia: inicio,
+      dataFinal: '2026-07-26',
+      assinaturaDaPrevia: 'assinatura',
+      resumo: {
+        quantidadeDePendencias: 0,
+        quantidadeDeFragmentos: 0,
+        minutosPendentes: 0,
+        minutosAlocados: 0,
+        minutosNaoAlocados: 0,
+        confirmacoesExigidas: 0,
+      },
+      capacidadesPorDia: [],
+      blocosPreservados: [],
+      pendencias: [],
     })
   })
 

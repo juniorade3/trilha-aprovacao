@@ -23,6 +23,7 @@ public record RespostaDeBlocoDeEstudo(
         String observacao,
         OrigemDoBlocoDeEstudo origem,
         String justificativaDaGeracao,
+        String justificativaDoReplanejamento,
         EstadoDoBlocoDeEstudo estado,
         int quantidadeDeReagendamentos,
         OffsetDateTime reagendadoEm,
@@ -37,7 +38,8 @@ public record RespostaDeBlocoDeEstudo(
                 bloco.tipoDeAtividade(), bloco.data(),
                 bloco.duracaoPrevistaEmMinutos(), bloco.ordem(),
                 bloco.horarioPrevisto(), bloco.observacao(), bloco.origem(),
-                bloco.justificativaDaGeracao(), bloco.estado(),
+                bloco.justificativaDaGeracao(), bloco.justificativaDoReplanejamento(),
+                bloco.estado(),
                 bloco.quantidadeDeReagendamentos(), bloco.reagendadoEm(),
                 bloco.criadoEm(), bloco.atualizadoEm(), bloco.versao());
     }

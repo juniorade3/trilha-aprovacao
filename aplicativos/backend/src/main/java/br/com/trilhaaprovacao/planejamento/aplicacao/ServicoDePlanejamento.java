@@ -24,6 +24,7 @@ import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeBlocosDeE
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeDisponibilidadesDoDia;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeExecucoesDeBloco;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDePlanosSemanais;
+import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeReplanejamentos;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public class ServicoDePlanejamento {
     private final ServicoDeMaterias materias;
     private final ServicoDeTopicos topicos;
     private final ServicoDeMateriaisEEstudos estudos;
+    private final RepositorioDeReplanejamentos replanejamentos;
 
     public ServicoDePlanejamento(RepositorioDePlanosSemanais planos,
             RepositorioDeDisponibilidadesDoDia disponibilidades,
@@ -54,7 +56,8 @@ public class ServicoDePlanejamento {
             RepositorioDeExecucoesDeBloco execucoes,
             ServicoDeMaterias materias,
             ServicoDeTopicos topicos,
-            ServicoDeMateriaisEEstudos estudos) {
+            ServicoDeMateriaisEEstudos estudos,
+            RepositorioDeReplanejamentos replanejamentos) {
         this.planos = planos;
         this.disponibilidades = disponibilidades;
         this.blocos = blocos;
@@ -62,6 +65,7 @@ public class ServicoDePlanejamento {
         this.materias = materias;
         this.topicos = topicos;
         this.estudos = estudos;
+        this.replanejamentos = replanejamentos;
     }
 
     @Transactional
@@ -127,6 +131,7 @@ public class ServicoDePlanejamento {
         }
         ResultadoDoPlanoSemanal atual = resultado(plano);
         validarAtivacao(atual);
+        replanejamentos.capturarSnapshot(identificadorDoPlano);
         PlanoSemanal ativo;
         try {
             ativo = plano.ativar();
