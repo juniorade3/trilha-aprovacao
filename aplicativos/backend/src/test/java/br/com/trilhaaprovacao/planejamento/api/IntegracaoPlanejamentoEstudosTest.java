@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.planejamento.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -189,6 +190,63 @@ class IntegracaoPlanejamentoEstudosTest {
         assertEquals(2, quantidadeDeRegistros());
     }
 
+    @Test
+    void deveRecuperarExecucaoAposNovaConsultaEBloquearSegundoInicio() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("retomada.a@example.com");
+        String plano = criarPlanoAtivo(sessaoA);
+        String primeiro = adicionarBloco(sessaoA, plano, "Primeiro bloco", null, null, 1);
+        String segundo = adicionarBloco(sessaoA, plano, "Segundo bloco", null, null, 2);
+        ativarPlano(sessaoA, plano);
+
+        iniciar(sessaoA, primeiro);
+
+        api.perform(get("/api/v1/planejamento/execucao-em-andamento")
+                        .session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bloco.identificador").value(primeiro))
+                .andExpect(jsonPath("$.bloco.estado").value("EM_ANDAMENTO"));
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/inicio", segundo)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dataDeReferencia\":\"" + SEGUNDA + "\"}"))
+                .andExpect(status().isConflict());
+
+        MockHttpSession sessaoB = criarContaEEntrar("retomada.b@example.com");
+        api.perform(get("/api/v1/blocos-de-estudo/{id}/execucao", primeiro)
+                        .session(sessaoB))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveReverterFinalizacaoQuandoIntegracaoComEstudosFalha() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("rollback.a@example.com");
+        String materiaA = criarMateria(sessaoA, "Segurança da informação");
+        String plano = criarPlanoAtivo(sessaoA);
+        String bloco = criarBloco(sessaoA, plano, "Estudar segurança", materiaA, null);
+        iniciar(sessaoA, bloco);
+
+        MockHttpSession sessaoB = criarContaEEntrar("rollback.b@example.com");
+        String materiaB = criarMateria(sessaoB, "Português");
+        String topicoB = criarTopico(sessaoB, materiaB, "Interpretação de texto");
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", bloco)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoExecutadaEmMinutos\":45,"
+                                + "\"observacao\":\"Não deve persistir\","
+                                + "\"identificadorDoTopico\":\"" + topicoB + "\"}"))
+                .andExpect(status().isNotFound());
+
+        api.perform(get("/api/v1/blocos-de-estudo/{id}/execucao", bloco)
+                        .session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bloco.estado").value("EM_ANDAMENTO"))
+                .andExpect(jsonPath("$.execucao.encerradaEm").doesNotExist())
+                .andExpect(jsonPath("$.execucao.resultado").doesNotExist());
+        assertEquals(0, quantidadeDeRegistros());
+    }
+
     private String registrarNoHistorico(MockHttpSession sessao, String execucao,
             String topico, org.springframework.test.web.servlet.ResultMatcher resultado)
             throws Exception {
@@ -243,6 +301,13 @@ class IntegracaoPlanejamentoEstudosTest {
 
     private String criarBloco(MockHttpSession sessao, String plano, String titulo,
             String materia, String topico) throws Exception {
+        String bloco = adicionarBloco(sessao, plano, titulo, materia, topico, 1);
+        ativarPlano(sessao, plano);
+        return bloco;
+    }
+
+    private String adicionarBloco(MockHttpSession sessao, String plano, String titulo,
+            String materia, String topico, int ordem) throws Exception {
         String referencias = materia == null ? "" :
                 ",\"identificadorDaMateria\":\"" + materia + "\""
                         + (topico == null ? "" :
@@ -253,16 +318,17 @@ class IntegracaoPlanejamentoEstudosTest {
                         .content("{\"titulo\":\"" + titulo
                                 + "\",\"tipoDeAtividade\":\"TEORIA\""
                                 + ",\"data\":\"" + SEGUNDA + "\""
-                                + ",\"duracaoPrevistaEmMinutos\":60,\"ordem\":1"
+                                + ",\"duracaoPrevistaEmMinutos\":60,\"ordem\":" + ordem
                                 + referencias + "}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String bloco = json.readTree(corpo).get("identificador").asString();
+        return json.readTree(corpo).get("identificador").asString();
+    }
 
+    private void ativarPlano(MockHttpSession sessao, String plano) throws Exception {
         api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
                         .session(sessao).with(csrf()))
                 .andExpect(status().isOk());
-        return bloco;
     }
 
     private String criarMateria(MockHttpSession sessao, String nome) throws Exception {

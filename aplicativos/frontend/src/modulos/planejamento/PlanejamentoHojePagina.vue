@@ -29,6 +29,7 @@ const execucaoAtual = ref<ResultadoDaExecucaoDoBloco>()
 const carregando = ref(true)
 const processando = ref(false)
 const erro = ref('')
+const conflito = ref(false)
 const aviso = ref('')
 const acaoDeFinalizacao = ref<'CONCLUIR' | 'INTERROMPER'>()
 const duracaoExecutada = ref(1)
@@ -114,6 +115,7 @@ async function carregar() {
   cancelamento = requisicao
   carregando.value = true
   erro.value = ''
+  conflito.value = false
   try {
     planejamento.value = await obterPlanejamentoDeHoje(
       dataConsultada,
@@ -154,6 +156,11 @@ async function carregar() {
   }
 }
 
+function registrarErro(causa: unknown, mensagemPadrao: string) {
+  conflito.value = causa instanceof ErroDaApi && causa.status === 409
+  erro.value = causa instanceof Error ? causa.message : mensagemPadrao
+}
+
 function rotuloDoTipo(bloco: BlocoDeEstudo) {
   return {
     TEORIA: 'Teoria',
@@ -169,6 +176,7 @@ function rotuloDoTipo(bloco: BlocoDeEstudo) {
 async function iniciar(bloco: BlocoDeEstudo) {
   processando.value = true
   erro.value = ''
+  conflito.value = false
   aviso.value = ''
   try {
     execucaoAtual.value = await iniciarBloco(
@@ -180,10 +188,7 @@ async function iniciar(bloco: BlocoDeEstudo) {
       'Bloco iniciado. O cronômetro continuará mesmo após recarregar.'
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível iniciar o bloco.'
+    registrarErro(causa, 'Não foi possível iniciar o bloco.')
   } finally {
     processando.value = false
   }
@@ -210,6 +215,7 @@ async function finalizar() {
   if (!execucaoAtual.value || !acaoDeFinalizacao.value) return
   processando.value = true
   erro.value = ''
+  conflito.value = false
   try {
     const identificador = execucaoAtual.value.bloco.identificador
     let resultado: ResultadoDaExecucaoDoBloco
@@ -237,10 +243,7 @@ async function finalizar() {
     acaoDeFinalizacao.value = undefined
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível finalizar o bloco.'
+    registrarErro(causa, 'Não foi possível finalizar o bloco.')
   } finally {
     processando.value = false
   }
@@ -261,6 +264,7 @@ async function registrarNoHistorico() {
   if (!resultado) return
   registrandoHistorico.value = true
   erro.value = ''
+  conflito.value = false
   try {
     const vinculado = await registrarExecucaoNoHistorico(
       resultado.execucao.identificador,
@@ -271,10 +275,7 @@ async function registrarNoHistorico() {
     blocoParaHistorico.value = undefined
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível registrar o estudo no Histórico.'
+    registrarErro(causa, 'Não foi possível registrar o estudo no Histórico.')
   } finally {
     registrandoHistorico.value = false
   }
@@ -291,6 +292,7 @@ async function confirmarReagendamento() {
   if (!blocoParaReagendar.value) return
   processando.value = true
   erro.value = ''
+  conflito.value = false
   try {
     await reagendarBloco(
       blocoParaReagendar.value.identificador,
@@ -302,8 +304,7 @@ async function confirmarReagendamento() {
     aviso.value = 'Bloco reagendado dentro desta semana.'
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error ? causa.message : 'Não foi possível reagendar.'
+    registrarErro(causa, 'Não foi possível reagendar.')
   } finally {
     processando.value = false
   }
@@ -313,14 +314,14 @@ async function confirmarCancelamento() {
   if (!blocoParaCancelar.value) return
   processando.value = true
   erro.value = ''
+  conflito.value = false
   try {
     await cancelarBloco(blocoParaCancelar.value.identificador)
     blocoParaCancelar.value = undefined
     aviso.value = 'Bloco cancelado e preservado no planejamento.'
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
+    registrarErro(causa, 'Não foi possível cancelar.')
   } finally {
     processando.value = false
   }
@@ -339,6 +340,7 @@ async function confirmarCorrecao() {
   if (!execucaoParaCorrigir.value) return
   processando.value = true
   erro.value = ''
+  conflito.value = false
   try {
     ultimoResultado.value = await corrigirExecucao(
       execucaoParaCorrigir.value.execucao.identificador,
@@ -351,10 +353,7 @@ async function confirmarCorrecao() {
       'Execução corrigida; o Histórico foi atualizado quando vinculado.'
     await carregar()
   } catch (causa) {
-    erro.value =
-      causa instanceof Error
-        ? causa.message
-        : 'Não foi possível corrigir a execução.'
+    registrarErro(causa, 'Não foi possível corrigir a execução.')
   } finally {
     processando.value = false
   }
@@ -392,7 +391,17 @@ onBeforeUnmount(() => {
       </template>
     </CabecalhoDaPagina>
 
-    <div v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</div>
+    <div v-if="erro" class="alert alert-danger" role="alert">
+      {{ erro }}
+      <button
+        v-if="conflito"
+        class="btn btn-sm btn-outline-danger ms-2"
+        type="button"
+        @click="carregar"
+      >
+        Recarregar dados
+      </button>
+    </div>
     <div v-if="aviso" class="alert alert-success" role="status">
       {{ aviso }}
       <RouterLink
