@@ -19,6 +19,9 @@ const chamadas = vi.hoisted(() => ({
   cancelarPlanoSemanal: vi.fn(),
   listarTodasAsMaterias: vi.fn(),
   listarTodosOsTopicos: vi.fn(),
+  listarMateriasParaGeracao: vi.fn(),
+  substituirPrioridadesDeMaterias: vi.fn(),
+  gerarPreviaDeterministica: vi.fn(),
   obterPlanoSemanal: vi.fn(),
   reordenarBlocos: vi.fn(),
 }))
@@ -36,6 +39,9 @@ vi.mock('./apiDePlanejamento', () => ({
   cancelarPlanoSemanal: chamadas.cancelarPlanoSemanal,
   obterPlanoSemanal: chamadas.obterPlanoSemanal,
   reordenarBlocos: chamadas.reordenarBlocos,
+  listarMateriasParaGeracao: chamadas.listarMateriasParaGeracao,
+  substituirPrioridadesDeMaterias: chamadas.substituirPrioridadesDeMaterias,
+  gerarPreviaDeterministica: chamadas.gerarPreviaDeterministica,
 }))
 
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
@@ -170,6 +176,15 @@ describe('PlanejamentoSemanaPagina', () => {
       planoSemanal(180, [blocoDeEstudo()], 'CANCELADO'),
     )
     chamadas.reordenarBlocos.mockResolvedValue(planoSemanal())
+    chamadas.listarMateriasParaGeracao.mockResolvedValue([
+      {
+        identificadorDaMateria: 'materia-1',
+        nome: 'Banco de dados',
+        ordemEstavel: 1,
+        prioridade: 'NORMAL',
+      },
+    ])
+    chamadas.substituirPrioridadesDeMaterias.mockResolvedValue([])
   })
 
   it('carrega e salva os sete dias da semana', async () => {
@@ -191,6 +206,19 @@ describe('PlanejamentoSemanaPagina', () => {
     )
     expect(chamadas.alterarDisponibilidades.mock.calls[0]?.[1]).toHaveLength(7)
     expect(pagina.text()).toContain('Disponibilidade salva')
+  })
+
+  it('abre a geracao deterministica somente em plano rascunho', async () => {
+    const { pagina } = await montarPagina()
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Gerar semana'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.listarMateriasParaGeracao).toHaveBeenCalledWith('plano-1')
+    expect(pagina.text()).toContain('Prioridades desta semana')
   })
 
   it('oferece criar um rascunho quando a semana ainda nao possui plano', async () => {

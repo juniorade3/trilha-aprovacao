@@ -143,6 +143,60 @@ export interface DisponibilidadeInformada {
   minutosDisponiveis: number
 }
 
+export type PrioridadeDaMateriaNoPlano =
+  'ALTA' | 'NORMAL' | 'BAIXA' | 'NAO_INCLUIR'
+
+export interface MateriaParaGeracao {
+  identificadorDaMateria: string
+  nome: string
+  ordemEstavel: number
+  prioridade: PrioridadeDaMateriaNoPlano
+}
+
+export interface JustificativaDaGeracao {
+  codigo: string
+  mensagem: string
+}
+
+export interface BlocoPreservadoNaPrevia {
+  identificador: string
+  identificadorDaMateria?: string
+  nomeDaMateria?: string
+  titulo: string
+  tipoDeAtividade: TipoDeAtividade
+  duracaoEmMinutos: number
+  ordem: number
+}
+
+export interface BlocoSugeridoNaPrevia {
+  identificadorDaMateria?: string
+  nomeDaMateria?: string
+  titulo: string
+  tipoDeAtividade: TipoDeAtividade
+  duracaoEmMinutos: number
+  justificativas: JustificativaDaGeracao[]
+}
+
+export interface DiaDaPreviaDaGeracao {
+  data: string
+  capacidade: {
+    minutosDisponiveis: number
+    minutosPreservados: number
+    minutosSugeridos: number
+    minutosLivres: number
+  }
+  blocosPreservados: BlocoPreservadoNaPrevia[]
+  blocosSugeridos: BlocoSugeridoNaPrevia[]
+  avisos: JustificativaDaGeracao[]
+}
+
+export interface PreviaDaGeracao {
+  identificadorDoPlano: string
+  dias: DiaDaPreviaDaGeracao[]
+  avisos: JustificativaDaGeracao[]
+  aplicada: false
+}
+
 export function criarPlanoSemanal(dataInicial: string): Promise<PlanoSemanal> {
   return requisitar<PlanoSemanal>('/v1/planos-semanais', {
     method: 'POST',
@@ -257,6 +311,46 @@ export function alterarDisponibilidades(
     {
       method: 'PUT',
       body: JSON.stringify({ disponibilidades }),
+    },
+  )
+}
+
+export async function listarMateriasParaGeracao(
+  identificadorDoPlano: string,
+): Promise<MateriaParaGeracao[]> {
+  const resposta = await requisitar<{ materias: MateriaParaGeracao[] }>(
+    `/v1/planos-semanais/${identificadorDoPlano}/materias-para-geracao`,
+  )
+  return resposta.materias
+}
+
+export async function substituirPrioridadesDeMaterias(
+  identificadorDoPlano: string,
+  prioridades: Pick<
+    MateriaParaGeracao,
+    'identificadorDaMateria' | 'prioridade'
+  >[],
+): Promise<MateriaParaGeracao[]> {
+  const resposta = await requisitar<{ materias: MateriaParaGeracao[] }>(
+    `/v1/planos-semanais/${identificadorDoPlano}/prioridades-de-materias`,
+    { method: 'PUT', body: JSON.stringify({ prioridades }) },
+  )
+  return resposta.materias
+}
+
+export function gerarPreviaDeterministica(
+  identificadorDoPlano: string,
+  duracaoPadraoDoBlocoPrincipalEmMinutos: number,
+  duracaoDoBlocoDeRevisaoEmMinutos: number,
+): Promise<PreviaDaGeracao> {
+  return requisitar<PreviaDaGeracao>(
+    `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica/previa`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        duracaoPadraoDoBlocoPrincipalEmMinutos,
+        duracaoDoBlocoDeRevisaoEmMinutos,
+      }),
     },
   )
 }

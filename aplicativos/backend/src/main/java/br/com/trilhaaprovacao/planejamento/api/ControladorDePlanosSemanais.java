@@ -2,7 +2,10 @@ package br.com.trilhaaprovacao.planejamento.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.planejamento.aplicacao.DisponibilidadeInformada;
+import br.com.trilhaaprovacao.planejamento.aplicacao.PrioridadeDeMateriaInformada;
+import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeGeracaoDeterministica;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
+import br.com.trilhaaprovacao.planejamento.dominio.ConfiguracaoDaGeracaoDeterministica;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -26,11 +29,14 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Planejamento")
 public class ControladorDePlanosSemanais {
     private final ServicoDePlanejamento servico;
+    private final ServicoDeGeracaoDeterministica geracao;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
 
     public ControladorDePlanosSemanais(ServicoDePlanejamento servico,
+            ServicoDeGeracaoDeterministica geracao,
             IdentidadeDoUsuarioAtual usuarioAtual) {
         this.servico = servico;
+        this.geracao = geracao;
         this.usuarioAtual = usuarioAtual;
     }
 
@@ -63,6 +69,38 @@ public class ControladorDePlanosSemanais {
                 .toList();
         return RespostaDePlanoSemanal.de(servico.alterarDisponibilidades(
                 usuarioAtual.obter(autenticacao), identificador, informadas));
+    }
+
+    @GetMapping("/{identificador}/materias-para-geracao")
+    public RespostaDeMateriasParaGeracao listarMateriasParaGeracao(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return RespostaDeMateriasParaGeracao.de(geracao.listarMaterias(
+                usuarioAtual.obter(autenticacao), identificador));
+    }
+
+    @PutMapping("/{identificador}/prioridades-de-materias")
+    public RespostaDeMateriasParaGeracao alterarPrioridades(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeAlteracaoDasPrioridades requisicao,
+            Authentication autenticacao) {
+        var prioridades = requisicao.prioridades().stream()
+                .map(item -> new PrioridadeDeMateriaInformada(
+                        item.identificadorDaMateria(), item.prioridade()))
+                .toList();
+        return RespostaDeMateriasParaGeracao.de(geracao.substituirPrioridades(
+                usuarioAtual.obter(autenticacao), identificador, prioridades));
+    }
+
+    @PostMapping("/{identificador}/geracao-deterministica/previa")
+    public RespostaDaPreviaDaGeracao gerarPrevia(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDePreviaDaGeracao requisicao,
+            Authentication autenticacao) {
+        var configuracao = new ConfiguracaoDaGeracaoDeterministica(
+                requisicao.duracaoPadraoDoBlocoPrincipalEmMinutos(),
+                requisicao.duracaoDoBlocoDeRevisaoEmMinutos());
+        return RespostaDaPreviaDaGeracao.de(geracao.gerarPrevia(
+                usuarioAtual.obter(autenticacao), identificador, configuracao));
     }
 
     @PostMapping("/{identificador}/encerramento")
