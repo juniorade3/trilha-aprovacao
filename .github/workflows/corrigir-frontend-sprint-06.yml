@@ -1,0 +1,76 @@
+name: Corrigir frontend Sprint 06
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  corrigir:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-06' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-06
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Corrigir estreitamento de tipo
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          arquivo = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue')
+          texto = arquivo.read_text()
+          marcador = '''async function abrirRegistroNoHistorico(bloco: BlocoDeEstudo) {'''
+          funcao = '''function podeRegistrarNoHistorico(bloco: BlocoDeEstudo) {
+            const resultado = execucoesRealizadas.value[bloco.identificador]
+            return (
+              !!resultado &&
+              !resultado.execucao.identificadorDoRegistroDeEstudo &&
+              !!(bloco.identificadorDoTopico || bloco.identificadorDaMateria)
+            )
+          }
+
+          '''
+          if 'function podeRegistrarNoHistorico' not in texto:
+              texto = texto.replace(marcador, funcao + marcador)
+          condicao = '''v-if="
+                execucoesRealizadas[bloco.identificador] &&
+                !execucoesRealizadas[bloco.identificador].execucao
+                  .identificadorDoRegistroDeEstudo &&
+                (bloco.identificadorDoTopico || bloco.identificadorDaMateria)
+              "'''
+          if condicao not in texto:
+              raise SystemExit('Condicao esperada nao encontrada')
+          texto = texto.replace(condicao, 'v-if="podeRegistrarNoHistorico(bloco)"')
+          arquivo.write_text(texto)
+          PY
+      - name: Instalar e formatar
+        working-directory: aplicativos/frontend
+        run: |
+          npm ci
+          npm run formatar
+      - name: Validar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm run verificar-tipos
+          npm run lint
+          npm run test
+          npm run build
+          npm run verificar-formatacao
+          npm audit --audit-level=low
+      - name: Remover diagnosticos e versionar
+        run: |
+          rm -f .github/workflows/diagnostico-frontend-sprint-06.yml
+          rm -f .github/workflows/corrigir-frontend-sprint-06.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: corrige tipagem da integracao com historico"
+          git push origin HEAD:feature/planejamento-sprint-06
