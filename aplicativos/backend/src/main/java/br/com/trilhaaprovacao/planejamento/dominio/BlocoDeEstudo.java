@@ -69,10 +69,39 @@ public record BlocoDeEstudo(
                 novaOrdem, horarioPrevisto, observacao);
     }
 
-    private void exigirPlanejado() {
+    public BlocoDeEstudo iniciar() {
+        exigirPlanejado();
+        return comEstado(EstadoDoBlocoDeEstudo.EM_ANDAMENTO);
+    }
+
+    public BlocoDeEstudo concluir() {
+        exigirEmAndamento();
+        return comEstado(EstadoDoBlocoDeEstudo.CONCLUIDO);
+    }
+
+    public BlocoDeEstudo concluirParcialmente() {
+        exigirEmAndamento();
+        return comEstado(EstadoDoBlocoDeEstudo.PARCIALMENTE_CONCLUIDO);
+    }
+
+    public void exigirPlanejado() {
         if (estado != EstadoDoBlocoDeEstudo.PLANEJADO) {
-            throw new IllegalStateException("Somente bloco planejado pode ser alterado.");
+            throw new IllegalStateException("Somente bloco planejado permite esta operacao.");
         }
+    }
+
+    public void exigirEmAndamento() {
+        if (estado != EstadoDoBlocoDeEstudo.EM_ANDAMENTO) {
+            throw new IllegalStateException("Somente bloco em andamento pode ser encerrado.");
+        }
+    }
+
+    private BlocoDeEstudo comEstado(EstadoDoBlocoDeEstudo novoEstado) {
+        return new BlocoDeEstudo(identificador, identificadorDoPlano,
+                identificadorDaMateria, identificadorDoTopico, titulo,
+                tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
+                horarioPrevisto, observacao, novoEstado, criadoEm,
+                OffsetDateTime.now(), versao);
     }
 
     private static String textoObrigatorio(String valor, String campo, int limite) {

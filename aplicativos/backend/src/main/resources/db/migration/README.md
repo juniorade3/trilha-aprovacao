@@ -9,6 +9,7 @@ As migrations versionadas acompanham as capacidades de dominio:
 - V5: materiais, coberturas de topicos e registros de estudo.
 - V6: planos semanais e disponibilidade diaria simples.
 - V7: blocos de estudo manuais vinculados ao plano semanal.
+- V8: execucoes de blocos com inicio, conclusao e interrupcao rastreaveis.
 
 O esquema e validado pelo Hibernate com `ddl-auto=validate`; nao ha criacao
 automatica de tabelas nem dados artificiais de demonstracao.
