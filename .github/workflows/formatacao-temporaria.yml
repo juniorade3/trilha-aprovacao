@@ -33,6 +33,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+      - name: Incluir execucoes na limpeza dos testes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          arquivo = Path('aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java')
+          texto = arquivo.read_text()
+          texto = texto.replace(
+              'TRUNCATE TABLE blocos_de_estudo, disponibilidades_do_dia, planos_semanais,',
+              'TRUNCATE TABLE execucoes_de_bloco, blocos_de_estudo, disponibilidades_do_dia, planos_semanais,',
+          )
+          arquivo.write_text(texto)
+          PY
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -48,3 +60,4 @@ jobs:
           path: |
             aplicativos/backend/backend.log
             aplicativos/backend/target/surefire-reports
+            aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java
