@@ -1,0 +1,64 @@
+name: Executar Sprint 07
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  executar:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-07' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-07
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: aplicativos/backend/pom.xml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Executar materialização
+        run: |
+          awk '
+            /      - name: Materializar Sprint 07/ { capturar=1; proximo=1; next }
+            capturar && proximo && /        run: \|/ { proximo=0; next }
+            capturar && /      - name: Formatar frontend/ { exit }
+            capturar && !proximo { sub(/^          /, ""); print }
+          ' .github/workflows/implementar-sprint-07.yml > /tmp/materializar.sh
+          bash /tmp/materializar.sh
+      - name: Formatar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm ci
+          npm run formatar
+      - name: Validar backend
+        working-directory: aplicativos/backend
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Validar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm run verificar-tipos
+          npm run lint
+          npm run test
+          npm run build
+          npm run verificar-formatacao
+          npm audit --audit-level=low
+      - name: Versionar implementação
+        run: |
+          rm .github/workflows/implementar-sprint-07.yml
+          rm .github/workflows/executar-sprint-07.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: implementa edição e replanejamento da sprint 07"
+          git push origin HEAD:feature/planejamento-sprint-07
