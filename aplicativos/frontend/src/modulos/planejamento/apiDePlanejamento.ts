@@ -117,7 +117,12 @@ export interface DadosDoBlocoDeEstudo {
 }
 
 export type EstadoDoPlanejamentoDeHoje =
-  'SEM_PLANO' | 'PLANO_EM_RASCUNHO' | 'DIA_SEM_BLOCOS' | 'DIA_PLANEJADO'
+  | 'SEM_PLANO'
+  | 'PLANO_EM_RASCUNHO'
+  | 'PLANO_ENCERRADO'
+  | 'PLANO_CANCELADO'
+  | 'DIA_SEM_BLOCOS'
+  | 'DIA_PLANEJADO'
 
 export interface PlanejamentoDeHoje {
   estado: EstadoDoPlanejamentoDeHoje

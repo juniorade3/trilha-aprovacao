@@ -58,6 +58,27 @@ class ExecucaoDoBlocoTest {
                         OffsetDateTime.now()));
     }
 
+    @Test
+    void deveCorrigirExecucaoFinalizada() {
+        ExecucaoDoBloco encerrada = ExecucaoDoBloco.iniciar(
+                        UUID.randomUUID(), UUID.randomUUID(),
+                        OffsetDateTime.now().minusMinutes(20))
+                .encerrar(ResultadoDaExecucao.CONCLUIDO, 20, "Original",
+                        OffsetDateTime.now());
+
+        ExecucaoDoBloco corrigida = encerrada.corrigir(
+                ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO, 15,
+                "Corrigida", null, OffsetDateTime.now());
+
+        assertEquals(ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO,
+                corrigida.resultado());
+        assertEquals(15, corrigida.duracaoExecutadaEmMinutos());
+        assertThrows(IllegalStateException.class,
+                () -> ExecucaoDoBloco.iniciar(UUID.randomUUID(), UUID.randomUUID(),
+                        OffsetDateTime.now()).corrigir(ResultadoDaExecucao.CONCLUIDO,
+                        10, null, null, OffsetDateTime.now()));
+    }
+
 
     @Test
     void deveVincularUmUnicoRegistroDeEstudo() {

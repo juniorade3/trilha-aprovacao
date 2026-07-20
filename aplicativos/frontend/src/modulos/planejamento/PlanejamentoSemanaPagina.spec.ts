@@ -13,6 +13,10 @@ const chamadas = vi.hoisted(() => ({
   ativarPlanoSemanal: vi.fn(),
   criarPlanoSemanal: vi.fn(),
   excluirBloco: vi.fn(),
+  cancelarBloco: vi.fn(),
+  reagendarBloco: vi.fn(),
+  encerrarPlanoSemanal: vi.fn(),
+  cancelarPlanoSemanal: vi.fn(),
   listarTodasAsMaterias: vi.fn(),
   listarTodosOsTopicos: vi.fn(),
   obterPlanoSemanal: vi.fn(),
@@ -26,6 +30,10 @@ vi.mock('./apiDePlanejamento', () => ({
   ativarPlanoSemanal: chamadas.ativarPlanoSemanal,
   criarPlanoSemanal: chamadas.criarPlanoSemanal,
   excluirBloco: chamadas.excluirBloco,
+  cancelarBloco: chamadas.cancelarBloco,
+  reagendarBloco: chamadas.reagendarBloco,
+  encerrarPlanoSemanal: chamadas.encerrarPlanoSemanal,
+  cancelarPlanoSemanal: chamadas.cancelarPlanoSemanal,
   obterPlanoSemanal: chamadas.obterPlanoSemanal,
   reordenarBlocos: chamadas.reordenarBlocos,
 }))
@@ -92,6 +100,7 @@ function blocoDeEstudo(
     duracaoPrevistaEmMinutos: 120,
     ordem,
     estado: 'PLANEJADO',
+    quantidadeDeReagendamentos: 0,
     criadoEm: '2026-07-19T12:00:00Z',
     atualizadoEm: '2026-07-19T12:00:00Z',
     versao: 0,
@@ -152,6 +161,14 @@ describe('PlanejamentoSemanaPagina', () => {
     chamadas.adicionarBloco.mockResolvedValue(blocoDeEstudo())
     chamadas.alterarBloco.mockResolvedValue(blocoDeEstudo())
     chamadas.excluirBloco.mockResolvedValue(undefined)
+    chamadas.cancelarBloco.mockResolvedValue(blocoDeEstudo())
+    chamadas.reagendarBloco.mockResolvedValue(blocoDeEstudo())
+    chamadas.encerrarPlanoSemanal.mockResolvedValue(
+      planoSemanal(180, [blocoDeEstudo()], 'ENCERRADO'),
+    )
+    chamadas.cancelarPlanoSemanal.mockResolvedValue(
+      planoSemanal(180, [blocoDeEstudo()], 'CANCELADO'),
+    )
     chamadas.reordenarBlocos.mockResolvedValue(planoSemanal())
   })
 
@@ -421,5 +438,58 @@ describe('PlanejamentoSemanaPagina', () => {
 
     expect(pagina.text()).toContain('Corrija os dias')
     expect(pagina.text()).toContain('Excesso de 20 min')
+  })
+
+  it('reagenda e cancela bloco de um plano ativo usando modais', async () => {
+    const ativo = planoSemanal(180, [blocoDeEstudo()], 'ATIVO')
+    chamadas.obterPlanoSemanal.mockResolvedValue(ativo)
+    const { pagina } = await montarPagina()
+
+    await pagina.get('[aria-label="Reagendar Banco de dados"]').trigger('click')
+    await pagina.get('#data-reagendamento').setValue('2026-07-21')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Confirmar reagendamento')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.reagendarBloco).toHaveBeenCalledWith(
+      'bloco-1',
+      '2026-07-21',
+      undefined,
+      1,
+    )
+
+    await pagina.get('[aria-label="Cancelar Banco de dados"]').trigger('click')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Cancelar bloco')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.cancelarBloco).toHaveBeenCalledWith('bloco-1')
+  })
+
+  it('confirma encerramento e apresenta pendente como nao realizado', async () => {
+    const bloco = blocoDeEstudo()
+    chamadas.obterPlanoSemanal.mockResolvedValue(
+      planoSemanal(180, [bloco], 'ATIVO'),
+    )
+    chamadas.encerrarPlanoSemanal.mockResolvedValue(
+      planoSemanal(180, [bloco], 'ENCERRADO'),
+    )
+    const { pagina } = await montarPagina()
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Encerrar semana')!
+      .trigger('click')
+    expect(pagina.text()).toContain('Esta ação não poderá ser desfeita')
+    const confirmacoes = pagina
+      .findAll('button')
+      .filter((botao) => botao.text() === 'Encerrar semana')
+    await confirmacoes[confirmacoes.length - 1]!.trigger('click')
+    await flushPromises()
+
+    expect(chamadas.encerrarPlanoSemanal).toHaveBeenCalledWith('plano-1')
+    expect(pagina.text()).toContain('Não realizado')
   })
 })

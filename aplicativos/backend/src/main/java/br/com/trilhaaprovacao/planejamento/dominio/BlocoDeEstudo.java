@@ -89,6 +89,19 @@ public record BlocoDeEstudo(
         return comEstado(EstadoDoBlocoDeEstudo.CANCELADO);
     }
 
+    public BlocoDeEstudo corrigirResultado(ResultadoDaExecucao resultado) {
+        if (estado != EstadoDoBlocoDeEstudo.CONCLUIDO
+                && estado != EstadoDoBlocoDeEstudo.PARCIALMENTE_CONCLUIDO) {
+            throw new IllegalStateException(
+                    "Somente bloco com execução finalizada pode ter o resultado corrigido.");
+        }
+        Objects.requireNonNull(resultado);
+        EstadoDoBlocoDeEstudo novoEstado = resultado == ResultadoDaExecucao.CONCLUIDO
+                ? EstadoDoBlocoDeEstudo.CONCLUIDO
+                : EstadoDoBlocoDeEstudo.PARCIALMENTE_CONCLUIDO;
+        return comEstado(novoEstado);
+    }
+
     public BlocoDeEstudo iniciar() {
         exigirPlanejado();
         return comEstado(EstadoDoBlocoDeEstudo.EM_ANDAMENTO);

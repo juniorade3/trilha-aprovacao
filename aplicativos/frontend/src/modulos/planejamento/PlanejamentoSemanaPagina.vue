@@ -22,6 +22,7 @@ import {
   criarPlanoSemanal,
   excluirBloco,
   cancelarBloco,
+  reagendarBloco,
   encerrarPlanoSemanal,
   cancelarPlanoSemanal,
   obterPlanoSemanal,
@@ -46,6 +47,9 @@ const topicos = ref<Topico[]>([])
 const editorAberto = ref(false)
 const blocoEmEdicao = ref<BlocoDeEstudo>()
 const blocoParaExcluir = ref<BlocoDeEstudo>()
+const blocoParaReagendar = ref<BlocoDeEstudo>()
+const reagendamento = reactive({ data: '', horarioPrevisto: '', ordem: 1 })
+const acaoDoPlano = ref<'ENCERRAR' | 'CANCELAR'>()
 const dataSugerida = ref('')
 const salvandoBloco = ref(false)
 const excluindoBloco = ref(false)
@@ -249,6 +253,36 @@ function abrirEdicaoDoBloco(bloco: BlocoDeEstudo) {
   editorAberto.value = true
 }
 
+function abrirReagendamento(bloco: BlocoDeEstudo) {
+  blocoParaReagendar.value = bloco
+  reagendamento.data = bloco.data
+  reagendamento.horarioPrevisto = bloco.horarioPrevisto?.slice(0, 5) ?? ''
+  reagendamento.ordem = bloco.ordem
+}
+
+async function confirmarReagendamento() {
+  if (!blocoParaReagendar.value) return
+  salvandoBloco.value = true
+  erro.value = ''
+  try {
+    await reagendarBloco(
+      blocoParaReagendar.value.identificador,
+      reagendamento.data,
+      reagendamento.horarioPrevisto || undefined,
+      Number(reagendamento.ordem),
+    )
+    await atualizarPlano()
+    blocoParaReagendar.value = undefined
+    aviso.value = 'Bloco reagendado e ordem dos dias atualizada.'
+  } catch (causa) {
+    conflito.value = causa instanceof ErroDaApi && causa.status === 409
+    erro.value =
+      causa instanceof Error ? causa.message : 'Não foi possível reagendar.'
+  } finally {
+    salvandoBloco.value = false
+  }
+}
+
 async function atualizarPlano() {
   const atualizado = await obterPlanoSemanal(dataInicial.value)
   plano.value = atualizado
@@ -409,6 +443,7 @@ async function encerrarPlano() {
     plano.value = await encerrarPlanoSemanal(plano.value.identificador)
     aviso.value =
       'Semana encerrada. Blocos pendentes foram preservados como não realizados.'
+    acaoDoPlano.value = undefined
   } catch (causa) {
     erro.value =
       causa instanceof Error ? causa.message : 'Não foi possível encerrar.'
@@ -420,6 +455,7 @@ async function cancelarPlano() {
   try {
     plano.value = await cancelarPlanoSemanal(plano.value.identificador)
     aviso.value = 'Plano cancelado. Execuções e estudos foram preservados.'
+    acaoDoPlano.value = undefined
   } catch (causa) {
     erro.value =
       causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
@@ -590,25 +626,28 @@ watch(
           <span class="rotulo-do-resumo">Total planejado</span>
           <strong>{{ plano.totalDeMinutosPlanejados }} min</strong>
         </div>
-        <div v-if="plano.estado === 'ATIVO'" class="d-flex gap-2">
+        <div
+          v-if="plano.estado === 'ATIVO'"
+          class="acoes-do-plano-semanal d-flex gap-2"
+        >
           <button
             class="btn btn-outline-primary"
             type="button"
-            @click="encerrarPlano"
+            @click="acaoDoPlano = 'ENCERRAR'"
           >
             Encerrar semana
           </button>
           <button
             class="btn btn-outline-danger"
             type="button"
-            @click="cancelarPlano"
+            @click="acaoDoPlano = 'CANCELAR'"
           >
             Cancelar plano
           </button>
         </div>
         <button
           v-if="plano.estado === 'RASCUNHO'"
-          class="btn btn-primary"
+          class="acao-principal-do-plano btn btn-primary"
           type="button"
           @click="confirmacaoDeAtivacaoAberta = true"
         >
@@ -710,6 +749,21 @@ watch(
                         — {{ nomeDoTopico(bloco) }}</template
                       >
                     </small>
+                    <small v-if="bloco.quantidadeDeReagendamentos">
+                      Reagendado {{ bloco.quantidadeDeReagendamentos }}
+                      {{
+                        bloco.quantidadeDeReagendamentos === 1 ? 'vez' : 'vezes'
+                      }}
+                    </small>
+                    <small
+                      v-if="
+                        plano.estado === 'ENCERRADO' &&
+                        bloco.estado === 'PLANEJADO'
+                      "
+                      class="text-danger"
+                    >
+                      Não realizado
+                    </small>
                   </div>
                 </div>
                 <div
@@ -720,6 +774,7 @@ watch(
                   class="acoes-do-bloco-planejado"
                 >
                   <button
+                    v-if="plano.estado === 'RASCUNHO'"
                     class="botao-de-icone"
                     type="button"
                     :disabled="posicao === 0"
@@ -729,6 +784,7 @@ watch(
                     <i class="bi bi-arrow-up" aria-hidden="true"></i>
                   </button>
                   <button
+                    v-if="plano.estado === 'RASCUNHO'"
                     class="botao-de-icone"
                     type="button"
                     :disabled="posicao === blocosDaData(data).length - 1"
@@ -746,9 +802,20 @@ watch(
                     <i class="bi bi-pencil" aria-hidden="true"></i>
                   </button>
                   <button
+                    v-if="plano.estado === 'ATIVO'"
+                    class="botao-de-icone"
+                    type="button"
+                    :aria-label="`Reagendar ${bloco.titulo}`"
+                    @click="abrirReagendamento(bloco)"
+                  >
+                    <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                  </button>
+                  <button
                     class="botao-de-icone text-danger"
                     type="button"
-                    :aria-label="`Excluir ${bloco.titulo}`"
+                    :aria-label="`${
+                      plano.estado === 'ATIVO' ? 'Cancelar' : 'Excluir'
+                    } ${bloco.titulo}`"
                     @click="blocoParaExcluir = bloco"
                   >
                     <i class="bi bi-trash" aria-hidden="true"></i>
@@ -795,6 +862,7 @@ watch(
       :materias="materias"
       :topicos="topicos"
       :salvando="salvandoBloco"
+      :edicao-de-plano-ativo="plano.estado === 'ATIVO'"
       :erro="erroDoEditor"
       @fechar="editorAberto = false"
       @salvar="salvarBloco"
@@ -804,7 +872,7 @@ watch(
       v-if="confirmacaoDeAtivacaoAberta && plano"
       titulo="Ativar plano semanal?"
       etiqueta="Confirmar compromisso"
-      descricao="Depois de ativado, o plano ficará somente para consulta até que a edição do plano ativo seja liberada."
+      descricao="Depois de ativado, os blocos planejados ainda poderão ser editados, reagendados ou cancelados."
       @fechar="confirmacaoDeAtivacaoAberta = false"
     >
       <div v-if="pendenciasDaAtivacao.length" class="alert alert-warning mb-0">
@@ -840,9 +908,17 @@ watch(
 
     <ModalDaAplicacao
       v-if="blocoParaExcluir"
-      titulo="Excluir bloco?"
-      etiqueta="Confirmar exclusão"
-      :descricao="`O bloco ${blocoParaExcluir.titulo} será removido do rascunho.`"
+      :titulo="plano?.estado === 'ATIVO' ? 'Cancelar bloco?' : 'Excluir bloco?'"
+      :etiqueta="
+        plano?.estado === 'ATIVO'
+          ? 'Confirmar cancelamento'
+          : 'Confirmar exclusão'
+      "
+      :descricao="
+        plano?.estado === 'ATIVO'
+          ? `O bloco ${blocoParaExcluir.titulo} ficará registrado como cancelado.`
+          : `O bloco ${blocoParaExcluir.titulo} será removido do rascunho.`
+      "
       @fechar="blocoParaExcluir = undefined"
     >
       <p>A ordem dos demais blocos do dia será ajustada automaticamente.</p>
@@ -860,7 +936,108 @@ watch(
           :disabled="excluindoBloco"
           @click="confirmarExclusao"
         >
-          Excluir bloco
+          {{ plano?.estado === 'ATIVO' ? 'Cancelar bloco' : 'Excluir bloco' }}
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="blocoParaReagendar"
+      titulo="Reagendar bloco"
+      etiqueta="Ajustar compromisso"
+      descricao="Escolha outra posição dentro da mesma semana."
+      @fechar="blocoParaReagendar = undefined"
+    >
+      <div class="mb-3">
+        <label class="form-label" for="data-reagendamento">Nova data</label>
+        <select
+          id="data-reagendamento"
+          v-model="reagendamento.data"
+          class="form-select"
+        >
+          <option v-for="data in datasDaSemana" :key="data" :value="data">
+            {{ data }}
+          </option>
+        </select>
+      </div>
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label class="form-label" for="horario-reagendamento"
+            >Horário opcional</label
+          >
+          <input
+            id="horario-reagendamento"
+            v-model="reagendamento.horarioPrevisto"
+            class="form-control"
+            type="time"
+          />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="ordem-reagendamento"
+            >Ordem no dia</label
+          >
+          <input
+            id="ordem-reagendamento"
+            v-model.number="reagendamento.ordem"
+            class="form-control"
+            type="number"
+            min="1"
+            :max="(quantidadesPorData[reagendamento.data] ?? 0) + 1"
+          />
+        </div>
+      </div>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="blocoParaReagendar = undefined"
+        >
+          Voltar
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="salvandoBloco"
+          @click="confirmarReagendamento"
+        >
+          Confirmar reagendamento
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="acaoDoPlano"
+      :titulo="
+        acaoDoPlano === 'ENCERRAR' ? 'Encerrar semana?' : 'Cancelar plano?'
+      "
+      etiqueta="Confirmar mudança de estado"
+      :descricao="
+        acaoDoPlano === 'ENCERRAR'
+          ? 'Os blocos pendentes serão preservados como não realizados e o plano ficará somente para leitura.'
+          : 'Os blocos planejados serão cancelados; execuções e estudos serão preservados.'
+      "
+      @fechar="acaoDoPlano = undefined"
+    >
+      <p class="mb-0">Esta ação não poderá ser desfeita nesta versão.</p>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="acaoDoPlano = undefined"
+        >
+          Voltar
+        </button>
+        <button
+          class="btn"
+          :class="acaoDoPlano === 'ENCERRAR' ? 'btn-primary' : 'btn-danger'"
+          type="button"
+          @click="
+            acaoDoPlano === 'ENCERRAR' ? encerrarPlano() : cancelarPlano()
+          "
+        >
+          {{
+            acaoDoPlano === 'ENCERRAR' ? 'Encerrar semana' : 'Cancelar plano'
+          }}
         </button>
       </template>
     </ModalDaAplicacao>

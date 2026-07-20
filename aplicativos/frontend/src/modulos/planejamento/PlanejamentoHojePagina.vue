@@ -15,6 +15,9 @@ import {
   obterExecucaoEmAndamento,
   registrarExecucaoNoHistorico,
   obterPlanejamentoDeHoje,
+  cancelarBloco,
+  corrigirExecucao,
+  reagendarBloco,
   type BlocoDeEstudo,
   type PlanejamentoDeHoje,
   type ResultadoDaExecucaoDoBloco,
@@ -36,6 +39,17 @@ const ultimoResultado = ref<ResultadoDaExecucaoDoBloco>()
 const execucoesRealizadas = ref<Record<string, ResultadoDaExecucaoDoBloco>>({})
 const blocoParaHistorico = ref<BlocoDeEstudo>()
 const registrandoHistorico = ref(false)
+const blocoParaReagendar = ref<BlocoDeEstudo>()
+const blocoParaCancelar = ref<BlocoDeEstudo>()
+const dataDoReagendamento = ref('')
+const horarioDoReagendamento = ref('')
+const ordemDoReagendamento = ref(1)
+const execucaoParaCorrigir = ref<ResultadoDaExecucaoDoBloco>()
+const resultadoCorrigido = ref<'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO'>(
+  'CONCLUIDO',
+)
+const duracaoCorrigida = ref(1)
+const observacaoCorrigida = ref('')
 const agora = ref(Date.now())
 let cancelamento: AbortController | undefined
 let temporizador: number | undefined
@@ -62,6 +76,15 @@ const linkDaSemana = computed(() => ({
     ? { inicio: planejamento.value.dataInicialDoPlano }
     : undefined,
 }))
+
+const datasDaSemana = computed(() => {
+  if (!planejamento.value?.dataInicialDoPlano) return []
+  return Array.from({ length: 7 }, (_, indice) => {
+    const data = new Date(`${planejamento.value!.dataInicialDoPlano}T12:00:00`)
+    data.setDate(data.getDate() + indice)
+    return data.toISOString().slice(0, 10)
+  })
+})
 
 const segundosDecorridos = computed(() => {
   if (!execucaoAtual.value) return 0
@@ -257,6 +280,86 @@ async function registrarNoHistorico() {
   }
 }
 
+function abrirReagendamento(bloco: BlocoDeEstudo) {
+  blocoParaReagendar.value = bloco
+  dataDoReagendamento.value = bloco.data
+  horarioDoReagendamento.value = bloco.horarioPrevisto?.slice(0, 5) ?? ''
+  ordemDoReagendamento.value = bloco.ordem
+}
+
+async function confirmarReagendamento() {
+  if (!blocoParaReagendar.value) return
+  processando.value = true
+  erro.value = ''
+  try {
+    await reagendarBloco(
+      blocoParaReagendar.value.identificador,
+      dataDoReagendamento.value,
+      horarioDoReagendamento.value || undefined,
+      Number(ordemDoReagendamento.value),
+    )
+    blocoParaReagendar.value = undefined
+    aviso.value = 'Bloco reagendado dentro desta semana.'
+    await carregar()
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error ? causa.message : 'Não foi possível reagendar.'
+  } finally {
+    processando.value = false
+  }
+}
+
+async function confirmarCancelamento() {
+  if (!blocoParaCancelar.value) return
+  processando.value = true
+  erro.value = ''
+  try {
+    await cancelarBloco(blocoParaCancelar.value.identificador)
+    blocoParaCancelar.value = undefined
+    aviso.value = 'Bloco cancelado e preservado no planejamento.'
+    await carregar()
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
+  } finally {
+    processando.value = false
+  }
+}
+
+function abrirCorrecao(bloco: BlocoDeEstudo) {
+  const resultado = execucoesRealizadas.value[bloco.identificador]
+  if (!resultado) return
+  execucaoParaCorrigir.value = resultado
+  resultadoCorrigido.value = resultado.execucao.resultado ?? 'CONCLUIDO'
+  duracaoCorrigida.value = resultado.execucao.duracaoExecutadaEmMinutos ?? 1
+  observacaoCorrigida.value = resultado.execucao.observacao ?? ''
+}
+
+async function confirmarCorrecao() {
+  if (!execucaoParaCorrigir.value) return
+  processando.value = true
+  erro.value = ''
+  try {
+    ultimoResultado.value = await corrigirExecucao(
+      execucaoParaCorrigir.value.execucao.identificador,
+      resultadoCorrigido.value,
+      Number(duracaoCorrigida.value),
+      observacaoCorrigida.value || undefined,
+    )
+    execucaoParaCorrigir.value = undefined
+    aviso.value =
+      'Execução corrigida; o Histórico foi atualizado quando vinculado.'
+    await carregar()
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error
+        ? causa.message
+        : 'Não foi possível corrigir a execução.'
+  } finally {
+    processando.value = false
+  }
+}
+
 onMounted(() => {
   carregar()
   temporizador = window.setInterval(() => {
@@ -343,6 +446,28 @@ onBeforeUnmount(() => {
       <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana"
         >Revisar e ativar plano</RouterLink
       >
+    </EstadoDaPagina>
+
+    <EstadoDaPagina
+      v-else-if="planejamento.estado === 'PLANO_ENCERRADO'"
+      titulo="Esta semana foi encerrada"
+      descricao="Consulte na Semana os blocos realizados e os que ficaram não realizados."
+      icone="bi-calendar-check"
+    >
+      <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana">
+        Ver semana encerrada
+      </RouterLink>
+    </EstadoDaPagina>
+
+    <EstadoDaPagina
+      v-else-if="planejamento.estado === 'PLANO_CANCELADO'"
+      titulo="Este plano foi cancelado"
+      descricao="Execuções e estudos realizados antes do cancelamento foram preservados."
+      icone="bi-calendar-x"
+    >
+      <RouterLink class="btn btn-outline-primary mt-3" :to="linkDaSemana">
+        Ver plano cancelado
+      </RouterLink>
     </EstadoDaPagina>
 
     <template v-else>
@@ -434,6 +559,24 @@ onBeforeUnmount(() => {
             >
               Iniciar
             </button>
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              :disabled="processando"
+              :aria-label="`Reagendar ${bloco.titulo}`"
+              @click="abrirReagendamento(bloco)"
+            >
+              Reagendar
+            </button>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              type="button"
+              :disabled="processando"
+              :aria-label="`Cancelar ${bloco.titulo}`"
+              @click="blocoParaCancelar = bloco"
+            >
+              Cancelar
+            </button>
           </li>
         </ol>
       </section>
@@ -460,6 +603,24 @@ onBeforeUnmount(() => {
           >
             Iniciar estudo
           </button>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              :aria-label="`Reagendar ${planejamento.proximoBloco.titulo}`"
+              @click="abrirReagendamento(planejamento.proximoBloco)"
+            >
+              Reagendar
+            </button>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              type="button"
+              :aria-label="`Cancelar ${planejamento.proximoBloco.titulo}`"
+              @click="blocoParaCancelar = planejamento.proximoBloco"
+            >
+              Cancelar
+            </button>
+          </div>
         </section>
 
         <section
@@ -482,6 +643,24 @@ onBeforeUnmount(() => {
                   >{{ rotuloDoTipo(bloco) }} ·
                   {{ bloco.duracaoPrevistaEmMinutos }} min</small
                 >
+              </div>
+              <div class="d-flex gap-2">
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  type="button"
+                  :aria-label="`Reagendar ${bloco.titulo}`"
+                  @click="abrirReagendamento(bloco)"
+                >
+                  Reagendar
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  type="button"
+                  :aria-label="`Cancelar ${bloco.titulo}`"
+                  @click="blocoParaCancelar = bloco"
+                >
+                  Cancelar
+                </button>
               </div>
             </li>
           </ol>
@@ -522,6 +701,15 @@ onBeforeUnmount(() => {
               @click="abrirRegistroNoHistorico(bloco)"
             >
               Registrar no Histórico
+            </button>
+            <button
+              v-if="execucoesRealizadas[bloco.identificador]"
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              :aria-label="`Corrigir execução de ${bloco.titulo}`"
+              @click="abrirCorrecao(bloco)"
+            >
+              Corrigir execução
             </button>
           </li>
         </ol>
@@ -666,6 +854,162 @@ onBeforeUnmount(() => {
           @click="registrarNoHistorico"
         >
           Registrar no Histórico
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="blocoParaReagendar"
+      titulo="Reagendar bloco"
+      etiqueta="Ajustar compromisso"
+      descricao="O bloco permanecerá nesta mesma semana."
+      @fechar="blocoParaReagendar = undefined"
+    >
+      <div class="mb-3">
+        <label class="form-label" for="data-reagendamento-hoje"
+          >Nova data</label
+        >
+        <select
+          id="data-reagendamento-hoje"
+          v-model="dataDoReagendamento"
+          class="form-select"
+        >
+          <option v-for="data in datasDaSemana" :key="data" :value="data">
+            {{ data }}
+          </option>
+        </select>
+      </div>
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label class="form-label" for="horario-reagendamento-hoje"
+            >Horário opcional</label
+          >
+          <input
+            id="horario-reagendamento-hoje"
+            v-model="horarioDoReagendamento"
+            class="form-control"
+            type="time"
+          />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="ordem-reagendamento-hoje"
+            >Ordem no dia</label
+          >
+          <input
+            id="ordem-reagendamento-hoje"
+            v-model.number="ordemDoReagendamento"
+            class="form-control"
+            type="number"
+            min="1"
+          />
+        </div>
+      </div>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="blocoParaReagendar = undefined"
+        >
+          Voltar
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="processando"
+          @click="confirmarReagendamento"
+        >
+          Confirmar reagendamento
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="blocoParaCancelar"
+      titulo="Cancelar bloco?"
+      etiqueta="Confirmar cancelamento"
+      :descricao="`O bloco ${blocoParaCancelar.titulo} ficará registrado como cancelado.`"
+      @fechar="blocoParaCancelar = undefined"
+    >
+      <p class="mb-0">A ordem dos blocos restantes será ajustada.</p>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="blocoParaCancelar = undefined"
+        >
+          Manter bloco
+        </button>
+        <button
+          class="btn btn-danger"
+          type="button"
+          :disabled="processando"
+          @click="confirmarCancelamento"
+        >
+          Cancelar bloco
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="execucaoParaCorrigir"
+      titulo="Corrigir execução"
+      etiqueta="Ajustar fato registrado"
+      descricao="Se houver estudo vinculado, o Histórico manterá a versão anterior como corrigida."
+      @fechar="execucaoParaCorrigir = undefined"
+    >
+      <div class="mb-3">
+        <label class="form-label" for="resultado-corrigido">Resultado</label>
+        <select
+          id="resultado-corrigido"
+          v-model="resultadoCorrigido"
+          class="form-select"
+        >
+          <option value="CONCLUIDO">Concluído</option>
+          <option value="PARCIALMENTE_CONCLUIDO">Parcialmente concluído</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="duracao-corrigida"
+          >Duração em minutos</label
+        >
+        <input
+          id="duracao-corrigida"
+          v-model.number="duracaoCorrigida"
+          class="form-control"
+          type="number"
+          min="1"
+          max="1440"
+        />
+      </div>
+      <div>
+        <label class="form-label" for="observacao-corrigida"
+          >Observação opcional</label
+        >
+        <textarea
+          id="observacao-corrigida"
+          v-model="observacaoCorrigida"
+          class="form-control"
+          maxlength="2000"
+          rows="3"
+        ></textarea>
+      </div>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="execucaoParaCorrigir = undefined"
+        >
+          Voltar
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="
+            processando || duracaoCorrigida < 1 || duracaoCorrigida > 1440
+          "
+          @click="confirmarCorrecao"
+        >
+          Salvar correção
         </button>
       </template>
     </ModalDaAplicacao>

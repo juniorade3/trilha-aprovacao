@@ -167,6 +167,11 @@ public class ServicoDePlanejamento {
         BlocoDeEstudo atual = persistido.paraDominio();
         PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();
         exigirPlanoAjustavel(plano);
+        if (plano.estaAtivo()
+                && (!atual.data().equals(dados.data()) || atual.ordem() != dados.ordem())) {
+            throw new ConflitoDeDominio("BLOCO_ATIVO_EXIGE_REAGENDAMENTO",
+                    "Use o reagendamento para alterar a data ou a ordem do bloco ativo.");
+        }
         validarDadosDoBloco(usuario, plano, dados);
         List<BlocoDeEstudoPersistido> origem = blocos
                 .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
@@ -211,10 +216,13 @@ public class ServicoDePlanejamento {
         List<BlocoDeEstudoPersistido> origem = blocos
                 .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
                         atual.identificadorDoPlano(), atual.data());
-        origem.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco));
+        origem.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco)
+                || item.paraDominio().estado() != EstadoDoBlocoDeEstudo.PLANEJADO);
         List<BlocoDeEstudoPersistido> destino = atual.data().equals(data)
                 ? origem : blocos.findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(
                         atual.identificadorDoPlano(), data);
+        destino.removeIf(item -> item.paraDominio().estado()
+                != EstadoDoBlocoDeEstudo.PLANEJADO);
         validarOrdemDeInsercao(ordem, destino.size());
         BlocoDeEstudo reagendado;
         try {
@@ -384,6 +392,12 @@ public class ServicoDePlanejamento {
                         registroCorrigido, OffsetDateTime.now()));
         persistida.atualizarDe(corrigida);
         BlocoDeEstudoPersistido bloco = blocoPersistido(usuario, atual.identificadorDoBloco());
+        try {
+            bloco.atualizarDe(bloco.paraDominio().corrigirResultado(resultado));
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_CORRIGIVEL",
+                    excecao.getMessage());
+        }
         blocos.flush();
         execucoes.flush();
         return new ResultadoDaExecucaoDoBloco(bloco.paraDominio(), persistida.paraDominio(), estudo);

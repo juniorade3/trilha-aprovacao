@@ -4043,6 +4043,22 @@ h2.titulo-editorial,
     grid-template-columns: 1fr;
   }
 
+  .resumo-do-plano-semanal {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 1rem;
+
+    .acoes-do-plano-semanal,
+    .acao-principal-do-plano {
+      grid-column: 1 / -1;
+    }
+
+    .acoes-do-plano-semanal button {
+      flex: 1;
+    }
+  }
+
   .acoes-da-disponibilidade {
     align-items: stretch;
     flex-direction: column;

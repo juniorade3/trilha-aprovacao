@@ -13,6 +13,9 @@ const chamadas = vi.hoisted(() => ({
   listarTopicosParaRegistro: vi.fn(),
   obterExecucaoDoBloco: vi.fn(),
   registrarExecucaoNoHistorico: vi.fn(),
+  cancelarBloco: vi.fn(),
+  reagendarBloco: vi.fn(),
+  corrigirExecucao: vi.fn(),
 }))
 
 vi.mock('./apiDePlanejamento', () => ({
@@ -24,6 +27,9 @@ vi.mock('./apiDePlanejamento', () => ({
   listarTopicosParaRegistro: chamadas.listarTopicosParaRegistro,
   obterExecucaoDoBloco: chamadas.obterExecucaoDoBloco,
   registrarExecucaoNoHistorico: chamadas.registrarExecucaoNoHistorico,
+  cancelarBloco: chamadas.cancelarBloco,
+  reagendarBloco: chamadas.reagendarBloco,
+  corrigirExecucao: chamadas.corrigirExecucao,
 }))
 
 import PlanejamentoHojePagina from './PlanejamentoHojePagina.vue'
@@ -38,6 +44,7 @@ function bloco(identificador: string, titulo: string, ordem: number) {
     duracaoPrevistaEmMinutos: 60,
     ordem,
     estado: 'PLANEJADO',
+    quantidadeDeReagendamentos: 0,
     criadoEm: '2026-07-19T12:00:00Z',
     atualizadoEm: '2026-07-19T12:00:00Z',
     versao: 0,
@@ -87,6 +94,9 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)
     chamadas.obterExecucaoDoBloco.mockRejectedValue(new Error('sem execucao'))
     chamadas.listarTopicosParaRegistro.mockResolvedValue([])
+    chamadas.cancelarBloco.mockResolvedValue(undefined)
+    chamadas.reagendarBloco.mockResolvedValue(undefined)
+    chamadas.corrigirExecucao.mockResolvedValue(undefined)
   })
 
   it('orienta a planejar quando nao existe plano', async () => {
@@ -123,6 +133,25 @@ describe('PlanejamentoHojePagina', () => {
 
     const pagina = await montar()
     expect(pagina.text()).toContain('Seu plano ainda precisa ser ativado')
+  })
+
+  it('apresenta plano encerrado como somente leitura', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
+      estado: 'PLANO_ENCERRADO',
+      data: '2026-07-20',
+      identificadorDoPlano: 'plano-1',
+      dataInicialDoPlano: '2026-07-20',
+      minutosDisponiveis: 0,
+      minutosPlanejados: 0,
+      quantidadeDeBlocos: 0,
+      sequencia: [],
+      atrasados: [],
+      realizados: [],
+    })
+
+    const pagina = await montar()
+    expect(pagina.text()).toContain('Esta semana foi encerrada')
+    expect(pagina.text()).toContain('Ver semana encerrada')
   })
 
   it('inicia o proximo bloco', async () => {
@@ -240,5 +269,78 @@ describe('PlanejamentoHojePagina', () => {
     await pagina.get('.blocos-atrasados-do-dia button').trigger('click')
     await flushPromises()
     expect(chamadas.iniciarBloco).toHaveBeenCalled()
+  })
+
+  it('reagenda e cancela o proximo bloco com confirmacao', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    const pagina = await montar()
+
+    await pagina.get('[aria-label="Reagendar Primeiro bloco"]').trigger('click')
+    await pagina.get('#data-reagendamento-hoje').setValue('2026-07-21')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Confirmar reagendamento')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.reagendarBloco).toHaveBeenCalledWith(
+      'bloco-1',
+      '2026-07-21',
+      undefined,
+      1,
+    )
+
+    await pagina.get('[aria-label="Cancelar Primeiro bloco"]').trigger('click')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Cancelar bloco')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.cancelarBloco).toHaveBeenCalledWith('bloco-1')
+  })
+
+  it('corrige uma execucao finalizada', async () => {
+    const realizado = {
+      ...bloco('bloco-1', 'Primeiro bloco', 1),
+      estado: 'CONCLUIDO',
+    }
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue({
+      ...diaPlanejado(),
+      proximoBloco: undefined,
+      sequencia: [],
+      realizados: [realizado],
+    })
+    chamadas.obterExecucaoDoBloco.mockResolvedValue({
+      bloco: realizado,
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: '2026-07-20T10:00:00Z',
+        encerradaEm: '2026-07-20T10:30:00Z',
+        duracaoExecutadaEmMinutos: 30,
+        resultado: 'CONCLUIDO',
+        criadoEm: '2026-07-20T10:00:00Z',
+        atualizadoEm: '2026-07-20T10:30:00Z',
+        versao: 0,
+      },
+    })
+    const pagina = await montar()
+
+    await pagina
+      .get('[aria-label="Corrigir execução de Primeiro bloco"]')
+      .trigger('click')
+    await pagina.get('#resultado-corrigido').setValue('PARCIALMENTE_CONCLUIDO')
+    await pagina.get('#duracao-corrigida').setValue(20)
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Salvar correção')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.corrigirExecucao).toHaveBeenCalledWith(
+      'execucao-1',
+      'PARCIALMENTE_CONCLUIDO',
+      20,
+      undefined,
+    )
   })
 })

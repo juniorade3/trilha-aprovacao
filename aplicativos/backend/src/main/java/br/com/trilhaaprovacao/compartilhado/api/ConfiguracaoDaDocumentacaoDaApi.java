@@ -62,7 +62,8 @@ public class ConfiguracaoDaDocumentacaoDaApi {
                         new Tag().name("Concursos").description("Concursos, editais, cargos, provas e grupos."),
                         new Tag().name("Conteúdo programático").description("Itens do edital e mapeamentos."),
                         new Tag().name("Materiais e estudos").description("Materiais, coberturas e registros de estudo."),
-                        new Tag().name("Planejamento").description("Planos semanais e disponibilidade diaria."),
+                        new Tag().name("Planejamento").description(
+                                "Planos semanais, blocos, execucoes e replanejamento manual."),
                         new Tag().name("Dashboard").description("Visão objetiva do concurso ativo.")));
     }
 

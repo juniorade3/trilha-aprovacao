@@ -58,6 +58,18 @@ class PlanejamentoTest {
     }
 
     @Test
+    void deveEncerrarOuCancelarSomenteNosEstadosPermitidos() {
+        PlanoSemanal rascunho = PlanoSemanal.criar(UUID.randomUUID(), SEGUNDA);
+        PlanoSemanal ativo = rascunho.ativar();
+
+        assertEquals(EstadoDoPlanoSemanal.ENCERRADO, ativo.encerrar().estado());
+        assertEquals(EstadoDoPlanoSemanal.CANCELADO, rascunho.cancelar().estado());
+        assertEquals(EstadoDoPlanoSemanal.CANCELADO, ativo.cancelar().estado());
+        assertThrows(IllegalStateException.class, rascunho::encerrar);
+        assertThrows(IllegalStateException.class, () -> ativo.encerrar().cancelar());
+    }
+
+    @Test
     void deveCriarEAlterarBlocoPlanejado() {
         UUID plano = UUID.randomUUID();
         BlocoDeEstudo bloco = BlocoDeEstudo.criar(plano, null, null,
@@ -68,6 +80,26 @@ class PlanejamentoTest {
         assertEquals("Capitulo inicial", bloco.observacao());
         assertEquals(EstadoDoBlocoDeEstudo.PLANEJADO, bloco.estado());
         assertEquals(2, bloco.moverPara(SEGUNDA.plusDays(1), 2).ordem());
+    }
+
+    @Test
+    void deveReagendarCancelarECorrigirResultadoDoBloco() {
+        BlocoDeEstudo bloco = BlocoDeEstudo.criar(UUID.randomUUID(), null, null,
+                "Teoria", TipoDeAtividade.TEORIA, SEGUNDA,
+                60, 1, null, null);
+
+        BlocoDeEstudo reagendado = bloco.reagendar(
+                SEGUNDA.plusDays(1), LocalTime.of(9, 0), 1);
+        assertEquals(1, reagendado.quantidadeDeReagendamentos());
+        assertEquals(SEGUNDA.plusDays(1), reagendado.data());
+        assertEquals(EstadoDoBlocoDeEstudo.CANCELADO, reagendado.cancelar().estado());
+
+        BlocoDeEstudo concluido = bloco.iniciar().concluir();
+        assertEquals(EstadoDoBlocoDeEstudo.PARCIALMENTE_CONCLUIDO,
+                concluido.corrigirResultado(
+                        ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO).estado());
+        assertThrows(IllegalStateException.class,
+                () -> bloco.corrigirResultado(ResultadoDaExecucao.CONCLUIDO));
     }
 
     @Test
