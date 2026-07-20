@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
@@ -14,6 +14,7 @@ import {
 } from '@/modulos/materias/apiDeConteudos'
 import EditorDeBloco from './EditorDeBloco.vue'
 import GavetaDeGeracaoDeterministica from './GavetaDeGeracaoDeterministica.vue'
+import GavetaDeReplanejamento from './GavetaDeReplanejamento.vue'
 import NavegacaoDoPlanejamento from './NavegacaoDoPlanejamento.vue'
 import {
   adicionarBloco,
@@ -27,11 +28,14 @@ import {
   encerrarPlanoSemanal,
   cancelarPlanoSemanal,
   obterPlanoSemanal,
+  obterHistoricoSemanal,
   reordenarBlocos,
   type BlocoDeEstudo,
   type DadosDoBlocoDeEstudo,
   type PlanoSemanal,
   type ResultadoDaAplicacaoDaGeracao,
+  type ResultadoDaAplicacaoDoReplanejamento,
+  type HistoricoSemanal,
 } from './apiDePlanejamento'
 
 const rota = useRoute()
@@ -60,6 +64,9 @@ const confirmacaoDeAtivacaoAberta = ref(false)
 const ativando = ref(false)
 const geracaoAberta = ref(false)
 const blocoDaJustificativa = ref<BlocoDeEstudo>()
+const replanejamentoAberto = ref(false)
+const historico = ref<HistoricoSemanal>()
+const botaoDoReplanejamento = ref<HTMLButtonElement>()
 
 const nomesDosDias = [
   'Segunda-feira',
@@ -158,6 +165,13 @@ const quantidadeDeBlocosGerados = computed(
     ).length ?? 0,
 )
 
+const dataDeReferenciaDoReplanejamento = computed(() => {
+  const hoje = paraIso(new Date())
+  if (hoje < dataInicial.value) return dataInicial.value
+  const domingo = adicionarDias(dataInicial.value, 6)
+  return hoje > domingo ? domingo : hoje
+})
+
 function formatarData(dataIso: string) {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
@@ -192,11 +206,16 @@ async function carregar() {
   aviso.value = ''
   conflito.value = false
   plano.value = undefined
+  historico.value = undefined
   try {
     const planoObtido = await obterPlanoSemanal(dataInicial.value)
     plano.value = planoObtido
     preencherFormulario(planoObtido)
     await carregarConteudos()
+    historico.value = await obterHistoricoSemanal(
+      planoObtido.identificador,
+      dataInicial.value,
+    )
   } catch (causa) {
     if (!(causa instanceof ErroDaApi && causa.status === 404)) {
       erro.value =
@@ -255,6 +274,8 @@ function rotuloDaOrigem(bloco: BlocoDeEstudo) {
     MANUAL: 'Manual',
     GERADO_DETERMINISTICAMENTE: 'Gerado',
     GERADO_AJUSTADO_MANUALMENTE: 'Gerado e ajustado',
+    REPLANEJADO: 'Replanejado',
+    REPLANEJADO_AJUSTADO_MANUALMENTE: 'Replanejado e ajustado',
   }[bloco.origem]
 }
 
@@ -263,7 +284,9 @@ function classeDaOrigem(bloco: BlocoDeEstudo) {
     ? 'text-bg-light'
     : bloco.origem === 'GERADO_DETERMINISTICAMENTE'
       ? 'text-bg-primary'
-      : 'text-bg-warning'
+      : bloco.origem === 'GERADO_AJUSTADO_MANUALMENTE'
+        ? 'text-bg-warning'
+        : 'text-bg-info'
 }
 
 function abrirNovoBloco(data: string) {
@@ -314,6 +337,10 @@ async function atualizarPlano() {
   const atualizado = await obterPlanoSemanal(dataInicial.value)
   plano.value = atualizado
   preencherFormulario(atualizado)
+  historico.value = await obterHistoricoSemanal(
+    atualizado.identificador,
+    dataInicial.value,
+  )
 }
 
 function concluirAplicacaoDaGeracao(resultado: ResultadoDaAplicacaoDaGeracao) {
@@ -322,6 +349,31 @@ function concluirAplicacaoDaGeracao(resultado: ResultadoDaAplicacaoDaGeracao) {
   geracaoAberta.value = false
   const resumo = resultado.resumo
   aviso.value = `${resumo.quantidadeDeBlocosCriados} bloco(s) aplicado(s). ${resumo.quantidadeDeBlocosSubstituidos} substituído(s) e ${resumo.quantidadeDeBlocosPreservados} preservado(s).`
+}
+
+async function concluirReplanejamento(
+  resultado: ResultadoDaAplicacaoDoReplanejamento,
+) {
+  plano.value = resultado.planoAtualizado
+  preencherFormulario(resultado.planoAtualizado)
+  replanejamentoAberto.value = false
+  historico.value = await obterHistoricoSemanal(
+    resultado.planoAtualizado.identificador,
+    dataInicial.value,
+  )
+  aviso.value = `${resultado.quantidadeDePendenciasTransferidas} pendência(s) transferida(s) em ${resultado.quantidadeDeFragmentosCriados} novo(s) bloco(s).`
+  await nextTick()
+  botaoDoReplanejamento.value?.focus()
+}
+
+function abrirReplanejamento() {
+  replanejamentoAberto.value = true
+}
+
+async function fecharReplanejamento() {
+  replanejamentoAberto.value = false
+  await nextTick()
+  botaoDoReplanejamento.value?.focus()
 }
 
 async function salvarBloco(dados: DadosDoBlocoDeEstudo) {
@@ -521,6 +573,7 @@ watch(
   () => rota.query.inicio,
   async (inicio) => {
     geracaoAberta.value = false
+    replanejamentoAberto.value = false
     if (!inicioValido(inicio)) {
       await roteador.replace({
         path: '/planejamento/semana',
@@ -672,6 +725,15 @@ watch(
           v-if="plano.estado === 'ATIVO'"
           class="acoes-do-plano-semanal d-flex gap-2"
         >
+          <button
+            ref="botaoDoReplanejamento"
+            class="btn btn-primary"
+            type="button"
+            @click="abrirReplanejamento"
+          >
+            <i class="bi bi-calendar2-range me-2" aria-hidden="true"></i>
+            Replanejar pendências
+          </button>
           <button
             class="btn btn-outline-primary"
             type="button"
@@ -919,6 +981,52 @@ watch(
       </div>
     </form>
 
+    <section
+      v-if="plano && historico"
+      class="historico-objetivo-da-semana"
+      aria-labelledby="titulo-historico-semanal"
+    >
+      <div>
+        <p class="sobretitulo-da-pagina">Histórico objetivo</p>
+        <h2 id="titulo-historico-semanal" class="h4">
+          Plano e execução da semana
+        </h2>
+      </div>
+      <dl class="grade-do-historico-semanal">
+        <div>
+          <dt>Planejado originalmente</dt>
+          <dd>{{ historico.resumo.minutosPlanejados }} min</dd>
+        </div>
+        <div>
+          <dt>Executado</dt>
+          <dd>{{ historico.resumo.minutosExecutados }} min</dd>
+        </div>
+        <div>
+          <dt>Interrompido</dt>
+          <dd>{{ historico.resumo.minutosInterrompidos }} min</dd>
+        </div>
+        <div>
+          <dt>Pendente</dt>
+          <dd>{{ historico.resumo.minutosPendentes }} min</dd>
+        </div>
+        <div>
+          <dt>Taxa executada / planejada</dt>
+          <dd>{{ historico.resumo.taxaExecutadaSobrePlanejada }}%</dd>
+        </div>
+        <div>
+          <dt>Reagendados</dt>
+          <dd>{{ historico.resumo.blocosReagendados }}</dd>
+        </div>
+      </dl>
+      <p
+        v-if="historico.transferencias.length"
+        class="mb-0 text-body-secondary"
+      >
+        {{ historico.transferencias.length }} fragmento(s) transferido(s) por
+        replanejamento.
+      </p>
+    </section>
+
     <GavetaDeGeracaoDeterministica
       v-if="geracaoAberta && plano"
       :key="plano.identificador"
@@ -926,6 +1034,15 @@ watch(
       :quantidade-de-blocos-gerados="quantidadeDeBlocosGerados"
       @fechar="geracaoAberta = false"
       @aplicado="concluirAplicacaoDaGeracao"
+    />
+
+    <GavetaDeReplanejamento
+      v-if="replanejamentoAberto && plano?.estado === 'ATIVO'"
+      :key="`${plano.identificador}-${dataDeReferenciaDoReplanejamento}`"
+      :identificador-do-plano="plano.identificador"
+      :data-de-referencia="dataDeReferenciaDoReplanejamento"
+      @fechar="fecharReplanejamento"
+      @aplicado="concluirReplanejamento"
     />
 
     <EditorDeBloco
@@ -1143,3 +1260,46 @@ watch(
     </ModalDaAplicacao>
   </main>
 </template>
+
+<style scoped lang="scss">
+.historico-objetivo-da-semana {
+  margin-top: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+  background: var(--bs-body-bg);
+}
+
+.grade-do-historico-semanal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+
+  div {
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--bs-light);
+  }
+  dt {
+    color: var(--bs-secondary-color);
+    font-size: 0.82rem;
+  }
+  dd {
+    margin: 0.2rem 0 0;
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .grade-do-historico-semanal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 399.98px) {
+  .grade-do-historico-semanal {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

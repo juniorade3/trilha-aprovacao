@@ -21,7 +21,7 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                     .withPassword("teste");
 
     @Test
-    void deveAplicarV11EV12EmPostgresqlVazioComTodasAsGarantias() {
+    void deveAplicarAteV13EmPostgresqlVazioComTodasAsGarantias() {
         var resultado = Flyway.configure()
                 .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(),
                         POSTGRESQL.getPassword())
@@ -31,12 +31,12 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword()));
 
         assertThat(resultado.success).isTrue();
-        assertThat(resultado.targetSchemaVersion).isEqualTo("12");
+        assertThat(resultado.targetSchemaVersion).isEqualTo("13");
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(12);
+                """, Integer.class)).isEqualTo(13);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
@@ -88,6 +88,16 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                   AND tablename = 'blocos_de_estudo'
                   AND indexname = 'idx_blocos_plano_data_ordem'
                 """, String.class)).contains("(plano_id, data, ordem)");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name IN (
+                    'blocos_originais_dos_planos', 'replanejamentos',
+                    'itens_de_replanejamento', 'fragmentos_de_replanejamento')
+                """, Integer.class)).isEqualTo(4);
+        assertThat(quantidadeDeRestricoes(banco,
+                "uk_itens_replanejamento_bloco", "u")).isEqualTo(1);
+        assertThat(quantidadeDeRestricoes(banco,
+                "uk_fragmentos_replanejamento_bloco", "u")).isEqualTo(1);
     }
 
     private int quantidadeDeRestricoes(JdbcTemplate banco, String nome, String tipo) {

@@ -36,6 +36,8 @@ public class BlocoDeEstudoPersistido {
     private OrigemDoBlocoDeEstudo origem;
     @Column(name = "justificativa_da_geracao", length = 2000)
     private String justificativaDaGeracao;
+    @Column(name = "justificativa_do_replanejamento", length = 2000)
+    private String justificativaDoReplanejamento;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private EstadoDoBlocoDeEstudo estado;
     @Column(name = "quantidade_de_reagendamentos", nullable = false)
     private int quantidadeDeReagendamentos;
@@ -66,6 +68,7 @@ public class BlocoDeEstudoPersistido {
         observacao = bloco.observacao();
         origem = bloco.origem();
         justificativaDaGeracao = bloco.justificativaDaGeracao();
+        justificativaDoReplanejamento = bloco.justificativaDoReplanejamento();
         estado = bloco.estado();
         quantidadeDeReagendamentos = bloco.quantidadeDeReagendamentos();
         reagendadoEm = bloco.reagendadoEm();
@@ -77,6 +80,7 @@ public class BlocoDeEstudoPersistido {
                 identificadorDaMateria, identificadorDoTopico, titulo,
                 tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
                 horarioPrevisto, observacao, origem, justificativaDaGeracao,
+                justificativaDoReplanejamento,
                 estado, quantidadeDeReagendamentos, reagendadoEm, criadoEm,
                 atualizadoEm, versao);
     }

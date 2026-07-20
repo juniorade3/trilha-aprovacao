@@ -1006,6 +1006,221 @@ class PlanejamentoIntegracaoTest {
                 .containsExactlyElementsOf(identificadoresOriginais);
     }
 
+    @Test
+    void devePreverSemEscreverAplicarComLinhagemEConsultarHistorico() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("replanejamento@example.com");
+        String plano = criarPlano(sessao, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(50)))
+                .andExpect(status().isOk());
+        String materia = criarMateria(sessao, "Banco de dados para replanejar");
+        String topico = criarTopico(sessao, materia, "Modelagem relacional");
+        String original = criarBloco(sessao, plano, "Pendencia original",
+                SEGUNDA, 50, 1, materia, topico);
+        api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_originais_dos_planos WHERE plano_id = ?::uuid
+                """, Integer.class, plano)).isEqualTo(1);
+        UUID usuario = banco.queryForObject(
+                "SELECT usuario_id FROM planos_semanais WHERE identificador = ?::uuid",
+                UUID.class, plano);
+        UUID registro = UUID.randomUUID();
+        UUID execucao = UUID.randomUUID();
+        banco.update("""
+                INSERT INTO registros_de_estudo (identificador, topico_id, data_hora,
+                    duracao_em_minutos, situacao, criado_em, atualizado_em, versao)
+                VALUES (?, ?::uuid, now(), 20, 'ATIVO', now(), now(), 0)
+                """, registro, topico);
+        banco.update("""
+                INSERT INTO execucoes_de_bloco (identificador, usuario_id, bloco_id,
+                    iniciada_em, encerrada_em, duracao_executada_em_minutos, resultado,
+                    registro_de_estudo_id, criado_em, atualizado_em, versao)
+                VALUES (?, ?, ?::uuid, now() - interval '20 minutes', now(), 20,
+                    'PARCIALMENTE_CONCLUIDO', ?, now(), now(), 0)
+                """, execucao, usuario, original, registro);
+        banco.update("UPDATE blocos_de_estudo SET estado = 'PARCIALMENTE_CONCLUIDO' "
+                + "WHERE identificador = ?::uuid", original);
+        banco.update("""
+                UPDATE disponibilidades_do_dia
+                SET minutos_disponiveis = 100, versao = versao + 1
+                WHERE plano_id = ?::uuid AND data = ?
+                """, plano, SEGUNDA.plusDays(2));
+
+        String corpoDaPrevia = """
+                {"dataDeReferencia":"%s",
+                 "identificadoresDasPendenciasIgnoradas":[]}
+                """.formatted(SEGUNDA.plusDays(2));
+        String previa = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/replanejamento/previa", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaPrevia))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDePendencias").value(1))
+                .andExpect(jsonPath("$.resumo.minutosAlocados").value(30))
+                .andExpect(jsonPath("$.pendencias[0].decisao").value("ADIAR"))
+                .andExpect(jsonPath("$.pendencias[0].fragmentos[0].data")
+                        .value(SEGUNDA.plusDays(2).toString()))
+                .andReturn().getResponse().getContentAsString();
+        assertThatQuantidade("replanejamentos", 0);
+        assertThatQuantidade("itens_de_replanejamento", 0);
+        assertThatQuantidade("fragmentos_de_replanejamento", 0);
+        String assinatura = json.readTree(previa).get("assinaturaDaPrevia").asString();
+
+        api.perform(post("/api/v1/planos-semanais/{id}/replanejamento", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dataDeReferencia":"%s",
+                                 "identificadoresDasPendenciasIgnoradas":[],
+                                 "identificadoresDasConfirmacoesDoLimite":[],
+                                 "assinaturaDaPrevia":"%s"}
+                                """.formatted(SEGUNDA.plusDays(2), assinatura)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantidadeDePendenciasTransferidas").value(1))
+                .andExpect(jsonPath("$.quantidadeDeFragmentosCriados").value(1))
+                .andExpect(jsonPath("$.planoAtualizado.blocos.length()").value(2));
+
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE identificador = ?::uuid AND estado = 'PARCIALMENTE_CONCLUIDO'
+                """, Integer.class, original)).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM execucoes_de_bloco
+                WHERE identificador = ? AND registro_de_estudo_id = ?
+                  AND duracao_executada_em_minutos = 20
+                """, Integer.class, execucao, registro)).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM registros_de_estudo WHERE identificador = ?
+                """, Integer.class, registro)).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid AND origem = 'REPLANEJADO'
+                  AND horario_previsto IS NULL
+                  AND justificativa_do_replanejamento IS NOT NULL
+                """, Integer.class, plano)).isEqualTo(1);
+        assertThatQuantidade("replanejamentos", 1);
+        assertThatQuantidade("itens_de_replanejamento", 1);
+        assertThatQuantidade("fragmentos_de_replanejamento", 1);
+
+        api.perform(get("/api/v1/planos-semanais/{id}/historico-semanal", plano)
+                        .param("dataDeReferencia", SEGUNDA.plusDays(2).toString())
+                        .session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.minutosPlanejados").value(50))
+                .andExpect(jsonPath("$.resumo.minutosExecutados").value(20))
+                .andExpect(jsonPath("$.resumo.minutosInterrompidos").value(20))
+                .andExpect(jsonPath("$.transferencias.length()").value(1))
+                .andExpect(jsonPath("$.snapshotOriginal[0].identificadorDoBloco")
+                        .value(original));
+
+        api.perform(post("/api/v1/planos-semanais/{id}/replanejamento", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dataDeReferencia":"%s",
+                                 "identificadoresDasPendenciasIgnoradas":[],
+                                 "identificadoresDasConfirmacoesDoLimite":[],
+                                 "assinaturaDaPrevia":"%s"}
+                                """.formatted(SEGUNDA.plusDays(2), assinatura)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("PREVIA_DE_REPLANEJAMENTO_DESATUALIZADA"));
+        assertThatQuantidade("fragmentos_de_replanejamento", 1);
+    }
+
+    @Test
+    void deveIsolarAsTresRotasDoReplanejamentoEntreUsuarios() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("isolamento.replanejamento.a@example.com");
+        String plano = criarPlano(sessaoA, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(50)))
+                .andExpect(status().isOk());
+        criarBloco(sessaoA, plano, "Pendencia", SEGUNDA, 50, 1, null, null);
+        api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk());
+        MockHttpSession sessaoB = criarContaEEntrar("isolamento.replanejamento.b@example.com");
+        String previa = """
+                {"dataDeReferencia":"%s","identificadoresDasPendenciasIgnoradas":[]}
+                """.formatted(SEGUNDA.plusDays(2));
+        String aplicacao = """
+                {"dataDeReferencia":"%s","identificadoresDasPendenciasIgnoradas":[],
+                 "identificadoresDasConfirmacoesDoLimite":[],"assinaturaDaPrevia":"x"}
+                """.formatted(SEGUNDA.plusDays(2));
+
+        api.perform(post("/api/v1/planos-semanais/{id}/replanejamento/previa", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(previa)).andExpect(status().isNotFound());
+        api.perform(post("/api/v1/planos-semanais/{id}/replanejamento", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(aplicacao)).andExpect(status().isNotFound());
+        api.perform(get("/api/v1/planos-semanais/{id}/historico-semanal", plano)
+                        .param("dataDeReferencia", SEGUNDA.toString()).session(sessaoB))
+                .andExpect(status().isNotFound());
+
+        assertThatQuantidade("replanejamentos", 0);
+        assertThatQuantidade("itens_de_replanejamento", 0);
+        assertThatQuantidade("fragmentos_de_replanejamento", 0);
+    }
+
+    @Test
+    void deveSerializarAplicacoesConcorrentesDoReplanejamentoSemDuplicar() throws Exception {
+        String email = "concorrencia.replanejamento@example.com";
+        MockHttpSession primeiraSessao = criarContaEEntrar(email);
+        MockHttpSession segundaSessao = entrar(email);
+        String plano = criarPlano(primeiraSessao, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(primeiraSessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(50))).andExpect(status().isOk());
+        criarBloco(primeiraSessao, plano, "Pendencia concorrente",
+                SEGUNDA, 50, 1, null, null);
+        api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
+                        .session(primeiraSessao).with(csrf())).andExpect(status().isOk());
+        banco.update("""
+                UPDATE disponibilidades_do_dia SET minutos_disponiveis = 100
+                WHERE plano_id = ?::uuid AND data = ?
+                """, plano, SEGUNDA.plusDays(2));
+        String previa = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/replanejamento/previa", plano)
+                        .session(primeiraSessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"dataDeReferencia":"%s",
+                                 "identificadoresDasPendenciasIgnoradas":[]}
+                                """.formatted(SEGUNDA.plusDays(2))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String assinatura = json.readTree(previa).get("assinaturaDaPrevia").asString();
+        String corpo = """
+                {"dataDeReferencia":"%s","identificadoresDasPendenciasIgnoradas":[],
+                 "identificadoresDasConfirmacoesDoLimite":[],
+                 "assinaturaDaPrevia":"%s"}
+                """.formatted(SEGUNDA.plusDays(2), assinatura);
+        CountDownLatch prontas = new CountDownLatch(2);
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> primeira = executor.submit(() -> aplicarReplanejamentoAposLargada(
+                    primeiraSessao, plano, corpo, prontas, largada));
+            Future<Integer> segunda = executor.submit(() -> aplicarReplanejamentoAposLargada(
+                    segundaSessao, plano, corpo, prontas, largada));
+            org.assertj.core.api.Assertions.assertThat(prontas.await(5, TimeUnit.SECONDS)).isTrue();
+            largada.countDown();
+            org.assertj.core.api.Assertions.assertThat(List.of(
+                            primeira.get(15, TimeUnit.SECONDS),
+                            segunda.get(15, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(200, 409);
+        } finally {
+            largada.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+        assertThatQuantidade("replanejamentos", 1);
+        assertThatQuantidade("itens_de_replanejamento", 1);
+        assertThatQuantidade("fragmentos_de_replanejamento", 1);
+    }
+
     private MockHttpSession criarContaEEntrar(String email) throws Exception {
         api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1035,6 +1250,17 @@ class PlanejamentoIntegracaoTest {
                         .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(corpoDaAplicacao(true)))
                 .andReturn().getResponse().getStatus();
+    }
+
+    private int aplicarReplanejamentoAposLargada(MockHttpSession sessao, String plano,
+            String corpo, CountDownLatch prontas, CountDownLatch largada) throws Exception {
+        prontas.countDown();
+        if (!largada.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("As aplicacoes concorrentes nao ficaram prontas.");
+        }
+        return api.perform(post("/api/v1/planos-semanais/{id}/replanejamento", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpo)).andReturn().getResponse().getStatus();
     }
 
     private String criarPlano(MockHttpSession sessao, LocalDate inicio) throws Exception {

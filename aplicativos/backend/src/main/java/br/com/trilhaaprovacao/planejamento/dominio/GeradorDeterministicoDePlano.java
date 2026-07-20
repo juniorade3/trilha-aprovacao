@@ -14,8 +14,10 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class GeradorDeterministicoDePlano {
-    private static final int DURACAO_MINIMA = 25;
-    private static final int META_DE_MATERIAS = 3;
+    private static final int DURACAO_MINIMA =
+            DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA;
+    private static final int META_DE_MATERIAS =
+            DistribuidorDeterministicoDeCapacidade.LIMITE_DE_MATERIAS;
 
     public PreviaDaGeracaoDaSemana gerar(UUID plano,
             List<CandidatoDeMateriaParaGeracao> candidatosInformados,

@@ -53,7 +53,11 @@ export type EstadoDoBlocoDeEstudo =
   | 'CANCELADO'
 
 export type OrigemDoBlocoDeEstudo =
-  'MANUAL' | 'GERADO_DETERMINISTICAMENTE' | 'GERADO_AJUSTADO_MANUALMENTE'
+  | 'MANUAL'
+  | 'GERADO_DETERMINISTICAMENTE'
+  | 'GERADO_AJUSTADO_MANUALMENTE'
+  | 'REPLANEJADO'
+  | 'REPLANEJADO_AJUSTADO_MANUALMENTE'
 
 export interface BlocoDeEstudo {
   identificador: string
@@ -69,6 +73,7 @@ export interface BlocoDeEstudo {
   observacao?: string
   origem: OrigemDoBlocoDeEstudo
   justificativaDaGeracao?: string
+  justificativaDoReplanejamento?: string
   estado: EstadoDoBlocoDeEstudo
   quantidadeDeReagendamentos: number
   reagendadoEm?: string
@@ -209,6 +214,93 @@ export interface ResultadoDaAplicacaoDaGeracao {
     quantidadeDeBlocosSubstituidos: number
     quantidadeDeBlocosPreservados: number
   }
+}
+
+export interface PreviaDoReplanejamento {
+  identificadorDoPlano: string
+  dataDeReferencia: string
+  dataFinal: string
+  assinaturaDaPrevia: string
+  resumo: {
+    quantidadeDePendencias: number
+    quantidadeDeFragmentos: number
+    minutosPendentes: number
+    minutosAlocados: number
+    minutosNaoAlocados: number
+    confirmacoesExigidas: number
+  }
+  capacidadesPorDia: Array<{
+    data: string
+    minutosDisponiveis: number
+    minutosOcupados: number
+    minutosAlocados: number
+    minutosRestantes: number
+    quantidadeDeMaterias: number
+  }>
+  blocosPreservados: Array<{
+    identificador: string
+    titulo: string
+    data: string
+    duracaoEmMinutos: number
+    estado: EstadoDoBlocoDeEstudo
+  }>
+  pendencias: Array<{
+    identificadorDoBloco: string
+    titulo: string
+    dataOriginal: string
+    minutosPrevistos: number
+    minutosExecutados: number
+    minutosPendentes: number
+    quantidadeDeReagendamentos: number
+    prioridade: PrioridadeDaMateriaNoPlano
+    motivo: string
+    decisao:
+      'ADIAR' | 'DIVIDIR' | 'DECIDIR_MANUALMENTE' | 'SEM_CAPACIDADE' | 'IGNORAR'
+    exigeConfirmacao: boolean
+    minutosNaoAlocados: number
+    justificativa: string
+    fragmentos: Array<{
+      data: string
+      duracaoEmMinutos: number
+      sequencia: number
+    }>
+    sugestoesManuais: string[]
+  }>
+}
+
+export interface ResultadoDaAplicacaoDoReplanejamento {
+  identificadorDoReplanejamento: string
+  aplicadoEm: string
+  planoAtualizado: PlanoSemanal
+  quantidadeDePendenciasTransferidas: number
+  quantidadeDeFragmentosCriados: number
+}
+
+export interface HistoricoSemanal {
+  identificadorDoPlano: string
+  dataDeReferencia: string
+  estadoDoPlano: EstadoDoPlanoSemanal
+  resumo: {
+    minutosPlanejados: number
+    minutosExecutados: number
+    minutosConcluidos: number
+    minutosInterrompidos: number
+    minutosPendentes: number
+    blocosConcluidos: number
+    blocosParciais: number
+    blocosNaoIniciados: number
+    blocosReagendados: number
+    taxaExecutadaSobrePlanejada: number
+  }
+  transferencias: Array<{
+    identificadorDoReplanejamento: string
+    aplicadoEm: string
+    identificadorDoBlocoOriginal: string
+    identificadorDoBlocoCriado: string
+    data: string
+    duracaoEmMinutos: number
+  }>
+  observacaoDoSnapshot: string
 }
 
 export function criarPlanoSemanal(dataInicial: string): Promise<PlanoSemanal> {
@@ -385,6 +477,54 @@ export function aplicarGeracaoDeterministica(
         substituirBlocosGerados,
       }),
     },
+  )
+}
+
+export function gerarPreviaDoReplanejamento(
+  identificadorDoPlano: string,
+  dataDeReferencia: string,
+  identificadoresDasPendenciasIgnoradas: string[],
+): Promise<PreviaDoReplanejamento> {
+  return requisitar<PreviaDoReplanejamento>(
+    `/v1/planos-semanais/${identificadorDoPlano}/replanejamento/previa`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        dataDeReferencia,
+        identificadoresDasPendenciasIgnoradas,
+      }),
+    },
+  )
+}
+
+export function aplicarReplanejamento(
+  identificadorDoPlano: string,
+  dataDeReferencia: string,
+  identificadoresDasPendenciasIgnoradas: string[],
+  identificadoresDasConfirmacoesDoLimite: string[],
+  assinaturaDaPrevia: string,
+): Promise<ResultadoDaAplicacaoDoReplanejamento> {
+  return requisitar<ResultadoDaAplicacaoDoReplanejamento>(
+    `/v1/planos-semanais/${identificadorDoPlano}/replanejamento`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        dataDeReferencia,
+        identificadoresDasPendenciasIgnoradas,
+        identificadoresDasConfirmacoesDoLimite,
+        assinaturaDaPrevia,
+      }),
+    },
+  )
+}
+
+export function obterHistoricoSemanal(
+  identificadorDoPlano: string,
+  dataDeReferencia: string,
+): Promise<HistoricoSemanal> {
+  const parametros = new URLSearchParams({ dataDeReferencia })
+  return requisitar<HistoricoSemanal>(
+    `/v1/planos-semanais/${identificadorDoPlano}/historico-semanal?${parametros}`,
   )
 }
 
