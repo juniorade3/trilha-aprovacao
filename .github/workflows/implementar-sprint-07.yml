@@ -1,0 +1,235 @@
+name: Implementar Sprint 07
+
+on:
+  push:
+    branches: [feature/planejamento-sprint-07]
+
+permissions:
+  contents: write
+
+jobs:
+  implementar:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-07
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: aplicativos/backend/pom.xml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Materializar Sprint 07
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def ler(caminho):
+              return Path(caminho).read_text()
+
+          def salvar(caminho, texto):
+              Path(caminho).write_text(texto)
+
+          def trocar(texto, antigo, novo, descricao):
+              if antigo not in texto:
+                  raise SystemExit(f'Marcador não encontrado: {descricao}')
+              return texto.replace(antigo, novo, 1)
+
+          # BlocoDeEstudo: reagendamento e cancelamento preservando fatos.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/dominio/BlocoDeEstudo.java'
+          texto = ler(caminho)
+          texto = trocar(texto,
+              '        EstadoDoBlocoDeEstudo estado,\n        OffsetDateTime criadoEm,',
+              '        EstadoDoBlocoDeEstudo estado,\n        int quantidadeDeReagendamentos,\n        OffsetDateTime reagendadoEm,\n        OffsetDateTime criadoEm,',
+              'campos de reagendamento')
+          texto = trocar(texto,
+              '        Objects.requireNonNull(estado);\n        Objects.requireNonNull(criadoEm);',
+              '        Objects.requireNonNull(estado);\n        if (quantidadeDeReagendamentos < 0) {\n            throw new IllegalArgumentException("Quantidade de reagendamentos invalida.");\n        }\n        Objects.requireNonNull(criadoEm);',
+              'invariante de reagendamento')
+          texto = trocar(texto,
+              '                EstadoDoBlocoDeEstudo.PLANEJADO, agora, agora, 0);',
+              '                EstadoDoBlocoDeEstudo.PLANEJADO, 0, null, agora, agora, 0);',
+              'criação do bloco')
+          texto = trocar(texto,
+              '                novaObservacao, estado, criadoEm, OffsetDateTime.now(), versao);',
+              '                novaObservacao, estado, quantidadeDeReagendamentos, reagendadoEm,\n                criadoEm, OffsetDateTime.now(), versao);',
+              'alteração do bloco')
+          marcador = '''    public BlocoDeEstudo iniciar() {\n'''
+          metodos = '''    public BlocoDeEstudo reagendar(LocalDate novaData, LocalTime novoHorario, int novaOrdem) {\n        exigirPlanejado();\n        OffsetDateTime agora = OffsetDateTime.now();\n        return new BlocoDeEstudo(identificador, identificadorDoPlano,\n                identificadorDaMateria, identificadorDoTopico, titulo, tipoDeAtividade,\n                novaData, duracaoPrevistaEmMinutos, novaOrdem, novoHorario, observacao,\n                estado, quantidadeDeReagendamentos + 1, agora, criadoEm, agora, versao);\n    }\n\n    public BlocoDeEstudo cancelar() {\n        exigirPlanejado();\n        return comEstado(EstadoDoBlocoDeEstudo.CANCELADO);\n    }\n\n'''
+          texto = trocar(texto, marcador, metodos + marcador, 'métodos do bloco')
+          texto = trocar(texto,
+              '                horarioPrevisto, observacao, novoEstado, criadoEm,\n                OffsetDateTime.now(), versao);',
+              '                horarioPrevisto, observacao, novoEstado,\n                quantidadeDeReagendamentos, reagendadoEm, criadoEm,\n                OffsetDateTime.now(), versao);',
+              'mudança de estado do bloco')
+          salvar(caminho, texto)
+
+          # PlanoSemanal: estados finais.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/dominio/PlanoSemanal.java'
+          texto = ler(caminho)
+          marcador = '''    public boolean contem(LocalDate data) {\n'''
+          metodos = '''    public PlanoSemanal encerrar() {\n        if (estado == EstadoDoPlanoSemanal.ENCERRADO) return this;\n        if (estado != EstadoDoPlanoSemanal.ATIVO) {\n            throw new IllegalStateException("Somente plano ativo pode ser encerrado.");\n        }\n        return comEstado(EstadoDoPlanoSemanal.ENCERRADO);\n    }\n\n    public PlanoSemanal cancelar() {\n        if (estado == EstadoDoPlanoSemanal.CANCELADO) return this;\n        if (estado != EstadoDoPlanoSemanal.RASCUNHO && estado != EstadoDoPlanoSemanal.ATIVO) {\n            throw new IllegalStateException("O estado atual não permite cancelamento.");\n        }\n        return comEstado(EstadoDoPlanoSemanal.CANCELADO);\n    }\n\n    private PlanoSemanal comEstado(EstadoDoPlanoSemanal novoEstado) {\n        return new PlanoSemanal(identificador, identificadorDoUsuario, dataInicial,\n                novoEstado, criadoEm, OffsetDateTime.now(), versao);\n    }\n\n'''
+          texto = trocar(texto, marcador, metodos + marcador, 'estados finais do plano')
+          salvar(caminho, texto)
+
+          # Execução: correção sem apagar o fato anterior do histórico.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/dominio/ExecucaoDoBloco.java'
+          texto = ler(caminho)
+          marcador = '''    public boolean estaEmAndamento() {\n'''
+          metodo = '''    public ExecucaoDoBloco corrigir(ResultadoDaExecucao novoResultado, int novaDuracao,\n            String novaObservacao, UUID novoRegistro, OffsetDateTime momento) {\n        if (estaEmAndamento()) {\n            throw new IllegalStateException("Execução em andamento não pode ser corrigida.");\n        }\n        Objects.requireNonNull(novoResultado);\n        Objects.requireNonNull(momento);\n        return new ExecucaoDoBloco(identificador, identificadorDoUsuario,\n                identificadorDoBloco, iniciadaEm, encerradaEm, novaDuracao,\n                novoResultado, novaObservacao, novoRegistro, criadoEm, momento, versao);\n    }\n\n'''
+          texto = trocar(texto, marcador, metodo + marcador, 'correção da execução')
+          salvar(caminho, texto)
+
+          # Persistência de reagendamento.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/infraestrutura/BlocoDeEstudoPersistido.java'
+          texto = ler(caminho)
+          texto = trocar(texto,
+              '    @Enumerated(EnumType.STRING) @Column(nullable = false) private EstadoDoBlocoDeEstudo estado;\n',
+              '    @Enumerated(EnumType.STRING) @Column(nullable = false) private EstadoDoBlocoDeEstudo estado;\n    @Column(name = "quantidade_de_reagendamentos", nullable = false)\n    private int quantidadeDeReagendamentos;\n    @Column(name = "reagendado_em") private OffsetDateTime reagendadoEm;\n',
+              'persistência dos campos')
+          texto = trocar(texto,
+              '        estado = bloco.estado();\n        atualizadoEm = bloco.atualizadoEm();',
+              '        estado = bloco.estado();\n        quantidadeDeReagendamentos = bloco.quantidadeDeReagendamentos();\n        reagendadoEm = bloco.reagendadoEm();\n        atualizadoEm = bloco.atualizadoEm();',
+              'atualização persistida')
+          texto = trocar(texto,
+              '                horarioPrevisto, observacao, estado, criadoEm, atualizadoEm, versao);',
+              '                horarioPrevisto, observacao, estado, quantidadeDeReagendamentos,\n                reagendadoEm, criadoEm, atualizadoEm, versao);',
+              'mapeamento para domínio')
+          salvar(caminho, texto)
+
+          # Resposta do bloco.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/RespostaDeBlocoDeEstudo.java'
+          texto = ler(caminho)
+          texto = trocar(texto,
+              '        EstadoDoBlocoDeEstudo estado,\n        OffsetDateTime criadoEm,',
+              '        EstadoDoBlocoDeEstudo estado,\n        int quantidadeDeReagendamentos,\n        OffsetDateTime reagendadoEm,\n        OffsetDateTime criadoEm,',
+              'resposta de reagendamento')
+          texto = trocar(texto,
+              '                bloco.horarioPrevisto(), bloco.observacao(), bloco.estado(),\n                bloco.criadoEm(), bloco.atualizadoEm(), bloco.versao());',
+              '                bloco.horarioPrevisto(), bloco.observacao(), bloco.estado(),\n                bloco.quantidadeDeReagendamentos(), bloco.reagendadoEm(),\n                bloco.criadoEm(), bloco.atualizadoEm(), bloco.versao());',
+              'mapeamento da resposta')
+          salvar(caminho, texto)
+
+          # DTOs.
+          base = Path('aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api')
+          (base / 'RequisicaoDeReagendamentoDoBloco.java').write_text('''package br.com.trilhaaprovacao.planejamento.api;\n\nimport jakarta.validation.constraints.Min;\nimport jakarta.validation.constraints.NotNull;\nimport java.time.LocalDate;\nimport java.time.LocalTime;\n\npublic record RequisicaoDeReagendamentoDoBloco(\n        @NotNull LocalDate data, LocalTime horarioPrevisto, @Min(1) int ordem) {\n}\n''')
+          (base / 'RequisicaoDeCorrecaoDaExecucao.java').write_text('''package br.com.trilhaaprovacao.planejamento.api;\n\nimport br.com.trilhaaprovacao.planejamento.dominio.ResultadoDaExecucao;\nimport jakarta.validation.constraints.Max;\nimport jakarta.validation.constraints.Min;\nimport jakarta.validation.constraints.NotNull;\nimport jakarta.validation.constraints.Size;\n\npublic record RequisicaoDeCorrecaoDaExecucao(\n        @NotNull ResultadoDaExecucao resultado,\n        @Min(1) @Max(1440) int duracaoExecutadaEmMinutos,\n        @Size(max = 2000) String observacao) {\n}\n''')
+
+          # Migration.
+          Path('aplicativos/backend/src/main/resources/db/migration/V10__adiciona_reagendamento_aos_blocos.sql').write_text('''ALTER TABLE blocos_de_estudo\n    ADD COLUMN quantidade_de_reagendamentos INTEGER NOT NULL DEFAULT 0,\n    ADD COLUMN reagendado_em TIMESTAMPTZ;\n\nALTER TABLE blocos_de_estudo\n    ADD CONSTRAINT ck_blocos_quantidade_reagendamentos\n    CHECK (quantidade_de_reagendamentos >= 0);\n''')
+
+          # Serviço de aplicação.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/aplicacao/ServicoDePlanejamento.java'
+          texto = ler(caminho)
+          # Disponibilidade e edição passam a aceitar plano ativo.
+          alvo = '''        PlanoSemanal plano = planoPersistido.paraDominio();\n        exigirPlanoEditavel(plano);\n        validarConjuntoDeDias(plano, informadas);'''
+          repl = '''        PlanoSemanal plano = planoPersistido.paraDominio();\n        exigirPlanoAjustavel(plano);\n        validarConjuntoDeDias(plano, informadas);\n        validarCargaDoPlanoAtivo(plano, informadas);'''
+          texto = trocar(texto, alvo, repl, 'disponibilidade ativa')
+          alvo = '''        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();\n        exigirPlanoEditavel(plano);\n        validarDadosDoBloco(usuario, plano, dados);'''
+          repl = '''        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();\n        exigirPlanoAjustavel(plano);\n        validarDadosDoBloco(usuario, plano, dados);'''
+          texto = trocar(texto, alvo, repl, 'edição ativa')
+
+          marcador = '''    @Transactional\n    public void excluirBloco(UUID usuario, UUID identificadorDoBloco) {\n'''
+          novos = '''    @Transactional\n    public BlocoDeEstudo reagendarBloco(UUID usuario, UUID identificadorDoBloco,\n            LocalDate data, java.time.LocalTime horario, int ordem) {\n        BlocoDeEstudoPersistido persistido = blocoPersistido(usuario, identificadorDoBloco);\n        BlocoDeEstudo atual = persistido.paraDominio();\n        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();\n        exigirPlanoAjustavel(plano);\n        if (!plano.contem(data)) {\n            throw new RegraDeDominio("DATA_DO_BLOCO_INVALIDA",\n                    "O reagendamento deve permanecer na mesma semana.");\n        }\n        List<BlocoDeEstudoPersistido> origem = blocos\n                .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(\n                        atual.identificadorDoPlano(), atual.data());\n        origem.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco));\n        List<BlocoDeEstudoPersistido> destino = atual.data().equals(data)\n                ? origem : blocos.findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(\n                        atual.identificadorDoPlano(), data);\n        validarOrdemDeInsercao(ordem, destino.size());\n        BlocoDeEstudo reagendado;\n        try {\n            reagendado = atual.reagendar(data, horario, ordem);\n        } catch (IllegalStateException excecao) {\n            throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_REAGENDAVEL", excecao.getMessage());\n        }\n        persistido.atualizarDe(reagendado);\n        destino.add(ordem - 1, persistido);\n        if (!atual.data().equals(data)) normalizarDia(origem, atual.data());\n        normalizarDia(destino, data);\n        blocos.flush();\n        return persistido.paraDominio();\n    }\n\n    @Transactional\n    public BlocoDeEstudo cancelarBloco(UUID usuario, UUID identificadorDoBloco) {\n        BlocoDeEstudoPersistido persistido = blocoPersistido(usuario, identificadorDoBloco);\n        BlocoDeEstudo atual = persistido.paraDominio();\n        PlanoSemanal plano = planoPersistido(usuario, atual.identificadorDoPlano()).paraDominio();\n        exigirPlanoAjustavel(plano);\n        try {\n            persistido.atualizarDe(atual.cancelar());\n        } catch (IllegalStateException excecao) {\n            throw new ConflitoDeDominio("BLOCO_DE_ESTUDO_NAO_CANCELAVEL", excecao.getMessage());\n        }\n        List<BlocoDeEstudoPersistido> restantes = blocos\n                .findByIdentificadorDoPlanoAndDataOrderByOrdemAsc(\n                        atual.identificadorDoPlano(), atual.data());\n        restantes.removeIf(item -> item.paraDominio().identificador().equals(identificadorDoBloco)\n                || item.paraDominio().estado() != EstadoDoBlocoDeEstudo.PLANEJADO);\n        normalizarDia(restantes, atual.data());\n        blocos.flush();\n        return persistido.paraDominio();\n    }\n\n'''
+          texto = trocar(texto, marcador, novos + marcador, 'ações de bloco')
+
+          marcador = '''    @Transactional(readOnly = true)\n    public ResultadoDaExecucaoDoBloco obterExecucaoEmAndamento(UUID usuario) {\n'''
+          novos = '''    @Transactional\n    public ResultadoDaExecucaoDoBloco corrigirExecucao(UUID usuario, UUID identificador,\n            ResultadoDaExecucao resultado, int duracao, String observacao) {\n        ExecucaoDoBlocoPersistida persistida = execucoes\n                .findByIdentificadorAndIdentificadorDoUsuario(identificador, usuario)\n                .orElseThrow(() -> new RecursoNaoEncontrado(\n                        "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA", "Execucao do bloco nao encontrada."));\n        ExecucaoDoBloco atual = persistida.paraDominio();\n        if (atual.estaEmAndamento()) {\n            throw new ConflitoDeDominio("EXECUCAO_EM_ANDAMENTO_NAO_CORRIGIVEL",\n                    "Interrompa ou conclua a execução antes de corrigi-la.");\n        }\n        UUID novoRegistro = atual.identificadorDoRegistroDeEstudo();\n        RegistroDeEstudo estudo = null;\n        if (novoRegistro != null) {\n            RegistroDeEstudo anterior = estudos.obterEstudo(usuario, novoRegistro);\n            estudo = estudos.corrigirEstudo(usuario, anterior.identificador(),\n                    anterior.identificadorDoTopico(), anterior.identificadorDoMaterial(),\n                    atual.iniciadaEm(), duracao, observacao);\n            novoRegistro = estudo.identificador();\n        }\n        ExecucaoDoBloco corrigida = regra("EXECUCAO_DO_BLOCO_INVALIDA",\n                () -> atual.corrigir(resultado, duracao, observacao, novoRegistro, OffsetDateTime.now()));\n        persistida.atualizarDe(corrigida);\n        BlocoDeEstudoPersistido bloco = blocoPersistido(usuario, atual.identificadorDoBloco());\n        blocos.flush();\n        execucoes.flush();\n        return new ResultadoDaExecucaoDoBloco(bloco.paraDominio(), persistida.paraDominio(), estudo);\n    }\n\n    @Transactional\n    public ResultadoDoPlanoSemanal encerrarPlano(UUID usuario, UUID identificadorDoPlano) {\n        PlanoSemanalPersistido persistido = planoPersistido(usuario, identificadorDoPlano);\n        impedirEstadoFinalComExecucaoAberta(usuario, identificadorDoPlano);\n        PlanoSemanal encerrado;\n        try {\n            encerrado = persistido.paraDominio().encerrar();\n        } catch (IllegalStateException excecao) {\n            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_ENCERRAVEL", excecao.getMessage());\n        }\n        persistido.atualizarDe(encerrado);\n        planos.flush();\n        return resultado(persistido.paraDominio());\n    }\n\n    @Transactional\n    public ResultadoDoPlanoSemanal cancelarPlano(UUID usuario, UUID identificadorDoPlano) {\n        PlanoSemanalPersistido persistido = planoPersistido(usuario, identificadorDoPlano);\n        impedirEstadoFinalComExecucaoAberta(usuario, identificadorDoPlano);\n        PlanoSemanal cancelado;\n        try {\n            cancelado = persistido.paraDominio().cancelar();\n        } catch (IllegalStateException excecao) {\n            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_CANCELAVEL", excecao.getMessage());\n        }\n        for (BlocoDeEstudoPersistido bloco : blocos\n                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(identificadorDoPlano)) {\n            if (bloco.paraDominio().estado() == EstadoDoBlocoDeEstudo.PLANEJADO) {\n                bloco.atualizarDe(bloco.paraDominio().cancelar());\n            }\n        }\n        persistido.atualizarDe(cancelado);\n        blocos.flush();\n        planos.flush();\n        return resultado(persistido.paraDominio());\n    }\n\n'''
+          texto = trocar(texto, marcador, novos + marcador, 'correção e estados finais')
+
+          marcador = '''    private void validarAtivacao(ResultadoDoPlanoSemanal resultado) {\n'''
+          auxiliares = '''    private void validarCargaDoPlanoAtivo(PlanoSemanal plano,\n            List<DisponibilidadeInformada> informadas) {\n        if (!plano.estaAtivo()) return;\n        Map<LocalDate, Integer> carga = blocos\n                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano.identificador()).stream()\n                .map(BlocoDeEstudoPersistido::paraDominio)\n                .filter(item -> item.estado() == EstadoDoBlocoDeEstudo.PLANEJADO)\n                .collect(Collectors.groupingBy(BlocoDeEstudo::data,\n                        Collectors.summingInt(BlocoDeEstudo::duracaoPrevistaEmMinutos)));\n        for (DisponibilidadeInformada informada : informadas) {\n            int minima = carga.getOrDefault(informada.data(), 0);\n            if (informada.minutosDisponiveis() < minima) {\n                throw new ConflitoDeDominio("DISPONIBILIDADE_ABAIXO_DA_CARGA_PLANEJADA",\n                        "A disponibilidade de " + informada.data()\n                                + " deve ser de pelo menos " + minima + " minutos.");\n            }\n        }\n    }\n\n    private void impedirEstadoFinalComExecucaoAberta(UUID usuario, UUID plano) {\n        execucoes.findByIdentificadorDoUsuarioAndEncerradaEmIsNull(usuario)\n                .ifPresent(execucao -> {\n                    BlocoDeEstudo bloco = blocoPersistido(usuario,\n                            execucao.paraDominio().identificadorDoBloco()).paraDominio();\n                    if (bloco.identificadorDoPlano().equals(plano)) {\n                        throw new ConflitoDeDominio("PLANO_POSSUI_EXECUCAO_EM_ANDAMENTO",\n                                "Conclua ou interrompa o bloco em andamento.");\n                    }\n                });\n    }\n\n'''
+          texto = trocar(texto, marcador, auxiliares + marcador, 'validações da sprint')
+          marcador = '''    private void exigirPlanoEditavel(PlanoSemanal plano) {\n'''
+          auxiliar = '''    private void exigirPlanoAjustavel(PlanoSemanal plano) {\n        if (plano.estado() != EstadoDoPlanoSemanal.RASCUNHO\n                && plano.estado() != EstadoDoPlanoSemanal.ATIVO) {\n            throw new ConflitoDeDominio("PLANO_SEMANAL_NAO_EDITAVEL",\n                    "Somente plano em rascunho ou ativo permite ajustes.");\n        }\n    }\n\n'''
+          texto = trocar(texto, marcador, auxiliar + marcador, 'plano ajustável')
+          salvar(caminho, texto)
+
+          # Controllers.
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/ControladorDeBlocosDeEstudo.java'
+          texto = ler(caminho)
+          marcador = '''    @DeleteMapping("/blocos-de-estudo/{identificador}")\n'''
+          endpoints = '''    @PostMapping("/blocos-de-estudo/{identificador}/reagendamento")\n    public RespostaDeBlocoDeEstudo reagendar(@PathVariable UUID identificador,\n            @Valid @RequestBody RequisicaoDeReagendamentoDoBloco requisicao,\n            Authentication autenticacao) {\n        return RespostaDeBlocoDeEstudo.de(servico.reagendarBloco(\n                usuarioAtual.obter(autenticacao), identificador, requisicao.data(),\n                requisicao.horarioPrevisto(), requisicao.ordem()));\n    }\n\n    @PostMapping("/blocos-de-estudo/{identificador}/cancelamento")\n    public RespostaDeBlocoDeEstudo cancelar(@PathVariable UUID identificador,\n            Authentication autenticacao) {\n        return RespostaDeBlocoDeEstudo.de(servico.cancelarBloco(\n                usuarioAtual.obter(autenticacao), identificador));\n    }\n\n'''
+          texto = trocar(texto, marcador, endpoints + marcador, 'endpoints de bloco')
+          marcador = '''    @PostMapping("/execucoes-de-bloco/{identificador}/registro-de-estudo")\n'''
+          endpoint = '''    @PutMapping("/execucoes-de-bloco/{identificador}/correcao")\n    public RespostaDaExecucaoDoBloco corrigirExecucao(\n            @PathVariable UUID identificador,\n            @Valid @RequestBody RequisicaoDeCorrecaoDaExecucao requisicao,\n            Authentication autenticacao) {\n        return RespostaDaExecucaoDoBloco.de(servico.corrigirExecucao(\n                usuarioAtual.obter(autenticacao), identificador, requisicao.resultado(),\n                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));\n    }\n\n'''
+          texto = trocar(texto, marcador, endpoint + marcador, 'endpoint de correção')
+          salvar(caminho, texto)
+
+          caminho = 'aplicativos/backend/src/main/java/br/com/trilhaaprovacao/planejamento/api/ControladorDePlanosSemanais.java'
+          texto = ler(caminho)
+          marcador = '''    @PostMapping("/{identificador}/ativacao")\n'''
+          endpoints = '''    @PostMapping("/{identificador}/encerramento")\n    public RespostaDePlanoSemanal encerrar(@PathVariable UUID identificador,\n            Authentication autenticacao) {\n        return RespostaDePlanoSemanal.de(servico.encerrarPlano(\n                usuarioAtual.obter(autenticacao), identificador));\n    }\n\n    @PostMapping("/{identificador}/cancelamento")\n    public RespostaDePlanoSemanal cancelar(@PathVariable UUID identificador,\n            Authentication autenticacao) {\n        return RespostaDePlanoSemanal.de(servico.cancelarPlano(\n                usuarioAtual.obter(autenticacao), identificador));\n    }\n\n'''
+          texto = trocar(texto, marcador, endpoints + marcador, 'endpoints do plano')
+          salvar(caminho, texto)
+
+          # Frontend API.
+          caminho = 'aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts'
+          texto = ler(caminho)
+          texto = trocar(texto,
+              '  estado: EstadoDoBlocoDeEstudo\n  criadoEm: string',
+              '  estado: EstadoDoBlocoDeEstudo\n  quantidadeDeReagendamentos: number\n  reagendadoEm?: string\n  criadoEm: string',
+              'tipos frontend')
+          texto += '''\n\nexport function reagendarBloco(identificador: string, data: string, horarioPrevisto: string | undefined, ordem: number): Promise<BlocoDeEstudo> {\n  return requisitar<BlocoDeEstudo>(`/v1/blocos-de-estudo/${identificador}/reagendamento`, {\n    method: 'POST', body: JSON.stringify({ data, horarioPrevisto, ordem }),\n  })\n}\n\nexport function cancelarBloco(identificador: string): Promise<BlocoDeEstudo> {\n  return requisitar<BlocoDeEstudo>(`/v1/blocos-de-estudo/${identificador}/cancelamento`, { method: 'POST' })\n}\n\nexport function encerrarPlanoSemanal(identificador: string): Promise<PlanoSemanal> {\n  return requisitar<PlanoSemanal>(`/v1/planos-semanais/${identificador}/encerramento`, { method: 'POST' })\n}\n\nexport function cancelarPlanoSemanal(identificador: string): Promise<PlanoSemanal> {\n  return requisitar<PlanoSemanal>(`/v1/planos-semanais/${identificador}/cancelamento`, { method: 'POST' })\n}\n\nexport function corrigirExecucao(identificador: string, resultado: 'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO', duracaoExecutadaEmMinutos: number, observacao?: string): Promise<ResultadoDaExecucaoDoBloco> {\n  return requisitar<ResultadoDaExecucaoDoBloco>(`/v1/execucoes-de-bloco/${identificador}/correcao`, {\n    method: 'PUT', body: JSON.stringify({ resultado, duracaoExecutadaEmMinutos, observacao }),\n  })\n}\n'''
+          salvar(caminho, texto)
+
+          # Semana: edição e disponibilidade no ativo; cancelamento sem exclusão física.
+          caminho = 'aplicativos/frontend/src/modulos/planejamento/PlanejamentoSemanaPagina.vue'
+          texto = ler(caminho)
+          texto = texto.replace('  excluirBloco,', '  excluirBloco,\n  cancelarBloco,\n  encerrarPlanoSemanal,\n  cancelarPlanoSemanal,')
+          texto = trocar(texto,
+              '    await excluirBloco(blocoParaExcluir.value.identificador)\n    await atualizarPlano()\n    aviso.value = \'Bloco excluído e ordem do dia atualizada.\'',
+              '''    if (plano.value?.estado === 'ATIVO') {\n      await cancelarBloco(blocoParaExcluir.value.identificador)\n      aviso.value = 'Bloco cancelado e ordem do dia atualizada.'\n    } else {\n      await excluirBloco(blocoParaExcluir.value.identificador)\n      aviso.value = 'Bloco excluído e ordem do dia atualizada.'\n    }\n    await atualizarPlano()''',
+              'cancelamento frontend')
+          texto = texto.replace(':disabled="salvando || plano.estado === \'ATIVO\'"', ':disabled="salvando || plano.estado === \'ENCERRADO\' || plano.estado === \'CANCELADO\'"')
+          texto = texto.replace('v-if="plano.estado === \'RASCUNHO\'"\n                  :id="`disponibilidade-${data}`"', 'v-if="plano.estado === \'RASCUNHO\' || plano.estado === \'ATIVO\'"\n                  :id="`disponibilidade-${data}`"')
+          texto = texto.replace('v-if="plano.estado === \'RASCUNHO\'"\n                   class="acoes-do-bloco-planejado"', 'v-if="(plano.estado === \'RASCUNHO\' || plano.estado === \'ATIVO\') && bloco.estado === \'PLANEJADO\'"\n                   class="acoes-do-bloco-planejado"')
+          texto = texto.replace('v-if="editorAberto && plano?.estado === \'RASCUNHO\'"', 'v-if="editorAberto && (plano?.estado === \'RASCUNHO\' || plano?.estado === \'ATIVO\')"')
+          texto = texto.replace('v-if="plano.estado === \'RASCUNHO\'" class="acoes-da-disponibilidade"', 'v-if="plano.estado === \'RASCUNHO\' || plano.estado === \'ATIVO\'" class="acoes-da-disponibilidade"')
+          texto = texto.replace('Você pode ajustar esses minutos enquanto o plano estiver em rascunho.', 'Você pode ajustar os minutos; em plano ativo, a carga ainda planejada precisa caber.')
+          texto = texto.replace("{{ plano.estado === 'ATIVO' ? 'Ativo' : 'Rascunho' }}", '{{ plano.estado }}')
+          # Métodos e botões de encerramento/cancelamento.
+          marcador = '''async function navegar(quantidadeDeDias: number) {\n'''
+          metodos = '''async function encerrarPlano() {\n  if (!plano.value) return\n  try {\n    plano.value = await encerrarPlanoSemanal(plano.value.identificador)\n    aviso.value = 'Semana encerrada. Blocos pendentes foram preservados como não realizados.'\n  } catch (causa) { erro.value = causa instanceof Error ? causa.message : 'Não foi possível encerrar.' }\n}\n\nasync function cancelarPlano() {\n  if (!plano.value) return\n  try {\n    plano.value = await cancelarPlanoSemanal(plano.value.identificador)\n    aviso.value = 'Plano cancelado. Execuções e estudos foram preservados.'\n  } catch (causa) { erro.value = causa instanceof Error ? causa.message : 'Não foi possível cancelar.' }\n}\n\n'''
+          texto = trocar(texto, marcador, metodos + marcador, 'ações finais frontend')
+          alvo = '''        <button\n          v-if="plano.estado === 'RASCUNHO'"\n          class="btn btn-primary"'''
+          repl = '''        <div v-if="plano.estado === 'ATIVO'" class="d-flex gap-2">\n          <button class="btn btn-outline-primary" type="button" @click="encerrarPlano">Encerrar semana</button>\n          <button class="btn btn-outline-danger" type="button" @click="cancelarPlano">Cancelar plano</button>\n        </div>\n        <button\n          v-if="plano.estado === 'RASCUNHO'"\n          class="btn btn-primary"'''
+          texto = trocar(texto, alvo, repl, 'botões finais')
+          texto = texto.replace('v-if="blocoParaExcluir"\n       titulo="Excluir bloco?"', 'v-if="blocoParaExcluir"\n       :titulo="plano?.estado === \'ATIVO\' ? \'Cancelar bloco?\' : \'Excluir bloco?\'"')
+          salvar(caminho, texto)
+
+          # Registro factual.
+          Path('documentacao/planejamento-manual-revisado/SPRINT-07-IMPLEMENTACAO.md').write_text('''# Sprint 07 — Registro de implementação\n\nSTATUS: implementação funcional em validação pela CI.\n\nENTREGAS:\n- edição e disponibilidade em plano ativo;\n- reagendamento e cancelamento de bloco planejado;\n- contagem de reagendamentos;\n- correção de execução com correção do estudo vinculado;\n- encerramento e cancelamento do plano;\n- preservação de execuções e estudos;\n- migration V10;\n- API e Semana atualizadas.\n\nPENDÊNCIAS: validação visual exploratória em 390, 768 e 1280 px.\nPRÓXIMA SPRINT: Sprint 08 — Consolidação e aceite, não iniciada.\n''')
+          PY
+      - name: Formatar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm ci
+          npm run formatar
+      - name: Validar backend
+        working-directory: aplicativos/backend
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Validar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm run verificar-tipos
+          npm run lint
+          npm run test
+          npm run build
+          npm run verificar-formatacao
+          npm audit --audit-level=low
+      - name: Versionar implementação
+        run: |
+          rm .github/workflows/implementar-sprint-07.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: implementa edição e replanejamento da sprint 07"
+          git push origin HEAD:feature/planejamento-sprint-07
