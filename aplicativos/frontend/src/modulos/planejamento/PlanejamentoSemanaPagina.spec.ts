@@ -709,5 +709,15 @@ describe('PlanejamentoSemanaPagina', () => {
     expect(pagina.text()).toContain('Cancelado')
     expect(pagina.get('fieldset').attributes('disabled')).toBeDefined()
     expect(pagina.text()).not.toContain('Encerrar semana')
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Criar novo plano'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.criarPlanoSemanal).toHaveBeenCalledWith(inicio)
+    expect(pagina.text()).toContain('Novo plano semanal criado em rascunho')
+    expect(pagina.text()).toContain('Rascunho')
   })
 })

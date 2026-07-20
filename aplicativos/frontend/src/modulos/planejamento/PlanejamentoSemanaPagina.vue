@@ -460,8 +460,10 @@ async function criar() {
   try {
     const planoCriado = await criarPlanoSemanal(dataInicial.value)
     plano.value = planoCriado
+    historico.value = undefined
     preencherFormulario(planoCriado)
-    aviso.value = 'Plano semanal criado em rascunho.'
+    aviso.value =
+      'Novo plano semanal criado em rascunho. O plano cancelado foi preservado no histórico.'
   } catch (causa) {
     if (causa instanceof ErroDaApi && causa.status === 409) {
       await carregar()
@@ -768,6 +770,21 @@ watch(
           >
             <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>
             Ativar plano
+          </button>
+        </div>
+        <div v-if="plano.estado === 'CANCELADO'" class="acoes-do-plano-semanal">
+          <button
+            class="btn btn-primary"
+            type="button"
+            :disabled="criando"
+            @click="criar"
+          >
+            <span
+              v-if="criando"
+              class="spinner-border spinner-border-sm me-2"
+              aria-hidden="true"
+            ></span>
+            Criar novo plano desta semana
           </button>
         </div>
       </div>

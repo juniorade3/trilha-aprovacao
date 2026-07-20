@@ -1,5 +1,6 @@
 package br.com.trilhaaprovacao.planejamento.infraestrutura;
 
+import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoPlanoSemanal;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface RepositorioDePlanosSemanais
         extends JpaRepository<PlanoSemanalPersistido, UUID> {
-    Optional<PlanoSemanalPersistido> findByIdentificadorDoUsuarioAndDataInicial(
+    Optional<PlanoSemanalPersistido> findFirstByIdentificadorDoUsuarioAndDataInicialOrderByCriadoEmDesc(
             UUID usuario, LocalDate dataInicial);
 
     Optional<PlanoSemanalPersistido> findByIdentificadorAndIdentificadorDoUsuario(
@@ -27,6 +28,6 @@ public interface RepositorioDePlanosSemanais
             @Param("identificador") UUID identificador,
             @Param("usuario") UUID usuario);
 
-    boolean existsByIdentificadorDoUsuarioAndDataInicial(
-            UUID usuario, LocalDate dataInicial);
+    boolean existsByIdentificadorDoUsuarioAndDataInicialAndEstadoNot(
+            UUID usuario, LocalDate dataInicial, EstadoDoPlanoSemanal estado);
 }

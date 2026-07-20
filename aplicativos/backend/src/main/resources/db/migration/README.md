@@ -18,3 +18,4 @@ automatica de tabelas nem dados artificiais de demonstracao.
 - V11 registra prioridades de materias por plano.
 - V12 registra origem e justificativa da geracao deterministica.
 - V13 registra snapshot original, replanejamentos, transferencias e fragmentos.
+- V14 preserva planos cancelados e permite um novo plano corrente na mesma semana.

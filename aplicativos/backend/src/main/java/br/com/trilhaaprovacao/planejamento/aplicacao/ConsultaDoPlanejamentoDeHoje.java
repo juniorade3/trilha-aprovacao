@@ -32,7 +32,9 @@ public class ConsultaDoPlanejamentoDeHoje {
     @Transactional(readOnly = true)
     public ResultadoDoPlanejamentoDeHoje consultar(UUID usuario, LocalDate data) {
         LocalDate inicio = data.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        var encontrado = planos.findByIdentificadorDoUsuarioAndDataInicial(usuario, inicio);
+        var encontrado = planos
+                .findFirstByIdentificadorDoUsuarioAndDataInicialOrderByCriadoEmDesc(
+                        usuario, inicio);
         if (encontrado.isEmpty()) return vazio(EstadoDoPlanejamentoDeHoje.SEM_PLANO, data);
 
         PlanoSemanal plano = encontrado.get().paraDominio();

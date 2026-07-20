@@ -21,7 +21,7 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                     .withPassword("teste");
 
     @Test
-    void deveAplicarAteV13EmPostgresqlVazioComTodasAsGarantias() {
+    void deveAplicarAteV14EmPostgresqlVazioComTodasAsGarantias() {
         var resultado = Flyway.configure()
                 .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(),
                         POSTGRESQL.getPassword())
@@ -31,12 +31,12 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword()));
 
         assertThat(resultado.success).isTrue();
-        assertThat(resultado.targetSchemaVersion).isEqualTo("13");
+        assertThat(resultado.targetSchemaVersion).isEqualTo("14");
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(13);
+                """, Integer.class)).isEqualTo(14);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
@@ -98,6 +98,12 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 "uk_itens_replanejamento_bloco", "u")).isEqualTo(1);
         assertThat(quantidadeDeRestricoes(banco,
                 "uk_fragmentos_replanejamento_bloco", "u")).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT pg_get_expr(indpred, indrelid)
+                FROM pg_index
+                WHERE indexrelid =
+                    'uk_planos_semanais_usuario_data_nao_cancelado'::regclass
+                """, String.class)).contains("CANCELADO");
     }
 
     private int quantidadeDeRestricoes(JdbcTemplate banco, String nome, String tipo) {

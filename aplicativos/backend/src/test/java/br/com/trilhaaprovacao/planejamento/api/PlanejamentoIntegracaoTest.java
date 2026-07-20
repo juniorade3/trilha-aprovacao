@@ -1,5 +1,6 @@
 package br.com.trilhaaprovacao.planejamento.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -113,6 +114,34 @@ class PlanejamentoIntegracaoTest {
                         .content("{\"dataInicial\":\"" + SEGUNDA + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_JA_EXISTE"));
+    }
+
+    @Test
+    void devePermitirNovoPlanoAposCancelamentoEPreservarOCancelado() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("novo.plano@example.com");
+        String cancelado = criarPlano(sessao, SEGUNDA);
+
+        api.perform(post("/api/v1/planos-semanais/{id}/cancelamento", cancelado)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("CANCELADO"));
+
+        String novo = criarPlano(sessao, SEGUNDA);
+
+        assertThat(novo).isNotEqualTo(cancelado);
+        api.perform(get("/api/v1/planos-semanais")
+                        .param("dataInicial", SEGUNDA.toString()).session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.identificador").value(novo))
+                .andExpect(jsonPath("$.estado").value("RASCUNHO"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM planos_semanais
+                WHERE data_inicial = ?
+                """, Integer.class, SEGUNDA)).isEqualTo(2);
+        assertThat(banco.queryForObject("""
+                SELECT estado FROM planos_semanais
+                WHERE identificador = ?::uuid
+                """, String.class, cancelado)).isEqualTo("CANCELADO");
     }
 
     @Test

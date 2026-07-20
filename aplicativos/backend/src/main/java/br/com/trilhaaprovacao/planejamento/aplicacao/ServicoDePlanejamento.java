@@ -70,7 +70,8 @@ public class ServicoDePlanejamento {
 
     @Transactional
     public ResultadoDoPlanoSemanal criarPlanoSemanal(UUID usuario, LocalDate dataInicial) {
-        if (planos.existsByIdentificadorDoUsuarioAndDataInicial(usuario, dataInicial)) {
+        if (planos.existsByIdentificadorDoUsuarioAndDataInicialAndEstadoNot(
+                usuario, dataInicial, EstadoDoPlanoSemanal.CANCELADO)) {
             throw new ConflitoDeDominio("PLANO_SEMANAL_JA_EXISTE",
                     "Ja existe um plano para a semana informada.");
         }
@@ -87,7 +88,9 @@ public class ServicoDePlanejamento {
 
     @Transactional(readOnly = true)
     public ResultadoDoPlanoSemanal obterPlanoSemanal(UUID usuario, LocalDate dataInicial) {
-        PlanoSemanal plano = planos.findByIdentificadorDoUsuarioAndDataInicial(usuario, dataInicial)
+        PlanoSemanal plano = planos
+                .findFirstByIdentificadorDoUsuarioAndDataInicialOrderByCriadoEmDesc(
+                        usuario, dataInicial)
                 .orElseThrow(this::naoEncontrado).paraDominio();
         return resultado(plano);
     }
