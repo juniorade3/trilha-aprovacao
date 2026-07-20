@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -528,6 +529,104 @@ class PlanejamentoIntegracaoTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void devePersistirPrioridadesGerarPreviaDeterministicaSemCriarBlocosEIsolarUsuario()
+            throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("geracao.a@example.com");
+        String planoA = criarPlano(sessaoA, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(170)))
+                .andExpect(status().isOk());
+        String bancoDeDados = criarMateria(sessaoA, "Banco de dados");
+        String redes = criarMateria(sessaoA, "Redes");
+        String seguranca = criarMateria(sessaoA, "Seguranca");
+        criarEstruturaElegivel("geracao.a@example.com",
+                List.of(bancoDeDados, redes, seguranca), bancoDeDados);
+
+        api.perform(get("/api/v1/planos-semanais/{id}/materias-para-geracao", planoA)
+                        .session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.materias.length()").value(3))
+                .andExpect(jsonPath("$.materias[0].prioridade").value("NORMAL"));
+
+        String prioridades = """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"},
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"}
+                ]}
+                """.formatted(bancoDeDados, redes, seguranca);
+        api.perform(put("/api/v1/planos-semanais/{id}/prioridades-de-materias", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(prioridades))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.materias[0].prioridade").value("ALTA"));
+        assertThatQuantidade("prioridades_de_materias_no_plano", 2);
+        String prioridadesEditadas = """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"},
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"}
+                ]}
+                """.formatted(bancoDeDados, redes, seguranca);
+        api.perform(put("/api/v1/planos-semanais/{id}/prioridades-de-materias", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(prioridadesEditadas))
+                .andExpect(status().isOk());
+        api.perform(get("/api/v1/planos-semanais/{id}/materias-para-geracao", planoA)
+                        .session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.materias[0].prioridade").value("BAIXA"))
+                .andExpect(jsonPath("$.materias[1].prioridade").value("ALTA"));
+        assertThatQuantidade("prioridades_de_materias_no_plano", 2);
+
+        String configuracao = """
+                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                 "duracaoDoBlocoDeRevisaoEmMinutos":20}
+                """;
+        String primeira = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/geracao-deterministica/previa", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias.length()").value(7))
+                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(4))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosSugeridos").value(170))
+                .andExpect(jsonPath("$.aplicada").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String segunda = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/geracao-deterministica/previa", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracao))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(segunda).isEqualTo(primeira);
+        assertThatQuantidade("blocos_de_estudo", 0);
+
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica/previa", planoA)
+                        .session(sessaoA).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracao))
+                .andExpect(status().isForbidden());
+
+        MockHttpSession sessaoB = criarContaEEntrar("geracao.b@example.com");
+        api.perform(get("/api/v1/planos-semanais/{id}/materias-para-geracao", planoA)
+                        .session(sessaoB))
+                .andExpect(status().isNotFound());
+        String planoB = criarPlano(sessaoB, SEGUNDA);
+        api.perform(get("/api/v1/planos-semanais/{id}/materias-para-geracao", planoB)
+                        .session(sessaoB))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("CONCURSO_ATIVO_NAO_ENCONTRADO"));
+
+        banco.update("UPDATE planos_semanais SET estado = 'ATIVO' WHERE identificador = ?::uuid",
+                planoA);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica/previa", planoA)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracao))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ESTA_EM_RASCUNHO"));
+    }
+
     private MockHttpSession criarContaEEntrar(String email) throws Exception {
         api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -558,6 +657,60 @@ class PlanejamentoIntegracaoTest {
                         .content("{\"nome\":\"" + nome + "\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return json.readTree(corpo).get("identificador").asString();
+    }
+
+    private void criarEstruturaElegivel(String email, List<String> materias,
+            String materiaRepetida) {
+        UUID usuario = banco.queryForObject(
+                "SELECT identificador FROM usuarios WHERE email = ?", UUID.class, email);
+        UUID concurso = UUID.randomUUID();
+        UUID cargo = UUID.randomUUID();
+        UUID prova = UUID.randomUUID();
+        UUID grupoA = UUID.randomUUID();
+        UUID grupoB = UUID.randomUUID();
+        banco.update("""
+                INSERT INTO concursos (identificador, usuario_id, nome, nome_normalizado,
+                    situacao, ativo, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Concurso ativo', 'concurso ativo', 'PLANEJADO', TRUE,
+                    now(), now(), 0)
+                """, concurso, usuario);
+        banco.update("""
+                INSERT INTO cargos_do_concurso (identificador, concurso_id, nome,
+                    nome_normalizado, nivel_de_escolaridade, selecionado, ordem,
+                    criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Auditor', 'auditor', 'SUPERIOR', TRUE, 1, now(), now(), 0)
+                """, cargo, concurso);
+        banco.update("""
+                INSERT INTO provas (identificador, cargo_id, nome, nome_normalizado,
+                    tipo, carater, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Objetiva', 'objetiva', 'OBJETIVA', 'ELIMINATORIO', 1,
+                    now(), now(), 0)
+                """, prova, cargo);
+        banco.update("""
+                INSERT INTO grupos_de_conteudo (identificador, prova_id, nome,
+                    nome_normalizado, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Basicos', 'basicos', 1, now(), now(), 0),
+                       (?, ?, 'Especificos', 'especificos', 2, now(), now(), 0)
+                """, grupoA, prova, grupoB, prova);
+        int ordem = 1;
+        for (String materia : materias) {
+            banco.update("""
+                    INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
+                        materia_id, ordem, criado_em, atualizado_em, versao)
+                    VALUES (?, ?, ?::uuid, ?, now(), now(), 0)
+                    """, UUID.randomUUID(), grupoA, materia, ordem++);
+        }
+        banco.update("""
+                INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
+                    materia_id, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, ?::uuid, 1, now(), now(), 0)
+                """, UUID.randomUUID(), grupoB, materiaRepetida);
+    }
+
+    private void assertThatQuantidade(String tabela, int esperada) {
+        Integer quantidade = banco.queryForObject(
+                "SELECT count(*) FROM " + tabela, Integer.class);
+        org.assertj.core.api.Assertions.assertThat(quantidade).isEqualTo(esperada);
     }
 
     private String criarTopico(MockHttpSession sessao, String materia, String nome)

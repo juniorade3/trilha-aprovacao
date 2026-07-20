@@ -13,6 +13,7 @@ import {
   type Topico,
 } from '@/modulos/materias/apiDeConteudos'
 import EditorDeBloco from './EditorDeBloco.vue'
+import GavetaDeGeracaoDeterministica from './GavetaDeGeracaoDeterministica.vue'
 import NavegacaoDoPlanejamento from './NavegacaoDoPlanejamento.vue'
 import {
   adicionarBloco,
@@ -56,6 +57,7 @@ const excluindoBloco = ref(false)
 const erroDoEditor = ref('')
 const confirmacaoDeAtivacaoAberta = ref(false)
 const ativando = ref(false)
+const geracaoAberta = ref(false)
 
 const nomesDosDias = [
   'Segunda-feira',
@@ -651,15 +653,27 @@ watch(
             Cancelar plano
           </button>
         </div>
-        <button
+        <div
           v-if="plano.estado === 'RASCUNHO'"
-          class="acao-principal-do-plano btn btn-primary"
-          type="button"
-          @click="confirmacaoDeAtivacaoAberta = true"
+          class="acoes-do-plano-semanal d-flex gap-2"
         >
-          <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>
-          Ativar plano
-        </button>
+          <button
+            class="btn btn-outline-primary"
+            type="button"
+            @click="geracaoAberta = true"
+          >
+            <i class="bi bi-stars me-2" aria-hidden="true"></i>
+            Gerar semana
+          </button>
+          <button
+            class="acao-principal-do-plano btn btn-primary"
+            type="button"
+            @click="confirmacaoDeAtivacaoAberta = true"
+          >
+            <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>
+            Ativar plano
+          </button>
+        </div>
       </div>
 
       <fieldset
@@ -854,6 +868,12 @@ watch(
         </button>
       </div>
     </form>
+
+    <GavetaDeGeracaoDeterministica
+      v-if="geracaoAberta && plano"
+      :identificador-do-plano="plano.identificador"
+      @fechar="geracaoAberta = false"
+    />
 
     <EditorDeBloco
       v-if="
