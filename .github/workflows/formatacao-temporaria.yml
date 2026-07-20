@@ -1,49 +1,42 @@
-name: Ajustes temporarios
+name: Corrige limpeza dos testes da Sprint 05
 
 on:
-  pull_request:
+  push:
+    branches: [feature/planejamento-sprint-05]
 
 permissions:
   contents: write
 
 jobs:
-  ajustar:
-    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-05'
+  corrigir:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           ref: feature/planejamento-sprint-05
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: aplicativos/frontend/package-lock.json
-      - working-directory: aplicativos/frontend
-        run: npm ci
-      - working-directory: aplicativos/frontend
-        run: npm run formatar
-      - name: Ajustar limpeza dos testes de planejamento
+      - name: Incluir dependencias no truncate dos testes
         run: |
           python - <<'PY'
           from pathlib import Path
-          arquivo = Path('aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java')
-          texto = arquivo.read_text()
-          texto = texto.replace(
-              'TRUNCATE TABLE blocos_de_estudo, disponibilidades_do_dia, planos_semanais,',
-              'TRUNCATE TABLE execucoes_de_bloco, blocos_de_estudo, disponibilidades_do_dia, planos_semanais,',
-          )
-          arquivo.write_text(texto)
+
+          raiz = Path('aplicativos/backend/src/test/java')
+          alterados = 0
+          for arquivo in raiz.rglob('*.java'):
+              texto = arquivo.read_text()
+              if 'TRUNCATE TABLE' not in texto or 'usuarios CASCADE' in texto:
+                  continue
+              novo = texto.replace('materias, usuarios\n', 'materias, usuarios CASCADE\n')
+              if novo != texto:
+                  arquivo.write_text(novo)
+                  alterados += 1
+          print(f'Arquivos de teste ajustados: {alterados}')
           PY
-      - name: Versionar ajustes
+      - name: Remover workflow temporario e versionar
         run: |
+          rm .github/workflows/formatacao-temporaria.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue
-          git add aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.spec.ts
-          git add aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts
-          git add aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: aplica formatacao e ajusta testes da sprint 05"
-            git push origin HEAD:feature/planejamento-sprint-05
-          fi
+          git add -A
+          git commit -m "test: ajusta limpeza do banco para execucoes de bloco"
+          git push origin HEAD:feature/planejamento-sprint-05
