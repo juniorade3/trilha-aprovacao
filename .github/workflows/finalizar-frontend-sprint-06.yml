@@ -1,0 +1,59 @@
+name: Finalizar frontend Sprint 06
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  finalizar:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-06' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-06
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Corrigir acesso opcional
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          arquivo = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue')
+          texto = arquivo.read_text()
+          antigo = '!execucoesRealizadas[bloco.identificador].execucao'
+          novo = '!execucoesRealizadas[bloco.identificador]?.execucao'
+          if antigo not in texto:
+              raise SystemExit('Acesso esperado nao encontrado')
+          arquivo.write_text(texto.replace(antigo, novo, 1))
+          PY
+      - name: Instalar e formatar
+        working-directory: aplicativos/frontend
+        run: |
+          npm ci
+          npm run formatar
+      - name: Validar frontend
+        working-directory: aplicativos/frontend
+        run: |
+          npm run verificar-tipos
+          npm run lint
+          npm run test
+          npm run build
+          npm run verificar-formatacao
+          npm audit --audit-level=low
+      - name: Remover temporarios e versionar
+        run: |
+          rm -f .github/workflows/diagnostico-frontend-sprint-06.yml
+          rm -f .github/workflows/corrigir-frontend-sprint-06.yml
+          rm -f .github/workflows/finalizar-frontend-sprint-06.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: corrige tipagem da integracao com historico"
+          git push origin HEAD:feature/planejamento-sprint-06
