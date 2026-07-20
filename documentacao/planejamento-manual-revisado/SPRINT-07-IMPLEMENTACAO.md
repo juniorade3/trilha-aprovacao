@@ -13,7 +13,7 @@ ENTREGAS:
 - API e Semana atualizadas.
 
 VALIDAÇÃO:
-- executar a workflow oficial `Verificacao continua` no HEAD deste PR;
+- workflow oficial `Verificacao continua` reexecutada após a correção de compilação;
 - não considerar a sprint aprovada antes de backend, frontend e estrutura ficarem verdes.
 
 PENDÊNCIAS: validação visual exploratória em 390, 768 e 1280 px.
