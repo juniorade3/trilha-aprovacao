@@ -293,6 +293,13 @@ class PlanejamentoIntegracaoTest {
                 UPDATE blocos_de_estudo SET duracao_prevista_em_minutos = 0
                 WHERE identificador = ?::uuid
                 """, bloco));
+        org.junit.jupiter.api.Assertions.assertEquals("MANUAL", banco.queryForObject("""
+                SELECT origem FROM blocos_de_estudo WHERE identificador = ?::uuid
+                """, String.class, bloco));
+        assertThrows(DataAccessException.class, () -> banco.update("""
+                UPDATE blocos_de_estudo SET origem = 'DESCONHECIDA'
+                WHERE identificador = ?::uuid
+                """, bloco));
         Integer indices = banco.queryForObject("""
                 SELECT COUNT(*) FROM pg_indexes
                 WHERE tablename = 'blocos_de_estudo'
@@ -304,7 +311,13 @@ class PlanejamentoIntegracaoTest {
                   AND table_name = 'blocos_de_estudo'
                   AND constraint_type = 'FOREIGN KEY'
                 """, Integer.class);
+        Integer indiceDeOrigem = banco.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE tablename = 'blocos_de_estudo'
+                  AND indexname = 'idx_blocos_plano_origem'
+                """, Integer.class);
         org.junit.jupiter.api.Assertions.assertEquals(1, indices);
+        org.junit.jupiter.api.Assertions.assertEquals(1, indiceDeOrigem);
         org.junit.jupiter.api.Assertions.assertEquals(3, chavesEstrangeiras);
     }
 
@@ -627,6 +640,155 @@ class PlanejamentoIntegracaoTest {
                 .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ESTA_EM_RASCUNHO"));
     }
 
+    @Test
+    void deveAplicarEditarERegenerarPreservandoBlocosManuaisEAjustados()
+            throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("aplicacao.a@example.com");
+        String plano = criarPlano(sessaoA, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(170)))
+                .andExpect(status().isOk());
+        String materiaA = criarMateria(sessaoA, "Banco de dados");
+        String materiaB = criarMateria(sessaoA, "Redes");
+        String materiaC = criarMateria(sessaoA, "Seguranca");
+        criarEstruturaElegivel("aplicacao.a@example.com",
+                List.of(materiaA, materiaB, materiaC), materiaA);
+        String manual = criarBloco(sessaoA, plano, "Leitura manual",
+                SEGUNDA, 30, 1, null, null);
+
+        String primeiraAplicacao = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosCriados").value(4))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosSubstituidos").value(0))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosPreservados").value(1))
+                .andExpect(jsonPath("$.plano.blocos[0].origem").value("MANUAL"))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(
+                json.readTree(primeiraAplicacao).get("plano").get("blocos").valueStream()
+                        .filter(item -> item.get("origem").asString()
+                                .equals("GERADO_DETERMINISTICAMENTE"))
+                        .count()).isEqualTo(4);
+
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(false)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo").value("GERACAO_DETERMINISTICA_JA_APLICADA"));
+        assertThatQuantidade("blocos_de_estudo", 5);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoA).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andExpect(status().isForbidden());
+
+        String geradoEditavel = banco.queryForObject("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                  AND materia_id IS NOT NULL
+                ORDER BY ordem LIMIT 1
+                """, String.class, plano);
+        String materiaDoGerado = banco.queryForObject("""
+                SELECT materia_id::text FROM blocos_de_estudo
+                WHERE identificador = ?::uuid
+                """, String.class, geradoEditavel);
+        Integer ordemDoGerado = banco.queryForObject("""
+                SELECT ordem FROM blocos_de_estudo WHERE identificador = ?::uuid
+                """, Integer.class, geradoEditavel);
+        api.perform(put("/api/v1/blocos-de-estudo/{id}", geradoEditavel)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDoBloco("Bloco ajustado", SEGUNDA, 45,
+                                ordemDoGerado, materiaDoGerado, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.origem").value("GERADO_AJUSTADO_MANUALMENTE"))
+                .andExpect(jsonPath("$.justificativaDaGeracao").isNotEmpty());
+
+        List<String> geradosPurosAnteriores = banco.queryForList("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid AND origem = 'GERADO_DETERMINISTICAMENTE'
+                """, String.class, plano);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosSubstituidos")
+                        .value(geradosPurosAnteriores.size()))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosPreservados").value(2));
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*) FROM blocos_de_estudo
+                WHERE identificador IN (?::uuid, ?::uuid)
+                """, Integer.class, manual, geradoEditavel)).isEqualTo(2);
+        for (String substituido : geradosPurosAnteriores) {
+            org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                    SELECT count(*) FROM blocos_de_estudo WHERE identificador = ?::uuid
+                    """, Integer.class, substituido)).isZero();
+        }
+
+        MockHttpSession sessaoB = criarContaEEntrar("aplicacao.b@example.com");
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andExpect(status().isNotFound());
+        api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk());
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(true)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo").value("PLANO_SEMANAL_NAO_ESTA_EM_RASCUNHO"));
+    }
+
+    @Test
+    void deveReverterSubstituicaoQuandoPersistenciaDaNovaGeracaoFalha()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("rollback.geracao@example.com");
+        String plano = criarPlano(sessao, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(170)))
+                .andExpect(status().isOk());
+        String materiaA = criarMateria(sessao, "Banco de dados");
+        String materiaB = criarMateria(sessao, "Redes");
+        String materiaC = criarMateria(sessao, "Seguranca");
+        criarEstruturaElegivel("rollback.geracao@example.com",
+                List.of(materiaA, materiaB, materiaC), materiaA);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaAplicacao(false)))
+                .andExpect(status().isOk());
+        List<String> identificadoresOriginais = banco.queryForList("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid ORDER BY identificador
+                """, String.class, plano);
+
+        banco.execute("""
+                ALTER TABLE blocos_de_estudo
+                ADD CONSTRAINT ck_rejeita_nova_geracao
+                CHECK (origem <> 'GERADO_DETERMINISTICAMENTE') NOT VALID
+                """);
+        try {
+            api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                            .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                            .content(corpoDaAplicacao(true)))
+                    .andExpect(status().isConflict());
+        } finally {
+            banco.execute("""
+                    ALTER TABLE blocos_de_estudo
+                    DROP CONSTRAINT IF EXISTS ck_rejeita_nova_geracao
+                    """);
+        }
+        List<String> identificadoresDepoisDaFalha = banco.queryForList("""
+                SELECT identificador::text FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid ORDER BY identificador
+                """, String.class, plano);
+        org.assertj.core.api.Assertions.assertThat(identificadoresDepoisDaFalha)
+                .containsExactlyElementsOf(identificadoresOriginais);
+    }
+
     private MockHttpSession criarContaEEntrar(String email) throws Exception {
         api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -749,6 +911,14 @@ class PlanejamentoIntegracaoTest {
 
     private String disponibilidades(int minutosDaSegunda) {
         return disponibilidadesDaSemana(SEGUNDA, minutosDaSegunda);
+    }
+
+    private String corpoDaAplicacao(boolean substituir) {
+        return """
+                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                 "duracaoDoBlocoDeRevisaoEmMinutos":20,
+                 "substituirBlocosGerados":%s}
+                """.formatted(substituir);
     }
 
     private String disponibilidadesDaSemana(LocalDate inicio, int minutosDaSegunda) {

@@ -18,6 +18,8 @@ public record BlocoDeEstudo(
         int ordem,
         LocalTime horarioPrevisto,
         String observacao,
+        OrigemDoBlocoDeEstudo origem,
+        String justificativaDaGeracao,
         EstadoDoBlocoDeEstudo estado,
         int quantidadeDeReagendamentos,
         OffsetDateTime reagendadoEm,
@@ -42,6 +44,9 @@ public record BlocoDeEstudo(
             throw new IllegalArgumentException("Topico exige uma materia.");
         }
         observacao = textoOpcional(observacao, "Observacao", 2000);
+        Objects.requireNonNull(origem);
+        justificativaDaGeracao = textoOpcional(
+                justificativaDaGeracao, "Justificativa da geracao", 2000);
         Objects.requireNonNull(estado);
         if (quantidadeDeReagendamentos < 0) {
             throw new IllegalArgumentException("Quantidade de reagendamentos invalida.");
@@ -56,7 +61,19 @@ public record BlocoDeEstudo(
         OffsetDateTime agora = OffsetDateTime.now();
         return new BlocoDeEstudo(UUID.randomUUID(), plano, materia, topico,
                 titulo, tipo, data, duracao, ordem, horario, observacao,
+                OrigemDoBlocoDeEstudo.MANUAL, null,
                 EstadoDoBlocoDeEstudo.PLANEJADO, 0, null, agora, agora, 0);
+    }
+
+    public static BlocoDeEstudo criarGerado(UUID plano, UUID materia,
+            String titulo, TipoDeAtividade tipo, LocalDate data, int duracao,
+            int ordem, String justificativaDaGeracao) {
+        OffsetDateTime agora = OffsetDateTime.now();
+        return new BlocoDeEstudo(UUID.randomUUID(), plano, materia, null,
+                titulo, tipo, data, duracao, ordem, null, null,
+                OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE,
+                justificativaDaGeracao, EstadoDoBlocoDeEstudo.PLANEJADO,
+                0, null, agora, agora, 0);
     }
 
     public BlocoDeEstudo alterarPlanejamento(UUID materia, UUID topico,
@@ -65,8 +82,9 @@ public record BlocoDeEstudo(
         exigirPlanejado();
         return new BlocoDeEstudo(identificador, identificadorDoPlano, materia, topico,
                 novoTitulo, tipo, novaData, novaDuracao, novaOrdem, horario,
-                novaObservacao, estado, quantidadeDeReagendamentos, reagendadoEm,
-                criadoEm, OffsetDateTime.now(), versao);
+                novaObservacao, origemAposAjusteManual(), justificativaDaGeracao,
+                estado, quantidadeDeReagendamentos, reagendadoEm, criadoEm,
+                OffsetDateTime.now(), versao);
     }
 
     public BlocoDeEstudo moverPara(LocalDate novaData, int novaOrdem) {
@@ -75,13 +93,23 @@ public record BlocoDeEstudo(
                 novaOrdem, horarioPrevisto, observacao);
     }
 
+    public BlocoDeEstudo normalizarPosicao(LocalDate novaData, int novaOrdem) {
+        return new BlocoDeEstudo(identificador, identificadorDoPlano,
+                identificadorDaMateria, identificadorDoTopico, titulo,
+                tipoDeAtividade, novaData, duracaoPrevistaEmMinutos, novaOrdem,
+                horarioPrevisto, observacao, origem, justificativaDaGeracao,
+                estado, quantidadeDeReagendamentos, reagendadoEm, criadoEm,
+                OffsetDateTime.now(), versao);
+    }
+
     public BlocoDeEstudo reagendar(LocalDate novaData, LocalTime novoHorario, int novaOrdem) {
         exigirPlanejado();
         OffsetDateTime agora = OffsetDateTime.now();
         return new BlocoDeEstudo(identificador, identificadorDoPlano,
                 identificadorDaMateria, identificadorDoTopico, titulo, tipoDeAtividade,
                 novaData, duracaoPrevistaEmMinutos, novaOrdem, novoHorario, observacao,
-                estado, quantidadeDeReagendamentos + 1, agora, criadoEm, agora, versao);
+                origemAposAjusteManual(), justificativaDaGeracao, estado,
+                quantidadeDeReagendamentos + 1, agora, criadoEm, agora, versao);
     }
 
     public BlocoDeEstudo cancelar() {
@@ -133,9 +161,15 @@ public record BlocoDeEstudo(
         return new BlocoDeEstudo(identificador, identificadorDoPlano,
                 identificadorDaMateria, identificadorDoTopico, titulo,
                 tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
-                horarioPrevisto, observacao, novoEstado,
+                horarioPrevisto, observacao, origem, justificativaDaGeracao, novoEstado,
                 quantidadeDeReagendamentos, reagendadoEm, criadoEm,
                 OffsetDateTime.now(), versao);
+    }
+
+    private OrigemDoBlocoDeEstudo origemAposAjusteManual() {
+        return origem == OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE
+                ? OrigemDoBlocoDeEstudo.GERADO_AJUSTADO_MANUALMENTE
+                : origem;
     }
 
     private static String textoObrigatorio(String valor, String campo, int limite) {

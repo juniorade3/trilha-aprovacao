@@ -114,6 +114,14 @@ function salvar() {
     @fechar="emitir('fechar')"
   >
     <div v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</div>
+    <div
+      v-if="bloco?.origem === 'GERADO_DETERMINISTICAMENTE'"
+      class="alert alert-info"
+      role="status"
+    >
+      Ao salvar, este bloco será preservado como “Gerado e ajustado” nas
+      próximas regenerações.
+    </div>
     <form
       id="formulario-bloco"
       class="formulario-da-aplicacao"

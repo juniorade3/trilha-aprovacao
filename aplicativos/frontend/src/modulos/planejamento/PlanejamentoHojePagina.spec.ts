@@ -45,6 +45,7 @@ function bloco(identificador: string, titulo: string, ordem: number) {
     data: '2026-07-20',
     duracaoPrevistaEmMinutos: 60,
     ordem,
+    origem: 'MANUAL',
     estado: 'PLANEJADO',
     quantidadeDeReagendamentos: 0,
     criadoEm: '2026-07-19T12:00:00Z',

@@ -7,12 +7,14 @@ const chamadas = vi.hoisted(() => ({
   listar: vi.fn(),
   substituir: vi.fn(),
   gerar: vi.fn(),
+  aplicar: vi.fn(),
 }))
 
 vi.mock('./apiDePlanejamento', () => ({
   listarMateriasParaGeracao: chamadas.listar,
   substituirPrioridadesDeMaterias: chamadas.substituir,
   gerarPreviaDeterministica: chamadas.gerar,
+  aplicarGeracaoDeterministica: chamadas.aplicar,
 }))
 
 import GavetaDeGeracaoDeterministica from './GavetaDeGeracaoDeterministica.vue'
@@ -79,10 +81,10 @@ function previa() {
   }
 }
 
-async function montar() {
+async function montar(quantidadeDeBlocosGerados = 0) {
   const componente = mount(GavetaDeGeracaoDeterministica, {
     attachTo: document.body,
-    props: { identificadorDoPlano: 'plano-1' },
+    props: { identificadorDoPlano: 'plano-1', quantidadeDeBlocosGerados },
   })
   montadas.push(componente)
   await flushPromises()
@@ -108,13 +110,21 @@ describe('GavetaDeGeracaoDeterministica', () => {
         })),
     )
     chamadas.gerar.mockResolvedValue(previa())
+    chamadas.aplicar.mockResolvedValue({
+      plano: { identificador: 'plano-1', blocos: [] },
+      resumo: {
+        quantidadeDeBlocosCriados: 2,
+        quantidadeDeBlocosSubstituidos: 0,
+        quantidadeDeBlocosPreservados: 0,
+      },
+    })
   })
 
   afterEach(() => {
     for (const componente of montadas.splice(0)) componente.unmount()
   })
 
-  it('percorre prioridades, configuracao e previa sem oferecer aplicacao', async () => {
+  it('percorre prioridades, configuracao e aplica a previa recalculada', async () => {
     const componente = await montar()
     expect(componente.text()).toContain('Banco de dados')
 
@@ -132,7 +142,41 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect(chamadas.gerar).toHaveBeenCalledWith('plano-1', 50, 20)
     expect(componente.findAll('.dia-da-previa')).toHaveLength(7)
     expect(componente.text()).toContain('Nada foi aplicado ao seu plano')
-    expect(componente.text()).not.toContain('Aplicar prévia')
+    const aplicar = componente
+      .findAll('button')
+      .find((botao) => botao.text().includes('Aplicar à semana'))!
+    await aplicar.trigger('click')
+    await flushPromises()
+
+    expect(chamadas.aplicar).toHaveBeenCalledWith('plano-1', 50, 20, false)
+    expect(componente.emitted('aplicado')).toHaveLength(1)
+  })
+
+  it('confirma regeneracao preservando manuais e ajustados', async () => {
+    const componente = await montar(3)
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.find('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    const aplicar = componente
+      .findAll('button')
+      .find((botao) => botao.text().includes('Aplicar à semana'))!
+    await aplicar.trigger('click')
+    await flushPromises()
+
+    expect(chamadas.aplicar).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('3 bloco(s) gerado(s)')
+    expect(document.body.textContent).toContain('manuais')
+    expect(
+      document.body.querySelector('.sobreposicao-da-aplicacao-sobre-gaveta'),
+    ).not.toBeNull()
+    const confirmar = Array.from(document.body.querySelectorAll('button')).find(
+      (botao) => botao.textContent?.includes('Substituir e aplicar'),
+    ) as HTMLButtonElement
+    confirmar.click()
+    await flushPromises()
+
+    expect(chamadas.aplicar).toHaveBeenCalledWith('plano-1', 50, 20, true)
   })
 
   it('exibe vazio recuperavel quando nao ha concurso ativo ou cargo', async () => {

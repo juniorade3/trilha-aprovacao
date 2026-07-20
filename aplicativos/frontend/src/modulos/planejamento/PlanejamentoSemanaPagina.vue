@@ -31,6 +31,7 @@ import {
   type BlocoDeEstudo,
   type DadosDoBlocoDeEstudo,
   type PlanoSemanal,
+  type ResultadoDaAplicacaoDaGeracao,
 } from './apiDePlanejamento'
 
 const rota = useRoute()
@@ -58,6 +59,7 @@ const erroDoEditor = ref('')
 const confirmacaoDeAtivacaoAberta = ref(false)
 const ativando = ref(false)
 const geracaoAberta = ref(false)
+const blocoDaJustificativa = ref<BlocoDeEstudo>()
 
 const nomesDosDias = [
   'Segunda-feira',
@@ -148,6 +150,13 @@ const pendenciasDaAtivacao = computed(() => {
     pendencias.push('Corrija os dias em que a carga supera a disponibilidade.')
   return pendencias
 })
+
+const quantidadeDeBlocosGerados = computed(
+  () =>
+    plano.value?.blocos.filter(
+      (bloco) => bloco.origem === 'GERADO_DETERMINISTICAMENTE',
+    ).length ?? 0,
+)
 
 function formatarData(dataIso: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -241,6 +250,22 @@ function rotuloDoTipo(tipo: BlocoDeEstudo['tipoDeAtividade']) {
   }[tipo]
 }
 
+function rotuloDaOrigem(bloco: BlocoDeEstudo) {
+  return {
+    MANUAL: 'Manual',
+    GERADO_DETERMINISTICAMENTE: 'Gerado',
+    GERADO_AJUSTADO_MANUALMENTE: 'Gerado e ajustado',
+  }[bloco.origem]
+}
+
+function classeDaOrigem(bloco: BlocoDeEstudo) {
+  return bloco.origem === 'MANUAL'
+    ? 'text-bg-light'
+    : bloco.origem === 'GERADO_DETERMINISTICAMENTE'
+      ? 'text-bg-primary'
+      : 'text-bg-warning'
+}
+
 function abrirNovoBloco(data: string) {
   blocoEmEdicao.value = undefined
   dataSugerida.value = data
@@ -289,6 +314,14 @@ async function atualizarPlano() {
   const atualizado = await obterPlanoSemanal(dataInicial.value)
   plano.value = atualizado
   preencherFormulario(atualizado)
+}
+
+function concluirAplicacaoDaGeracao(resultado: ResultadoDaAplicacaoDaGeracao) {
+  plano.value = resultado.plano
+  preencherFormulario(resultado.plano)
+  geracaoAberta.value = false
+  const resumo = resultado.resumo
+  aviso.value = `${resumo.quantidadeDeBlocosCriados} bloco(s) aplicado(s). ${resumo.quantidadeDeBlocosSubstituidos} substituído(s) e ${resumo.quantidadeDeBlocosPreservados} preservado(s).`
 }
 
 async function salvarBloco(dados: DadosDoBlocoDeEstudo) {
@@ -756,6 +789,22 @@ watch(
                   <span class="ordem-do-bloco">{{ bloco.ordem }}</span>
                   <div>
                     <strong>{{ bloco.titulo }}</strong>
+                    <span
+                      class="d-flex flex-wrap align-items-center gap-2 my-1"
+                    >
+                      <span class="badge" :class="classeDaOrigem(bloco)">
+                        {{ rotuloDaOrigem(bloco) }}
+                      </span>
+                      <button
+                        v-if="bloco.justificativaDaGeracao"
+                        class="btn btn-sm btn-link p-0"
+                        type="button"
+                        :aria-label="`Ver justificativa de ${bloco.titulo}`"
+                        @click="blocoDaJustificativa = bloco"
+                      >
+                        Por que este bloco?
+                      </button>
+                    </span>
                     <span>
                       {{ rotuloDoTipo(bloco.tipoDeAtividade) }} ·
                       {{ bloco.duracaoPrevistaEmMinutos }} min
@@ -872,7 +921,9 @@ watch(
     <GavetaDeGeracaoDeterministica
       v-if="geracaoAberta && plano"
       :identificador-do-plano="plano.identificador"
+      :quantidade-de-blocos-gerados="quantidadeDeBlocosGerados"
       @fechar="geracaoAberta = false"
+      @aplicado="concluirAplicacaoDaGeracao"
     />
 
     <EditorDeBloco
@@ -893,6 +944,27 @@ watch(
       @fechar="editorAberto = false"
       @salvar="salvarBloco"
     />
+
+    <ModalDaAplicacao
+      v-if="blocoDaJustificativa"
+      titulo="Por que este bloco foi sugerido?"
+      etiqueta="Justificativa da geração"
+      :descricao="blocoDaJustificativa.titulo"
+      @fechar="blocoDaJustificativa = undefined"
+    >
+      <p class="mb-0 text-break">
+        {{ blocoDaJustificativa.justificativaDaGeracao }}
+      </p>
+      <template #rodape>
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="blocoDaJustificativa = undefined"
+        >
+          Entendi
+        </button>
+      </template>
+    </ModalDaAplicacao>
 
     <ModalDaAplicacao
       v-if="confirmacaoDeAtivacaoAberta && plano"

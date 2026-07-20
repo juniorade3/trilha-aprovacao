@@ -757,7 +757,7 @@ public class ServicoDePlanejamento {
             int ordem = indice + 1;
             if (!atual.data().equals(data) || atual.ordem() != ordem) {
                 try {
-                    persistido.atualizarDe(atual.moverPara(data, ordem));
+                    persistido.atualizarDe(atual.normalizarPosicao(data, ordem));
                 } catch (IllegalStateException excecao) {
                     throw new ConflitoDeDominio(
                             "BLOCO_DE_ESTUDO_NAO_EDITAVEL", excecao.getMessage());

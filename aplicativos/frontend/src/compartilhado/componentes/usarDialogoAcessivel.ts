@@ -9,8 +9,11 @@ const seletoresFocaveis = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+const pilhaDeDialogos: symbol[] = []
+
 export function usarDialogoAcessivel(fechar: () => void) {
   const raizDoDialogo = ref<HTMLElement>()
+  const identificadorDoDialogo = Symbol('dialogo')
   let focoAnterior: HTMLElement | null = null
 
   function elementosFocaveis() {
@@ -21,6 +24,8 @@ export function usarDialogoAcessivel(fechar: () => void) {
   }
 
   function aoPressionarTecla(evento: KeyboardEvent) {
+    if (pilhaDeDialogos[pilhaDeDialogos.length - 1] !== identificadorDoDialogo)
+      return
     if (evento.key === 'Escape') {
       evento.preventDefault()
       fechar()
@@ -49,6 +54,7 @@ export function usarDialogoAcessivel(fechar: () => void) {
         ? document.activeElement
         : null
     document.body.classList.add('modal-aberto')
+    pilhaDeDialogos.push(identificadorDoDialogo)
     window.addEventListener('keydown', aoPressionarTecla)
     await nextTick()
     const focoInicial =
@@ -58,7 +64,10 @@ export function usarDialogoAcessivel(fechar: () => void) {
   })
 
   onBeforeUnmount(() => {
-    document.body.classList.remove('modal-aberto')
+    const indice = pilhaDeDialogos.lastIndexOf(identificadorDoDialogo)
+    if (indice >= 0) pilhaDeDialogos.splice(indice, 1)
+    if (pilhaDeDialogos.length === 0)
+      document.body.classList.remove('modal-aberto')
     window.removeEventListener('keydown', aoPressionarTecla)
     focoAnterior?.focus()
   })

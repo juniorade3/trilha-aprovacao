@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.planejamento.infraestrutura;
 
 import br.com.trilhaaprovacao.planejamento.dominio.BlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoBlocoDeEstudo;
+import br.com.trilhaaprovacao.planejamento.dominio.OrigemDoBlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.TipoDeAtividade;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -31,6 +32,10 @@ public class BlocoDeEstudoPersistido {
     @Column(nullable = false) private int ordem;
     @Column(name = "horario_previsto") private LocalTime horarioPrevisto;
     @Column(length = 2000) private String observacao;
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 40)
+    private OrigemDoBlocoDeEstudo origem;
+    @Column(name = "justificativa_da_geracao", length = 2000)
+    private String justificativaDaGeracao;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private EstadoDoBlocoDeEstudo estado;
     @Column(name = "quantidade_de_reagendamentos", nullable = false)
     private int quantidadeDeReagendamentos;
@@ -59,6 +64,8 @@ public class BlocoDeEstudoPersistido {
         ordem = bloco.ordem();
         horarioPrevisto = bloco.horarioPrevisto();
         observacao = bloco.observacao();
+        origem = bloco.origem();
+        justificativaDaGeracao = bloco.justificativaDaGeracao();
         estado = bloco.estado();
         quantidadeDeReagendamentos = bloco.quantidadeDeReagendamentos();
         reagendadoEm = bloco.reagendadoEm();
@@ -69,7 +76,8 @@ public class BlocoDeEstudoPersistido {
         return new BlocoDeEstudo(identificador, identificadorDoPlano,
                 identificadorDaMateria, identificadorDoTopico, titulo,
                 tipoDeAtividade, data, duracaoPrevistaEmMinutos, ordem,
-                horarioPrevisto, observacao, estado, quantidadeDeReagendamentos,
-                reagendadoEm, criadoEm, atualizadoEm, versao);
+                horarioPrevisto, observacao, origem, justificativaDaGeracao,
+                estado, quantidadeDeReagendamentos, reagendadoEm, criadoEm,
+                atualizadoEm, versao);
     }
 }
