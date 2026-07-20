@@ -713,7 +713,10 @@ watch(
                   </div>
                 </div>
                 <div
-                  v-if="plano.estado === 'RASCUNHO'"
+                  v-if="
+                    (plano.estado === 'RASCUNHO' || plano.estado === 'ATIVO') &&
+                    bloco.estado === 'PLANEJADO'
+                  "
                   class="acoes-do-bloco-planejado"
                 >
                   <button
