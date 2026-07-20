@@ -52,6 +52,9 @@ export type EstadoDoBlocoDeEstudo =
   | 'PARCIALMENTE_CONCLUIDO'
   | 'CANCELADO'
 
+export type OrigemDoBlocoDeEstudo =
+  'MANUAL' | 'GERADO_DETERMINISTICAMENTE' | 'GERADO_AJUSTADO_MANUALMENTE'
+
 export interface BlocoDeEstudo {
   identificador: string
   identificadorDoPlano: string
@@ -64,6 +67,8 @@ export interface BlocoDeEstudo {
   ordem: number
   horarioPrevisto?: string
   observacao?: string
+  origem: OrigemDoBlocoDeEstudo
+  justificativaDaGeracao?: string
   estado: EstadoDoBlocoDeEstudo
   quantidadeDeReagendamentos: number
   reagendadoEm?: string
@@ -195,6 +200,15 @@ export interface PreviaDaGeracao {
   dias: DiaDaPreviaDaGeracao[]
   avisos: JustificativaDaGeracao[]
   aplicada: false
+}
+
+export interface ResultadoDaAplicacaoDaGeracao {
+  plano: PlanoSemanal
+  resumo: {
+    quantidadeDeBlocosCriados: number
+    quantidadeDeBlocosSubstituidos: number
+    quantidadeDeBlocosPreservados: number
+  }
 }
 
 export function criarPlanoSemanal(dataInicial: string): Promise<PlanoSemanal> {
@@ -350,6 +364,25 @@ export function gerarPreviaDeterministica(
       body: JSON.stringify({
         duracaoPadraoDoBlocoPrincipalEmMinutos,
         duracaoDoBlocoDeRevisaoEmMinutos,
+      }),
+    },
+  )
+}
+
+export function aplicarGeracaoDeterministica(
+  identificadorDoPlano: string,
+  duracaoPadraoDoBlocoPrincipalEmMinutos: number,
+  duracaoDoBlocoDeRevisaoEmMinutos: number,
+  substituirBlocosGerados: boolean,
+): Promise<ResultadoDaAplicacaoDaGeracao> {
+  return requisitar<ResultadoDaAplicacaoDaGeracao>(
+    `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        duracaoPadraoDoBlocoPrincipalEmMinutos,
+        duracaoDoBlocoDeRevisaoEmMinutos,
+        substituirBlocosGerados,
       }),
     },
   )

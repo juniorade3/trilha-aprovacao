@@ -5,6 +5,7 @@ const propriedades = defineProps<{
   titulo: string
   etiqueta: string
   descricao?: string
+  sobreGaveta?: boolean
 }>()
 
 const emitir = defineEmits<{
@@ -19,6 +20,9 @@ const { raizDoDialogo } = usarDialogoAcessivel(() => emitir('fechar'))
     <div
       ref="raizDoDialogo"
       class="sobreposicao-da-aplicacao"
+      :class="{
+        'sobreposicao-da-aplicacao-sobre-gaveta': propriedades.sobreGaveta,
+      }"
       @mousedown.self="emitir('fechar')"
     >
       <section

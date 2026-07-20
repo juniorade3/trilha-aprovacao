@@ -22,6 +22,7 @@ const chamadas = vi.hoisted(() => ({
   listarMateriasParaGeracao: vi.fn(),
   substituirPrioridadesDeMaterias: vi.fn(),
   gerarPreviaDeterministica: vi.fn(),
+  aplicarGeracaoDeterministica: vi.fn(),
   obterPlanoSemanal: vi.fn(),
   reordenarBlocos: vi.fn(),
 }))
@@ -42,6 +43,7 @@ vi.mock('./apiDePlanejamento', () => ({
   listarMateriasParaGeracao: chamadas.listarMateriasParaGeracao,
   substituirPrioridadesDeMaterias: chamadas.substituirPrioridadesDeMaterias,
   gerarPreviaDeterministica: chamadas.gerarPreviaDeterministica,
+  aplicarGeracaoDeterministica: chamadas.aplicarGeracaoDeterministica,
 }))
 
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
@@ -105,6 +107,7 @@ function blocoDeEstudo(
     data: inicio,
     duracaoPrevistaEmMinutos: 120,
     ordem,
+    origem: 'MANUAL',
     estado: 'PLANEJADO',
     quantidadeDeReagendamentos: 0,
     criadoEm: '2026-07-19T12:00:00Z',
@@ -185,6 +188,14 @@ describe('PlanejamentoSemanaPagina', () => {
       },
     ])
     chamadas.substituirPrioridadesDeMaterias.mockResolvedValue([])
+    chamadas.aplicarGeracaoDeterministica.mockResolvedValue({
+      plano: planoSemanal(),
+      resumo: {
+        quantidadeDeBlocosCriados: 0,
+        quantidadeDeBlocosSubstituidos: 0,
+        quantidadeDeBlocosPreservados: 0,
+      },
+    })
   })
 
   it('carrega e salva os sete dias da semana', async () => {
@@ -219,6 +230,88 @@ describe('PlanejamentoSemanaPagina', () => {
 
     expect(chamadas.listarMateriasParaGeracao).toHaveBeenCalledWith('plano-1')
     expect(pagina.text()).toContain('Prioridades desta semana')
+  })
+
+  it('aplica a geracao e atualiza a semana com origem e justificativa', async () => {
+    const materia = {
+      identificadorDaMateria: 'materia-1',
+      nome: 'Banco de dados',
+      ordemEstavel: 1,
+      prioridade: 'NORMAL',
+    }
+    chamadas.substituirPrioridadesDeMaterias.mockResolvedValue([materia])
+    chamadas.gerarPreviaDeterministica.mockResolvedValue({
+      identificadorDoPlano: 'plano-1',
+      aplicada: false,
+      avisos: [],
+      dias: Array.from({ length: 7 }, (_, indice) => ({
+        data: `2026-07-${20 + indice}`,
+        capacidade: {
+          minutosDisponiveis: indice === 0 ? 50 : 0,
+          minutosPreservados: 0,
+          minutosSugeridos: indice === 0 ? 50 : 0,
+          minutosLivres: 0,
+        },
+        blocosPreservados: [],
+        blocosSugeridos:
+          indice === 0
+            ? [
+                {
+                  identificadorDaMateria: 'materia-1',
+                  nomeDaMateria: 'Banco de dados',
+                  titulo: 'Banco de dados',
+                  tipoDeAtividade: 'TEORIA',
+                  duracaoEmMinutos: 50,
+                  justificativas: [
+                    {
+                      codigo: 'PRIORIDADE_NORMAL',
+                      mensagem: 'Prioridade normal.',
+                    },
+                  ],
+                },
+              ]
+            : [],
+        avisos: [],
+      })),
+    })
+    const gerado = {
+      ...blocoDeEstudo(),
+      duracaoPrevistaEmMinutos: 50,
+      origem: 'GERADO_DETERMINISTICAMENTE',
+      justificativaDaGeracao: 'PRIORIDADE_NORMAL: Prioridade normal.',
+    }
+    chamadas.aplicarGeracaoDeterministica.mockResolvedValue({
+      plano: planoSemanal(50, [gerado]),
+      resumo: {
+        quantidadeDeBlocosCriados: 1,
+        quantidadeDeBlocosSubstituidos: 0,
+        quantidadeDeBlocosPreservados: 0,
+      },
+    })
+    const { pagina } = await montarPagina()
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Gerar semana'))!
+      .trigger('click')
+    await flushPromises()
+    await pagina.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await pagina.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Aplicar à semana'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(pagina.text()).toContain('1 bloco(s) aplicado(s)')
+    expect(pagina.text()).toContain('Gerado')
+    expect(pagina.text()).toContain('Por que este bloco?')
+    await pagina
+      .get('[aria-label="Ver justificativa de Banco de dados"]')
+      .trigger('click')
+    expect(pagina.text()).toContain('PRIORIDADE_NORMAL')
   })
 
   it('oferece criar um rascunho quando a semana ainda nao possui plano', async () => {

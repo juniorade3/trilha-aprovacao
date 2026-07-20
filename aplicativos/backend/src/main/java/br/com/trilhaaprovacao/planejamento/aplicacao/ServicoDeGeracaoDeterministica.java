@@ -7,21 +7,30 @@ import br.com.trilhaaprovacao.concursos.aplicacao.ConsultaDeMateriasElegiveisPar
 import br.com.trilhaaprovacao.concursos.aplicacao.MateriaElegivelParaPlanejamento;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
 import br.com.trilhaaprovacao.planejamento.dominio.BlocoPreservadoNaGeracao;
+import br.com.trilhaaprovacao.planejamento.dominio.BlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.CandidatoDeMateriaParaGeracao;
 import br.com.trilhaaprovacao.planejamento.dominio.ConfiguracaoDaGeracaoDeterministica;
+import br.com.trilhaaprovacao.planejamento.dominio.DiaDaPreviaDaGeracao;
 import br.com.trilhaaprovacao.planejamento.dominio.EntradaDoDiaParaGeracao;
 import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoBlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoPlanoSemanal;
 import br.com.trilhaaprovacao.planejamento.dominio.GeradorDeterministicoDePlano;
+import br.com.trilhaaprovacao.planejamento.dominio.JustificativaDaGeracao;
+import br.com.trilhaaprovacao.planejamento.dominio.OrigemDoBlocoDeEstudo;
+import br.com.trilhaaprovacao.planejamento.dominio.PlanoSemanal;
 import br.com.trilhaaprovacao.planejamento.dominio.PreviaDaGeracaoDaSemana;
 import br.com.trilhaaprovacao.planejamento.dominio.PrioridadeDaMateriaNoPlano;
 import br.com.trilhaaprovacao.planejamento.dominio.PrioridadeDeMateriaNoPlano;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.BlocoDeEstudoPersistido;
+import br.com.trilhaaprovacao.planejamento.infraestrutura.DisponibilidadeDoDiaPersistida;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.PrioridadeDeMateriaNoPlanoPersistida;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeBlocosDeEstudo;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDeDisponibilidadesDoDia;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDePlanosSemanais;
 import br.com.trilhaaprovacao.planejamento.infraestrutura.RepositorioDePrioridadesDeMateriasNoPlano;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -102,6 +111,52 @@ public class ServicoDeGeracaoDeterministica {
     public PreviaDaGeracaoDaSemana gerarPrevia(UUID usuario, UUID plano,
             ConfiguracaoDaGeracaoDeterministica configuracao) {
         exigirRascunho(obterPlano(usuario, plano).estado());
+        return calcularPrevia(usuario, plano, configuracao,
+                blocos.findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano));
+    }
+
+    @Transactional
+    public ResultadoDaAplicacaoDaGeracao aplicar(UUID usuario, UUID plano,
+            ConfiguracaoDaGeracaoDeterministica configuracao,
+            boolean substituirBlocosGerados) {
+        PlanoSemanal planoSemanal = planos.encontrarParaAtualizacao(plano, usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "PLANO_SEMANAL_NAO_ENCONTRADO", "Plano semanal nao encontrado."))
+                .paraDominio();
+        exigirRascunho(planoSemanal.estado());
+        List<BlocoDeEstudoPersistido> existentes = blocos
+                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano);
+        List<BlocoDeEstudoPersistido> substituiveis = existentes.stream()
+                .filter(this::eGeradoPuro).toList();
+        if (!substituiveis.isEmpty() && !substituirBlocosGerados) {
+            throw new ConflitoDeDominio("GERACAO_DETERMINISTICA_JA_APLICADA",
+                    "O plano ja possui blocos gerados. Confirme a substituicao para regenerar.");
+        }
+        PreviaDaGeracaoDaSemana previa = calcularPrevia(
+                usuario, plano, configuracao, existentes);
+        if (!substituiveis.isEmpty()) {
+            blocos.deleteAll(substituiveis);
+            blocos.flush();
+        }
+        List<BlocoDeEstudoPersistido> preservados = existentes.stream()
+                .filter(item -> !eGeradoPuro(item))
+                .sorted(ordemDosBlocos()).collect(Collectors.toCollection(ArrayList::new));
+        normalizarPreservados(preservados);
+        List<BlocoDeEstudoPersistido> gerados = criarBlocosGerados(plano, previa, preservados);
+        blocos.saveAll(gerados);
+        blocos.flush();
+        ResultadoDoPlanoSemanal atualizado = new ResultadoDoPlanoSemanal(planoSemanal,
+                disponibilidades.findByIdentificadorDoPlanoOrderByDataAsc(plano).stream()
+                        .map(DisponibilidadeDoDiaPersistida::paraDominio).toList(),
+                blocos.findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano).stream()
+                        .map(BlocoDeEstudoPersistido::paraDominio).toList());
+        return new ResultadoDaAplicacaoDaGeracao(atualizado, gerados.size(),
+                substituiveis.size(), preservados.size());
+    }
+
+    private PreviaDaGeracaoDaSemana calcularPrevia(UUID usuario, UUID plano,
+            ConfiguracaoDaGeracaoDeterministica configuracao,
+            List<BlocoDeEstudoPersistido> blocosDoPlano) {
         List<MateriaParaGeracao> materiasParaGeracao = montarMaterias(usuario, plano);
         Map<UUID, MateriaElegivelParaPlanejamento> dadosElegiveis = materiasElegiveis
                 .consultar(usuario).stream().collect(Collectors.toMap(
@@ -116,10 +171,11 @@ public class ServicoDeGeracaoDeterministica {
                 }).toList();
         Map<UUID, String> nomes = new HashMap<>();
         candidatos.forEach(item -> nomes.put(item.identificadorDaMateria(), item.nome()));
-        List<BlocoPreservadoNaGeracao> preservados = blocos
-                .findByIdentificadorDoPlanoOrderByDataAscOrdemAsc(plano).stream()
+        List<BlocoPreservadoNaGeracao> preservados = blocosDoPlano.stream()
                 .map(BlocoDeEstudoPersistido::paraDominio)
                 .filter(item -> item.estado() != EstadoDoBlocoDeEstudo.CANCELADO)
+                .filter(item -> item.origem()
+                        != OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE)
                 .map(item -> new BlocoPreservadoNaGeracao(item.identificador(),
                         item.identificadorDaMateria(), nomeDaMateria(usuario,
                                 item.identificadorDaMateria(), nomes), item.titulo(),
@@ -139,6 +195,62 @@ public class ServicoDeGeracaoDeterministica {
         } catch (IllegalArgumentException excecao) {
             throw new RegraDeDominio("CONFIGURACAO_DA_GERACAO_INVALIDA", excecao.getMessage());
         }
+    }
+
+    private boolean eGeradoPuro(BlocoDeEstudoPersistido persistido) {
+        return persistido.paraDominio().origem()
+                == OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE;
+    }
+
+    private Comparator<BlocoDeEstudoPersistido> ordemDosBlocos() {
+        return Comparator.comparing((BlocoDeEstudoPersistido item) ->
+                        item.paraDominio().data())
+                .thenComparingInt(item -> item.paraDominio().ordem())
+                .thenComparing(item -> item.paraDominio().identificador());
+    }
+
+    private void normalizarPreservados(List<BlocoDeEstudoPersistido> preservados) {
+        Map<LocalDate, List<BlocoDeEstudoPersistido>> porData = preservados.stream()
+                .collect(Collectors.groupingBy(item -> item.paraDominio().data()));
+        porData.values().forEach(itens -> {
+            itens.sort(ordemDosBlocos());
+            for (int indice = 0; indice < itens.size(); indice++) {
+                BlocoDeEstudoPersistido persistido = itens.get(indice);
+                BlocoDeEstudo atual = persistido.paraDominio();
+                if (atual.ordem() != indice + 1) {
+                    persistido.atualizarDe(atual.normalizarPosicao(atual.data(), indice + 1));
+                }
+            }
+        });
+    }
+
+    private List<BlocoDeEstudoPersistido> criarBlocosGerados(UUID plano,
+            PreviaDaGeracaoDaSemana previa,
+            List<BlocoDeEstudoPersistido> preservados) {
+        Map<LocalDate, Integer> proximaOrdem = preservados.stream()
+                .collect(Collectors.groupingBy(item -> item.paraDominio().data(),
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+        List<BlocoDeEstudoPersistido> gerados = new ArrayList<>();
+        for (DiaDaPreviaDaGeracao dia : previa.dias()) {
+            int ordem = proximaOrdem.getOrDefault(dia.data(), 0);
+            for (var sugestao : dia.blocosSugeridos()) {
+                BlocoDeEstudo bloco = BlocoDeEstudo.criarGerado(plano,
+                        sugestao.identificadorDaMateria(), sugestao.titulo(),
+                        sugestao.tipoDeAtividade(), dia.data(),
+                        sugestao.duracaoEmMinutos(), ++ordem,
+                        resumir(sugestao.justificativas()));
+                gerados.add(new BlocoDeEstudoPersistido(bloco));
+            }
+        }
+        return gerados;
+    }
+
+    private String resumir(List<JustificativaDaGeracao> justificativas) {
+        if (justificativas.isEmpty()) return null;
+        String resumo = justificativas.stream()
+                .map(item -> item.codigo() + ": " + item.mensagem())
+                .collect(Collectors.joining(" | "));
+        return resumo.length() <= 2000 ? resumo : resumo.substring(0, 2000);
     }
 
     private List<MateriaParaGeracao> montarMaterias(UUID usuario, UUID plano) {

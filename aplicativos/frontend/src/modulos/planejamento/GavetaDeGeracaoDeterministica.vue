@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
+import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
 import {
+  aplicarGeracaoDeterministica,
   gerarPreviaDeterministica,
   listarMateriasParaGeracao,
   substituirPrioridadesDeMaterias,
   type MateriaParaGeracao,
   type PreviaDaGeracao,
   type PrioridadeDaMateriaNoPlano,
+  type ResultadoDaAplicacaoDaGeracao,
 } from './apiDePlanejamento'
 
-const propriedades = defineProps<{ identificadorDoPlano: string }>()
-const emitir = defineEmits<{ fechar: [] }>()
+const propriedades = defineProps<{
+  identificadorDoPlano: string
+  quantidadeDeBlocosGerados: number
+}>()
+const emitir = defineEmits<{
+  fechar: []
+  aplicado: [resultado: ResultadoDaAplicacaoDaGeracao]
+}>()
 
 const etapa = ref<'PRIORIDADES' | 'CONFIGURACAO' | 'PREVIA'>('PRIORIDADES')
 const materias = ref<MateriaParaGeracao[]>([])
@@ -22,6 +32,7 @@ const duracaoDaRevisao = ref(20)
 const carregando = ref(true)
 const processando = ref(false)
 const erro = ref('')
+const confirmacaoDeRegeneracaoAberta = ref(false)
 
 const rotulos: Record<PrioridadeDaMateriaNoPlano, string> = {
   ALTA: 'Alta',
@@ -88,6 +99,44 @@ async function calcularPrevia() {
   } finally {
     processando.value = false
   }
+}
+
+async function aplicar(substituirBlocosGerados: boolean) {
+  processando.value = true
+  erro.value = ''
+  try {
+    const resultado = await aplicarGeracaoDeterministica(
+      propriedades.identificadorDoPlano,
+      Number(duracaoPrincipal.value),
+      Number(duracaoDaRevisao.value),
+      substituirBlocosGerados,
+    )
+    confirmacaoDeRegeneracaoAberta.value = false
+    emitir('aplicado', resultado)
+  } catch (causa) {
+    if (
+      causa instanceof ErroDaApi &&
+      causa.status === 409 &&
+      causa.codigo === 'GERACAO_DETERMINISTICA_JA_APLICADA'
+    ) {
+      confirmacaoDeRegeneracaoAberta.value = true
+    } else {
+      erro.value =
+        causa instanceof Error
+          ? causa.message
+          : 'Não foi possível aplicar a geração.'
+    }
+  } finally {
+    processando.value = false
+  }
+}
+
+function solicitarAplicacao() {
+  if (propriedades.quantidadeDeBlocosGerados > 0) {
+    confirmacaoDeRegeneracaoAberta.value = true
+    return
+  }
+  void aplicar(false)
 }
 
 function formatarData(data: string) {
@@ -307,12 +356,51 @@ onMounted(carregarMaterias)
           </p>
         </article>
       </div>
-      <div class="alert alert-info mb-0" role="status">
-        <strong>Prévia somente para conferência.</strong> Nenhum bloco foi
-        criado ou alterado.
+      <div class="acoes-da-aplicacao-da-geracao">
+        <p class="mb-0">
+          O servidor recalculará esta proposta antes de salvar os blocos.
+        </p>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="processando"
+          @click="solicitarAplicacao"
+        >
+          {{ processando ? 'Aplicando…' : 'Aplicar à semana' }}
+        </button>
       </div>
     </section>
   </GavetaLateral>
+
+  <ModalDaAplicacao
+    v-if="confirmacaoDeRegeneracaoAberta"
+    titulo="Substituir geração anterior?"
+    etiqueta="Confirmar regeneração"
+    sobre-gaveta
+    :descricao="`${propriedades.quantidadeDeBlocosGerados} bloco(s) gerado(s) serão substituídos.`"
+    @fechar="confirmacaoDeRegeneracaoAberta = false"
+  >
+    <p class="mb-0">
+      Blocos manuais e blocos gerados que você já ajustou serão preservados.
+    </p>
+    <template #rodape>
+      <button
+        class="btn btn-outline-secondary"
+        type="button"
+        @click="confirmacaoDeRegeneracaoAberta = false"
+      >
+        Manter geração atual
+      </button>
+      <button
+        class="btn btn-primary"
+        type="button"
+        :disabled="processando"
+        @click="aplicar(true)"
+      >
+        {{ processando ? 'Regenerando…' : 'Substituir e aplicar' }}
+      </button>
+    </template>
+  </ModalDaAplicacao>
 </template>
 
 <style scoped lang="scss">
@@ -429,6 +517,16 @@ onMounted(carregarMaterias)
   font-size: 0.85rem;
   margin: 0.6rem 0 0;
 }
+.acoes-da-aplicacao-da-geracao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #b9ddd3;
+  border-radius: 0.85rem;
+  background: #eef9f6;
+  padding: 1rem;
+}
 @media (max-width: 576px) {
   .etapas-da-geracao {
     grid-template-columns: 1fr;
@@ -449,6 +547,10 @@ onMounted(carregarMaterias)
   }
   .bloco-da-previa ul {
     grid-column: 1 / -1;
+  }
+  .acoes-da-aplicacao-da-geracao {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

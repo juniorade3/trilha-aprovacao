@@ -78,8 +78,30 @@ class PlanejamentoTest {
 
         assertEquals("Leitura livre", bloco.titulo());
         assertEquals("Capitulo inicial", bloco.observacao());
+        assertEquals(OrigemDoBlocoDeEstudo.MANUAL, bloco.origem());
         assertEquals(EstadoDoBlocoDeEstudo.PLANEJADO, bloco.estado());
         assertEquals(2, bloco.moverPara(SEGUNDA.plusDays(1), 2).ordem());
+    }
+
+    @Test
+    void deveCriarGeradoETransformarEmAjustadoNaPrimeiraEdicaoManual() {
+        BlocoDeEstudo gerado = BlocoDeEstudo.criarGerado(UUID.randomUUID(),
+                UUID.randomUUID(), "Banco de dados", TipoDeAtividade.TEORIA,
+                SEGUNDA, 50, 2, "EQUILIBRIO_DA_SEMANA: Menor carga.");
+
+        assertEquals(OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE,
+                gerado.origem());
+        assertEquals(OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE,
+                gerado.normalizarPosicao(SEGUNDA, 1).origem());
+
+        BlocoDeEstudo ajustado = gerado.alterarPlanejamento(
+                gerado.identificadorDaMateria(), null, "Banco de dados ajustado",
+                TipoDeAtividade.QUESTOES, SEGUNDA, 45, 1, null, null);
+
+        assertEquals(OrigemDoBlocoDeEstudo.GERADO_AJUSTADO_MANUALMENTE,
+                ajustado.origem());
+        assertEquals(gerado.justificativaDaGeracao(),
+                ajustado.justificativaDaGeracao());
     }
 
     @Test

@@ -4,6 +4,7 @@ export class ErroDaApi extends Error {
   constructor(
     readonly status: number,
     mensagem: string,
+    readonly codigo?: string,
   ) {
     super(mensagem)
   }
@@ -42,10 +43,12 @@ export async function requisitar<T>(
     }
     const erro = (await resposta.json().catch(() => null)) as {
       mensagem?: string
+      codigo?: string
     } | null
     throw new ErroDaApi(
       resposta.status,
       erro?.mensagem ?? 'Nao foi possivel concluir a operacao.',
+      erro?.codigo,
     )
   }
   return resposta.status === 204

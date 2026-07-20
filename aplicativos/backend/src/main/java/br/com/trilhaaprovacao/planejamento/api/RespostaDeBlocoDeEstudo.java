@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.planejamento.api;
 
 import br.com.trilhaaprovacao.planejamento.dominio.BlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.EstadoDoBlocoDeEstudo;
+import br.com.trilhaaprovacao.planejamento.dominio.OrigemDoBlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.TipoDeAtividade;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -20,6 +21,8 @@ public record RespostaDeBlocoDeEstudo(
         int ordem,
         LocalTime horarioPrevisto,
         String observacao,
+        OrigemDoBlocoDeEstudo origem,
+        String justificativaDaGeracao,
         EstadoDoBlocoDeEstudo estado,
         int quantidadeDeReagendamentos,
         OffsetDateTime reagendadoEm,
@@ -33,7 +36,8 @@ public record RespostaDeBlocoDeEstudo(
                 bloco.identificadorDoTopico(), bloco.titulo(),
                 bloco.tipoDeAtividade(), bloco.data(),
                 bloco.duracaoPrevistaEmMinutos(), bloco.ordem(),
-                bloco.horarioPrevisto(), bloco.observacao(), bloco.estado(),
+                bloco.horarioPrevisto(), bloco.observacao(), bloco.origem(),
+                bloco.justificativaDaGeracao(), bloco.estado(),
                 bloco.quantidadeDeReagendamentos(), bloco.reagendadoEm(),
                 bloco.criadoEm(), bloco.atualizadoEm(), bloco.versao());
     }

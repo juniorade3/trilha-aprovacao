@@ -63,6 +63,7 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/materias-para-geracao'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/prioridades-de-materias'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/geracao-deterministica/previa'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/geracao-deterministica'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{plano}/blocos'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].delete").exists())

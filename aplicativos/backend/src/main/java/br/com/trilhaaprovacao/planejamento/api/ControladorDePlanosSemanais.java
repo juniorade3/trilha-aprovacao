@@ -103,6 +103,19 @@ public class ControladorDePlanosSemanais {
                 usuarioAtual.obter(autenticacao), identificador, configuracao));
     }
 
+    @PostMapping("/{identificador}/geracao-deterministica")
+    public RespostaDaAplicacaoDaGeracao aplicarGeracao(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeAplicacaoDaGeracao requisicao,
+            Authentication autenticacao) {
+        var configuracao = new ConfiguracaoDaGeracaoDeterministica(
+                requisicao.duracaoPadraoDoBlocoPrincipalEmMinutos(),
+                requisicao.duracaoDoBlocoDeRevisaoEmMinutos());
+        return RespostaDaAplicacaoDaGeracao.de(geracao.aplicar(
+                usuarioAtual.obter(autenticacao), identificador, configuracao,
+                requisicao.substituirBlocosGerados()));
+    }
+
     @PostMapping("/{identificador}/encerramento")
     public RespostaDePlanoSemanal encerrar(@PathVariable UUID identificador,
             Authentication autenticacao) {
