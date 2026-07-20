@@ -1,6 +1,6 @@
 # Sprint 07 — Registro de implementação
 
-STATUS: concluída e aprovada nas portas locais; o workflow oficial continua sendo a porta de merge.
+STATUS: concluída e integrada à `main` no commit de merge `a11ecedb11f89794565912842f208c82afdf0d69`.
 
 ARQUIVOS ALTERADOS:
 - domínio e aplicação de planejamento para reagendamento, cancelamento, correção e estados finais;
@@ -26,6 +26,6 @@ TESTES EXECUTADOS:
 - OpenAPI local: confirmadas as rotas de reagendamento e cancelamento de bloco, correção de execução e encerramento e cancelamento de plano;
 - navegador autenticado contra API e PostgreSQL atuais: Hoje e Semana validados em 390, 768 e 1280 px, sem rolagem horizontal; ações móveis dentro do viewport.
 
-PENDÊNCIAS: nenhuma pendência funcional da Sprint 07; merge condicionado ao CI oficial verde.
+PENDÊNCIAS: nenhuma pendência funcional da Sprint 07.
 
-PRÓXIMA SPRINT: Sprint 08 — Consolidação e aceite, não iniciada.
+PRÓXIMA SPRINT: Sprint 08 — Consolidação e aceite.

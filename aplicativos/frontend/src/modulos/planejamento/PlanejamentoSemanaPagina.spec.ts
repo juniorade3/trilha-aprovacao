@@ -492,4 +492,27 @@ describe('PlanejamentoSemanaPagina', () => {
     expect(chamadas.encerrarPlanoSemanal).toHaveBeenCalledWith('plano-1')
     expect(pagina.text()).toContain('Não realizado')
   })
+
+  it('cancela o plano ativo e deixa a semana somente para leitura', async () => {
+    const bloco = blocoDeEstudo()
+    chamadas.obterPlanoSemanal.mockResolvedValue(
+      planoSemanal(180, [bloco], 'ATIVO'),
+    )
+    const { pagina } = await montarPagina()
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Cancelar plano')!
+      .trigger('click')
+    const confirmacoes = pagina
+      .findAll('button')
+      .filter((botao) => botao.text() === 'Cancelar plano')
+    await confirmacoes[confirmacoes.length - 1]!.trigger('click')
+    await flushPromises()
+
+    expect(chamadas.cancelarPlanoSemanal).toHaveBeenCalledWith('plano-1')
+    expect(pagina.text()).toContain('Cancelado')
+    expect(pagina.get('fieldset').attributes('disabled')).toBeDefined()
+    expect(pagina.text()).not.toContain('Encerrar semana')
+  })
 })

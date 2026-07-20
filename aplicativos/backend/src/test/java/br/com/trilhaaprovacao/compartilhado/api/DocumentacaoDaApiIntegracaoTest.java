@@ -71,6 +71,13 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/encerramento'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/cancelamento'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planejamento/hoje'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planejamento/execucao-em-andamento'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/inicio'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/execucao'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/topicos-para-registro'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/conclusao'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/interrupcao'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/execucoes-de-bloco/{identificador}/registro-de-estudo'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/dashboard'].get").exists())
                 .andReturn().getResponse().getContentAsString();
 

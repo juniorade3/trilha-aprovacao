@@ -439,12 +439,15 @@ async function ativar() {
 
 async function encerrarPlano() {
   if (!plano.value) return
+  erro.value = ''
+  conflito.value = false
   try {
     plano.value = await encerrarPlanoSemanal(plano.value.identificador)
     aviso.value =
       'Semana encerrada. Blocos pendentes foram preservados como não realizados.'
     acaoDoPlano.value = undefined
   } catch (causa) {
+    conflito.value = causa instanceof ErroDaApi && causa.status === 409
     erro.value =
       causa instanceof Error ? causa.message : 'Não foi possível encerrar.'
   }
@@ -452,11 +455,14 @@ async function encerrarPlano() {
 
 async function cancelarPlano() {
   if (!plano.value) return
+  erro.value = ''
+  conflito.value = false
   try {
     plano.value = await cancelarPlanoSemanal(plano.value.identificador)
     aviso.value = 'Plano cancelado. Execuções e estudos foram preservados.'
     acaoDoPlano.value = undefined
   } catch (causa) {
+    conflito.value = causa instanceof ErroDaApi && causa.status === 409
     erro.value =
       causa instanceof Error ? causa.message : 'Não foi possível cancelar.'
   }

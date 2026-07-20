@@ -4,6 +4,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
+
 const chamadas = vi.hoisted(() => ({
   obterPlanejamentoDeHoje: vi.fn(),
   obterExecucaoEmAndamento: vi.fn(),
@@ -154,6 +156,56 @@ describe('PlanejamentoHojePagina', () => {
     expect(pagina.text()).toContain('Ver semana encerrada')
   })
 
+  it('apresenta plano cancelado e dia ativo sem blocos', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValueOnce({
+      estado: 'PLANO_CANCELADO',
+      data: '2026-07-20',
+      identificadorDoPlano: 'plano-1',
+      dataInicialDoPlano: '2026-07-20',
+      minutosDisponiveis: 0,
+      minutosPlanejados: 0,
+      quantidadeDeBlocos: 0,
+      sequencia: [],
+      atrasados: [],
+      realizados: [],
+    })
+    const cancelado = await montar()
+    expect(cancelado.text()).toContain('Este plano foi cancelado')
+    cancelado.unmount()
+
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValueOnce({
+      estado: 'DIA_SEM_BLOCOS',
+      data: '2026-07-20',
+      identificadorDoPlano: 'plano-1',
+      dataInicialDoPlano: '2026-07-20',
+      minutosDisponiveis: 60,
+      minutosPlanejados: 0,
+      quantidadeDeBlocos: 0,
+      sequencia: [],
+      atrasados: [],
+      realizados: [],
+    })
+    const vazio = await montar()
+    expect(vazio.text()).toContain('Hoje não há blocos planejados')
+  })
+
+  it('permite tentar novamente quando a consulta falha', async () => {
+    chamadas.obterPlanejamentoDeHoje
+      .mockRejectedValueOnce(new Error('API indisponível'))
+      .mockResolvedValueOnce(diaPlanejado())
+
+    const pagina = await montar()
+    expect(pagina.text()).toContain('Não foi possível carregar seu dia')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.obterPlanejamentoDeHoje).toHaveBeenCalledTimes(2)
+    expect(pagina.text()).toContain('Primeiro bloco')
+  })
+
   it('inicia o proximo bloco', async () => {
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.iniciarBloco.mockResolvedValue({
@@ -179,6 +231,25 @@ describe('PlanejamentoHojePagina', () => {
       'bloco-1',
       expect.any(String),
     )
+  })
+
+  it('oferece recarregar os dados depois de conflito', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.iniciarBloco.mockRejectedValue(
+      new ErroDaApi(409, 'O bloco foi alterado por outra operação.'),
+    )
+    const pagina = await montar()
+
+    await pagina.get('.proximo-bloco-do-dia button').trigger('click')
+    await flushPromises()
+    expect(pagina.text()).toContain('Recarregar dados')
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Recarregar dados')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.obterPlanejamentoDeHoje).toHaveBeenCalledTimes(2)
   })
 
   it('recupera uma execucao aberta e mostra o cronometro', async () => {
