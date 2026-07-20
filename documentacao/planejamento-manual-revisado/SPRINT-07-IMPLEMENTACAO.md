@@ -1,6 +1,6 @@
 # Sprint 07 — Registro de implementação
 
-STATUS: implementação funcional em validação pela CI.
+STATUS: implementação funcional enviada; validação oficial pelo GitHub Actions.
 
 ENTREGAS:
 - edição e disponibilidade em plano ativo;
@@ -11,6 +11,10 @@ ENTREGAS:
 - preservação de execuções e estudos;
 - migration V10;
 - API e Semana atualizadas.
+
+VALIDAÇÃO:
+- executar a workflow oficial `Verificacao continua` no HEAD deste PR;
+- não considerar a sprint aprovada antes de backend, frontend e estrutura ficarem verdes.
 
 PENDÊNCIAS: validação visual exploratória em 390, 768 e 1280 px.
 PRÓXIMA SPRINT: Sprint 08 — Consolidação e aceite, não iniciada.
