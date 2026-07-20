@@ -89,6 +89,26 @@ curl -i -b /tmp/trilha-cookies.txt \
 rm -f /tmp/trilha-cookies.txt
 ```
 
+## Planejamento Manual
+
+O grupo **Planejamento** da OpenAPI documenta o fluxo completo nas rotas:
+
+- `POST` e `GET /api/v1/planos-semanais`;
+- `PUT /api/v1/planos-semanais/{identificador}/disponibilidades`;
+- criacao, edicao, exclusao de rascunho e ordenacao de blocos;
+- ativacao, encerramento e cancelamento do plano;
+- `GET /api/v1/planejamento/hoje` e
+  `GET /api/v1/planejamento/execucao-em-andamento`;
+- inicio, consulta, conclusao e interrupcao de execucao;
+- consulta de topicos e registro da execucao no Historico;
+- reagendamento e cancelamento de bloco;
+- correcao de execucao.
+
+As leituras exigem `JSESSIONID`. Todas as operacoes mutaveis exigem tambem o
+token no cabecalho `X-XSRF-TOKEN`. Os identificadores de plano, bloco e execucao
+nao substituem a sessao: um recurso de outro usuario responde como nao
+encontrado.
+
 ## Limitacoes da interface Swagger
 
 O navegador mantém `JSESSIONID`, mas a interface nao automatiza todo o ciclo de
@@ -116,5 +136,5 @@ faz parte desta reconstrucao.
 ## Validacao automatizada
 
 `DocumentacaoDaApiIntegracaoTest` inicia PostgreSQL vazio, aplica as migrations
-e confirma documento, grupos, caminhos principais, schemas de erro, sessao,
-CSRF e as duas rotas da interface Swagger.
+e confirma documento, grupos, caminhos do Planejamento, schemas de erro,
+sessao, CSRF e as duas rotas da interface Swagger.
