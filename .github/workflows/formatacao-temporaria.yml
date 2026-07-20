@@ -1,16 +1,19 @@
-name: Diagnostico temporario
+name: Ajustes temporarios
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  formatar:
+  ajustar:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-05'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-05
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -20,20 +23,7 @@ jobs:
         run: npm ci
       - working-directory: aplicativos/frontend
         run: npm run formatar
-      - uses: actions/upload-artifact@v6
-        with:
-          name: formatacao
-          path: |
-            aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue
-            aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.spec.ts
-            aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts
-
-  backend:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-      - name: Incluir execucoes na limpeza dos testes
+      - name: Ajustar limpeza dos testes de planejamento
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -45,19 +35,15 @@ jobs:
           )
           arquivo.write_text(texto)
           PY
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-          cache-dependency-path: aplicativos/backend/pom.xml
-      - name: Executar e registrar
-        working-directory: aplicativos/backend
-        run: ./mvnw --batch-mode --no-transfer-progress verify > backend.log 2>&1 || true
-      - uses: actions/upload-artifact@v6
-        with:
-          name: diagnostico-backend
-          path: |
-            aplicativos/backend/backend.log
-            aplicativos/backend/target/surefire-reports
-            aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java
+      - name: Versionar ajustes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.vue
+          git add aplicativos/frontend/src/modulos/planejamento/PlanejamentoHojePagina.spec.ts
+          git add aplicativos/frontend/src/modulos/planejamento/apiDePlanejamento.ts
+          git add aplicativos/backend/src/test/java/br/com/trilhaaprovacao/planejamento/api/PlanejamentoIntegracaoTest.java
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: aplica formatacao e ajusta testes da sprint 05"
+            git push origin HEAD:feature/planejamento-sprint-05
+          fi
