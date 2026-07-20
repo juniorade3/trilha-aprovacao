@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,151 @@ class IntegracaoPlanejamentoEstudosTest {
                     provas, cargos_do_concurso, editais, concursos,
                     topicos_da_materia, materias, usuarios CASCADE
                 """);
+    }
+
+    @Test
+    void devePercorrerGeracaoHojeExecucaoEHistoricoDeEstudos() throws Exception {
+        String email = "fluxo.geracao@example.com";
+        MockHttpSession sessao = criarContaEEntrar(email);
+        String materiaA = criarMateria(sessao, "Banco de dados");
+        String topicoA = criarTopico(sessao, materiaA, "Modelagem relacional");
+        String materiaB = criarMateria(sessao, "Redes");
+        String materiaC = criarMateria(sessao, "Seguranca");
+        String plano = criarPlanoAtivo(sessao);
+        criarEstruturaElegivel(email, List.of(materiaA, materiaB, materiaC), materiaA);
+        String manual = adicionarBloco(
+                sessao, plano, "Leitura manual", null, null, 1);
+        api.perform(put("/api/v1/planos-semanais/{id}/prioridades-de-materias", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prioridades":[
+                                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"},
+                                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"}
+                                ]}
+                                """.formatted(materiaA, materiaB, materiaC)))
+                .andExpect(status().isOk());
+
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica/previa", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracaoDaPrevia()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias[0].blocosPreservados.length()").value(1))
+                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(4))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosDisponiveis").value(180))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosPreservados").value(60))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosSugeridos").value(120))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosLivres").value(0));
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracaoDaAplicacao(false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosCriados").value(4))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosPreservados").value(1));
+
+        String ajustado = banco.queryForObject("""
+                SELECT identificador::text
+                FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND materia_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                ORDER BY data, ordem
+                LIMIT 1
+                """, String.class, plano, materiaA);
+        Integer ordemDoAjustado = banco.queryForObject("""
+                SELECT ordem FROM blocos_de_estudo WHERE identificador = ?::uuid
+                """, Integer.class, ajustado);
+        String justificativaOriginal = banco.queryForObject("""
+                SELECT justificativa_da_geracao
+                FROM blocos_de_estudo
+                WHERE identificador = ?::uuid
+                """, String.class, ajustado);
+        api.perform(put("/api/v1/blocos-de-estudo/{id}", ajustado)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"identificadorDaMateria":"%s",
+                                 "identificadorDoTopico":"%s",
+                                 "titulo":"Questoes de modelagem",
+                                 "tipoDeAtividade":"QUESTOES",
+                                 "data":"%s","duracaoPrevistaEmMinutos":45,
+                                 "ordem":%d,"observacao":"Ajustado antes de regenerar"}
+                                """.formatted(materiaA, topicoA, SEGUNDA, ordemDoAjustado)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.origem").value("GERADO_AJUSTADO_MANUALMENTE"))
+                .andExpect(jsonPath("$.tipoDeAtividade").value("QUESTOES"))
+                .andExpect(jsonPath("$.duracaoPrevistaEmMinutos").value(45))
+                .andExpect(jsonPath("$.identificadorDoTopico").value(topicoA))
+                .andExpect(jsonPath("$.justificativaDaGeracao")
+                        .value(justificativaOriginal));
+        List<String> geradosPurosAnteriores = banco.queryForList("""
+                SELECT identificador::text
+                FROM blocos_de_estudo
+                WHERE plano_id = ?::uuid
+                  AND origem = 'GERADO_DETERMINISTICAMENTE'
+                ORDER BY identificador
+                """, String.class, plano);
+
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracaoDaAplicacao(true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosSubstituidos")
+                        .value(geradosPurosAnteriores.size()))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosPreservados").value(2));
+        org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM blocos_de_estudo
+                WHERE identificador IN (?::uuid, ?::uuid)
+                """, Integer.class, manual, ajustado)).isEqualTo(2);
+        for (String geradoAnterior : geradosPurosAnteriores) {
+            org.assertj.core.api.Assertions.assertThat(banco.queryForObject("""
+                    SELECT count(*) FROM blocos_de_estudo
+                    WHERE identificador = ?::uuid
+                    """, Integer.class, geradoAnterior)).isZero();
+        }
+
+        ativarPlano(sessao, plano);
+        api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracaoDaAplicacao(true)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("PLANO_SEMANAL_NAO_ESTA_EM_RASCUNHO"));
+
+        api.perform(get("/api/v1/planejamento/hoje")
+                        .param("data", SEGUNDA.toString()).session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("DIA_PLANEJADO"))
+                .andExpect(jsonPath("$.identificadorDoPlano").value(plano))
+                .andExpect(jsonPath("$.quantidadeDeBlocos").value(5))
+                .andExpect(jsonPath("$.minutosPlanejados").value(180));
+
+        iniciar(sessao, ajustado);
+        String conclusao = concluir(sessao, ajustado, 45, topicoA);
+        String registro = json.readTree(conclusao).get("estudo")
+                .get("identificador").asString();
+        String repeticao = concluir(sessao, ajustado, 45, topicoA);
+        org.assertj.core.api.Assertions.assertThat(json.readTree(repeticao).get("estudo")
+                .get("identificador").asString()).isEqualTo(registro);
+        assertEquals(1, quantidadeDeRegistros());
+
+        api.perform(get("/api/v1/estudos").session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDeItens").value(1))
+                .andExpect(jsonPath("$.itens[0].identificador").value(registro))
+                .andExpect(jsonPath("$.itens[0].identificadorDoTopico").value(topicoA))
+                .andExpect(jsonPath("$.itens[0].duracaoEmMinutos").value(45));
+        api.perform(get("/api/v1/planejamento/hoje")
+                        .param("data", SEGUNDA.toString()).session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.realizados[0].identificador").value(ajustado));
+
+        MockHttpSession sessaoB = criarContaEEntrar("fluxo.geracao.b@example.com");
+        api.perform(get("/api/v1/blocos-de-estudo/{id}/execucao", ajustado)
+                        .session(sessaoB))
+                .andExpect(status().isNotFound());
+        api.perform(get("/api/v1/estudos/{id}", registro).session(sessaoB))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -368,6 +515,69 @@ class IntegracaoPlanejamentoEstudosTest {
 
     private int quantidadeDeRegistros() {
         return banco.queryForObject("SELECT COUNT(*) FROM registros_de_estudo", Integer.class);
+    }
+
+    private void criarEstruturaElegivel(String email, List<String> materias,
+            String materiaRepetida) {
+        UUID usuario = banco.queryForObject(
+                "SELECT identificador FROM usuarios WHERE email = ?", UUID.class, email);
+        UUID concurso = UUID.randomUUID();
+        UUID cargo = UUID.randomUUID();
+        UUID prova = UUID.randomUUID();
+        UUID grupoA = UUID.randomUUID();
+        UUID grupoB = UUID.randomUUID();
+        banco.update("""
+                INSERT INTO concursos (identificador, usuario_id, nome, nome_normalizado,
+                    situacao, ativo, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Concurso ativo', 'concurso ativo', 'PLANEJADO', TRUE,
+                    now(), now(), 0)
+                """, concurso, usuario);
+        banco.update("""
+                INSERT INTO cargos_do_concurso (identificador, concurso_id, nome,
+                    nome_normalizado, nivel_de_escolaridade, selecionado, ordem,
+                    criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Auditor', 'auditor', 'SUPERIOR', TRUE, 1, now(), now(), 0)
+                """, cargo, concurso);
+        banco.update("""
+                INSERT INTO provas (identificador, cargo_id, nome, nome_normalizado,
+                    tipo, carater, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Objetiva', 'objetiva', 'OBJETIVA', 'ELIMINATORIO', 1,
+                    now(), now(), 0)
+                """, prova, cargo);
+        banco.update("""
+                INSERT INTO grupos_de_conteudo (identificador, prova_id, nome,
+                    nome_normalizado, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Basicos', 'basicos', 1, now(), now(), 0),
+                       (?, ?, 'Especificos', 'especificos', 2, now(), now(), 0)
+                """, grupoA, prova, grupoB, prova);
+        int ordem = 1;
+        for (String materia : materias) {
+            banco.update("""
+                    INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
+                        materia_id, ordem, criado_em, atualizado_em, versao)
+                    VALUES (?, ?, ?::uuid, ?, now(), now(), 0)
+                    """, UUID.randomUUID(), grupoA, materia, ordem++);
+        }
+        banco.update("""
+                INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
+                    materia_id, ordem, criado_em, atualizado_em, versao)
+                VALUES (?, ?, ?::uuid, 1, now(), now(), 0)
+                """, UUID.randomUUID(), grupoB, materiaRepetida);
+    }
+
+    private String configuracaoDaPrevia() {
+        return """
+                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                 "duracaoDoBlocoDeRevisaoEmMinutos":20}
+                """;
+    }
+
+    private String configuracaoDaAplicacao(boolean substituir) {
+        return """
+                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
+                 "duracaoDoBlocoDeRevisaoEmMinutos":20,
+                 "substituirBlocosGerados":%s}
+                """.formatted(substituir);
     }
 
     private String disponibilidades(int minutosDaSegunda) {

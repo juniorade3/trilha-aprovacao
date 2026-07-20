@@ -109,6 +109,55 @@ token no cabecalho `X-XSRF-TOKEN`. Os identificadores de plano, bloco e execucao
 nao substituem a sessao: um recurso de outro usuario responde como nao
 encontrado.
 
+## Geracao Deterministica
+
+As quatro operacoes da geracao pertencem ao grupo **Planejamento**:
+
+- `GET /api/v1/planos-semanais/{identificador}/materias-para-geracao`;
+- `PUT /api/v1/planos-semanais/{identificador}/prioridades-de-materias`;
+- `POST /api/v1/planos-semanais/{identificador}/geracao-deterministica/previa`;
+- `POST /api/v1/planos-semanais/{identificador}/geracao-deterministica`.
+
+Prioridades:
+
+```json
+{
+  "prioridades": [
+    {
+      "identificadorDaMateria": "UUID",
+      "prioridade": "ALTA"
+    }
+  ]
+}
+```
+
+Previa:
+
+```json
+{
+  "duracaoPadraoDoBlocoPrincipalEmMinutos": 50,
+  "duracaoDoBlocoDeRevisaoEmMinutos": 20
+}
+```
+
+Aplicacao:
+
+```json
+{
+  "duracaoPadraoDoBlocoPrincipalEmMinutos": 50,
+  "duracaoDoBlocoDeRevisaoEmMinutos": 20,
+  "substituirBlocosGerados": false
+}
+```
+
+Use o cookie `JSESSIONID` em todas as quatro rotas. Para `PUT` e `POST`, obtenha
+o token em `GET /api/v1/autenticacao/csrf` e envie o valor no cabecalho
+`X-XSRF-TOKEN`. Se a aplicacao responder `409` porque existe uma geracao
+anterior, repita a aplicacao com `substituirBlocosGerados=true` somente depois
+da confirmacao do usuario. A regeneracao substitui apenas blocos puramente
+gerados; blocos manuais e gerados ja ajustados permanecem. Prioridades, previa
+e aplicacao sao bloqueadas quando o plano nao esta em rascunho.
+
 ## Limitacoes da interface Swagger
 
 O navegador mantém `JSESSIONID`, mas a interface nao automatiza todo o ciclo de

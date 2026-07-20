@@ -3,6 +3,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
+
 const chamadas = vi.hoisted(() => ({
   listar: vi.fn(),
   substituir: vi.fn(),
@@ -152,6 +154,93 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect(componente.emitted('aplicado')).toHaveLength(1)
   })
 
+  it('preserva prioridades e duracoes ao voltar entre todas as etapas', async () => {
+    const componente = await montar()
+    await componente.find('select').setValue('ALTA')
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    const duracoes = componente.findAll('input[type="number"]')
+    await duracoes[0]!.setValue('75')
+    await duracoes[1]!.setValue('25')
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Ajustar')!
+      .trigger('click')
+    expect((componente.find('select').element as HTMLSelectElement).value).toBe(
+      'ALTA',
+    )
+
+    await componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Configuração'))!
+      .trigger('click')
+    const duracoesPreservadas = componente.findAll('input[type="number"]')
+    expect((duracoesPreservadas[0]!.element as HTMLInputElement).value).toBe(
+      '75',
+    )
+    expect((duracoesPreservadas[1]!.element as HTMLInputElement).value).toBe(
+      '25',
+    )
+
+    await componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Prévia'))!
+      .trigger('click')
+    expect(componente.text()).toContain('Prévia da semana')
+    expect(componente.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('repete o calculo sem recarregar materias e preserva a configuracao', async () => {
+    chamadas.gerar.mockRejectedValueOnce(new Error('Falha ao gerar prévia.'))
+    const componente = await montar()
+    await componente.find('select').setValue('ALTA')
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    const duracoes = componente.findAll('input[type="number"]')
+    await duracoes[0]!.setValue('75')
+    await duracoes[1]!.setValue('25')
+
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    expect(componente.text()).toContain('Falha ao gerar prévia.')
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.listar).toHaveBeenCalledTimes(1)
+    expect(chamadas.substituir).toHaveBeenCalledWith('plano-1', [
+      { identificadorDaMateria: 'materia-1', prioridade: 'ALTA' },
+      { identificadorDaMateria: 'materia-2', prioridade: 'NORMAL' },
+    ])
+    expect(chamadas.gerar).toHaveBeenCalledTimes(2)
+    expect(chamadas.gerar).toHaveBeenNthCalledWith(1, 'plano-1', 75, 25)
+    expect(chamadas.gerar).toHaveBeenNthCalledWith(2, 'plano-1', 75, 25)
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Ajustar')!
+      .trigger('click')
+    expect((componente.find('select').element as HTMLSelectElement).value).toBe(
+      'ALTA',
+    )
+    await componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Configuração'))!
+      .trigger('click')
+    const duracoesPreservadas = componente.findAll('input[type="number"]')
+    expect((duracoesPreservadas[0]!.element as HTMLInputElement).value).toBe(
+      '75',
+    )
+    expect((duracoesPreservadas[1]!.element as HTMLInputElement).value).toBe(
+      '25',
+    )
+  })
+
   it('confirma regeneracao preservando manuais e ajustados', async () => {
     const componente = await montar(3)
     await componente.get('button.btn-primary.w-100').trigger('click')
@@ -179,6 +268,250 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect(chamadas.aplicar).toHaveBeenCalledWith('plano-1', 50, 20, true)
   })
 
+  it('fecha primeiro o modal de regeneracao e depois a gaveta com escape', async () => {
+    const componente = await montar(3)
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    const aplicar = componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+    ;(aplicar.element as HTMLButtonElement).focus()
+    await aplicar.trigger('click')
+    await flushPromises()
+    expect(
+      document.body.querySelector('.sobreposicao-da-aplicacao-sobre-gaveta'),
+    ).not.toBeNull()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(
+      document.body.querySelector('.sobreposicao-da-aplicacao-sobre-gaveta'),
+    ).toBeNull()
+    expect(componente.text()).toContain('Prévia da semana')
+    expect(componente.emitted('fechar')).toBeUndefined()
+    expect(document.activeElement).toBe(aplicar.element)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(componente.emitted('fechar')).toHaveLength(1)
+  })
+
+  it('fecha o modal apos falha de regeneracao e expoe o retry seguro', async () => {
+    chamadas.aplicar.mockRejectedValueOnce(new Error('Falha de rede.'))
+    const componente = await montar(3)
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+      .trigger('click')
+    const confirmar = Array.from(document.body.querySelectorAll('button')).find(
+      (botao) => botao.textContent?.includes('Substituir e aplicar'),
+    ) as HTMLButtonElement
+    confirmar.click()
+    await flushPromises()
+
+    expect(
+      document.body.querySelector('.sobreposicao-da-aplicacao-sobre-gaveta'),
+    ).toBeNull()
+    expect(componente.get('[role="alert"]').text()).toContain('Falha de rede.')
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.aplicar).toHaveBeenNthCalledWith(1, 'plano-1', 50, 20, true)
+    expect(chamadas.aplicar).toHaveBeenNthCalledWith(
+      2,
+      'plano-1',
+      50,
+      20,
+      false,
+    )
+    expect(componente.emitted('aplicado')).toHaveLength(1)
+  })
+
+  it('exige salvar prioridades novas e permite consultar a previa antiga', async () => {
+    const componente = await montar()
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Ajustar')!
+      .trigger('click')
+    await componente.find('select').setValue('ALTA')
+    const configuracao = componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Configuração'))!
+    expect(configuracao.attributes('disabled')).toBeDefined()
+    await configuracao.trigger('click')
+    expect(componente.text()).toContain('Prioridades desta semana')
+    expect(chamadas.gerar).toHaveBeenCalledTimes(1)
+
+    const previaAntiga = componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Prévia'))!
+    expect(previaAntiga.attributes('disabled')).toBeUndefined()
+    await previaAntiga.trigger('click')
+
+    expect(componente.get('[role="status"]').text()).toContain(
+      'Prévia desatualizada. Prioridades ou durações mudaram. Recalcule antes de aplicar.',
+    )
+    const recalcular = componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Recalcular prévia')!
+    expect(recalcular.attributes('disabled')).toBeDefined()
+    await recalcular.trigger('click')
+    await flushPromises()
+    expect(chamadas.gerar).toHaveBeenCalledTimes(1)
+    expect(chamadas.aplicar).not.toHaveBeenCalled()
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Ajustar')!
+      .trigger('click')
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    expect(chamadas.substituir).toHaveBeenLastCalledWith('plano-1', [
+      { identificadorDaMateria: 'materia-1', prioridade: 'ALTA' },
+      { identificadorDaMateria: 'materia-2', prioridade: 'NORMAL' },
+    ])
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    expect(chamadas.gerar).toHaveBeenCalledTimes(2)
+    expect(componente.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('recalcula e libera a aplicacao pelo fluxo de ajuste e configuracao', async () => {
+    const componente = await montar()
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+
+    await componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Configuração'))!
+      .trigger('click')
+    await componente.find('input[type="number"]').setValue('60')
+    await componente
+      .findAll('.etapa-da-geracao')
+      .find((botao) => botao.text().includes('Prévia'))!
+      .trigger('click')
+    expect(componente.get('[role="status"]').text()).toContain(
+      'Prévia desatualizada.',
+    )
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Ajustar')!
+      .trigger('click')
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+
+    expect(chamadas.gerar).toHaveBeenLastCalledWith('plano-1', 60, 20)
+    expect(componente.find('[role="status"]').exists()).toBe(false)
+    const aplicar = componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+    expect(aplicar.attributes('disabled')).toBeUndefined()
+    await aplicar.trigger('click')
+    await flushPromises()
+    expect(chamadas.aplicar).toHaveBeenCalledWith('plano-1', 60, 20, false)
+  })
+
+  it('repete a operacao que falhou em cada etapa recuperavel', async () => {
+    chamadas.substituir.mockRejectedValueOnce(
+      new Error('Falha ao salvar prioridades.'),
+    )
+    chamadas.gerar.mockRejectedValueOnce(new Error('Falha ao gerar prévia.'))
+    chamadas.aplicar.mockRejectedValueOnce(new Error('Falha ao aplicar.'))
+    const componente = await montar()
+
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    expect(componente.text()).toContain('Falha ao salvar prioridades.')
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.substituir).toHaveBeenCalledTimes(2)
+    expect(componente.text()).toContain('Configuração dos blocos')
+
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    expect(componente.text()).toContain('Falha ao gerar prévia.')
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.gerar).toHaveBeenCalledTimes(2)
+    expect(componente.text()).toContain('Prévia da semana')
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+      .trigger('click')
+    await flushPromises()
+    expect(componente.text()).toContain('Falha ao aplicar.')
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.aplicar).toHaveBeenCalledTimes(2)
+    expect(chamadas.aplicar).toHaveBeenLastCalledWith('plano-1', 50, 20, false)
+    expect(componente.emitted('aplicado')).toHaveLength(1)
+  })
+
+  it('explica o conflito encontrado pelo servidor sem exibir contador zero', async () => {
+    chamadas.aplicar.mockRejectedValueOnce(
+      new ErroDaApi(
+        409,
+        'A geração já foi aplicada.',
+        'GERACAO_DETERMINISTICA_JA_APLICADA',
+      ),
+    )
+    const componente = await montar()
+    await componente.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await componente.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain(
+      'O servidor encontrou uma geração anterior. Os blocos puramente gerados serão substituídos.',
+    )
+    expect(document.body.textContent).not.toContain(
+      '0 bloco(s) gerado(s) serão substituídos.',
+    )
+    const confirmar = Array.from(document.body.querySelectorAll('button')).find(
+      (botao) => botao.textContent?.includes('Substituir e aplicar'),
+    ) as HTMLButtonElement
+    confirmar.click()
+    await flushPromises()
+
+    expect(chamadas.aplicar).toHaveBeenLastCalledWith('plano-1', 50, 20, true)
+  })
+
   it('exibe vazio recuperavel quando nao ha concurso ativo ou cargo', async () => {
     chamadas.listar.mockRejectedValueOnce(
       new Error('Defina um concurso ativo antes de gerar a semana.'),
@@ -187,5 +520,13 @@ describe('GavetaDeGeracaoDeterministica', () => {
 
     expect(componente.get('[role="alert"]').text()).toContain('concurso ativo')
     expect(componente.text()).toContain('Tentar novamente')
+
+    await componente
+      .findAll('button')
+      .find((botao) => botao.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+    expect(chamadas.listar).toHaveBeenCalledTimes(2)
+    expect(componente.text()).toContain('Banco de dados')
   })
 })

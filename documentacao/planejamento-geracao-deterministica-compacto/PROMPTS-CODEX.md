@@ -9,8 +9,8 @@ Implemente exclusivamente a Sprint 01 da Geração Determinística.
 
 Leia:
 - AGENTS.md
-- documentacao/planejamento-geracao-deterministica/CONTEXTO-COMUM.md
-- documentacao/planejamento-geracao-deterministica/sprint-01-prioridades-e-previa-completa.md
+- documentacao/planejamento-geracao-deterministica-compacto/CONTEXTO-COMUM.md
+- documentacao/planejamento-geracao-deterministica-compacto/sprint-01-prioridades-e-previa-completa.md
 
 Antes de alterar código:
 1. confirme que a Sprint 08 do Planejamento Manual está na main;
@@ -32,8 +32,8 @@ Implemente exclusivamente a Sprint 02 da Geração Determinística.
 
 Leia:
 - AGENTS.md
-- documentacao/planejamento-geracao-deterministica/CONTEXTO-COMUM.md
-- documentacao/planejamento-geracao-deterministica/sprint-02-aplicacao-e-regeneracao-segura.md
+- documentacao/planejamento-geracao-deterministica-compacto/CONTEXTO-COMUM.md
+- documentacao/planejamento-geracao-deterministica-compacto/sprint-02-aplicacao-e-regeneracao-segura.md
 - registro de conclusão da Sprint 01
 
 Parta da main atualizada após o merge da Sprint 01.
@@ -51,15 +51,18 @@ Implemente exclusivamente a Sprint 03 da Geração Determinística.
 
 Leia:
 - AGENTS.md
-- documentacao/planejamento-geracao-deterministica/CONTEXTO-COMUM.md
-- documentacao/planejamento-geracao-deterministica/sprint-03-consolidacao-e-aceite.md
+- documentacao/planejamento-geracao-deterministica-compacto/CONTEXTO-COMUM.md
+- documentacao/planejamento-geracao-deterministica-compacto/SPRINT-03-IMPLEMENTACAO-DETALHADA.md
 - registros de conclusão das Sprints 01 e 02
 
 Parta da main atualizada.
 Não adicione regra nova sem falha comprovada.
-Consolide testes, segurança, migrations, Swagger, acessibilidade, responsividade, documentação e fluxo completo.
-Remova qualquer workflow ou arquivo temporário.
+Siga o roteiro técnico detalhado sem reprojetar a solução.
+Consolide fluxo integral, determinismo, capacidade, revisão única, regeneração seletiva,
+isolamento A/B, concorrência, PostgreSQL vazio, arquitetura, OpenAPI, frontend, teclado e foco.
+Não crie entidade, migration V13, Pinia, dependência de navegador ou módulo futuro sem falha comprovada.
 Execute make verificar e a validação manual.
-Abra PR e faça merge apenas com CI verde.
+Preencha ACEITE-SPRINT-03.md somente com resultados executados e abra o PR.
+Não faça merge com CI vermelha.
 Não inicie Motor de Evidências, Revisões, Lacunas ou IA.
 ```

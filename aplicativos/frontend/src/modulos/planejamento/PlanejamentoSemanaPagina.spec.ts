@@ -220,16 +220,31 @@ describe('PlanejamentoSemanaPagina', () => {
   })
 
   it('abre a geracao deterministica somente em plano rascunho', async () => {
-    const { pagina } = await montarPagina()
-
-    await pagina
+    const bloco = blocoDeEstudo()
+    chamadas.obterPlanoSemanal.mockResolvedValue(planoSemanal(180, [bloco]))
+    const { pagina, roteador } = await montarPagina()
+    expect(pagina.findAll('.lista-de-blocos-do-dia > li')).toHaveLength(1)
+    const botao = pagina
       .findAll('button')
-      .find((botao) => botao.text().includes('Gerar semana'))!
-      .trigger('click')
+      .find((item) => item.text().includes('Gerar semana'))!
+    ;(botao.element as HTMLButtonElement).focus()
+
+    await botao.trigger('click')
     await flushPromises()
 
     expect(chamadas.listarMateriasParaGeracao).toHaveBeenCalledWith('plano-1')
     expect(pagina.text()).toContain('Prioridades desta semana')
+    expect(roteador.currentRoute.value.query).toEqual({ inicio })
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(pagina.text()).not.toContain('Prioridades desta semana')
+    expect(roteador.currentRoute.value.query).toEqual({ inicio })
+    expect(document.activeElement).toBe(botao.element)
+    expect(chamadas.aplicarGeracaoDeterministica).not.toHaveBeenCalled()
+    expect(pagina.findAll('.lista-de-blocos-do-dia > li')).toHaveLength(1)
+    expect(pagina.text()).toContain('Banco de dados')
   })
 
   it('aplica a geracao e atualiza a semana com origem e justificativa', async () => {
@@ -338,6 +353,23 @@ describe('PlanejamentoSemanaPagina', () => {
     await flushPromises()
 
     expect(roteador.currentRoute.value.query.inicio).toBe('2026-07-27')
+    expect(chamadas.obterPlanoSemanal).toHaveBeenLastCalledWith('2026-07-27')
+  })
+
+  it('fecha a geracao aberta antes de carregar outra semana', async () => {
+    const { pagina, roteador } = await montarPagina()
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Gerar semana'))!
+      .trigger('click')
+    await flushPromises()
+    expect(pagina.text()).toContain('Prioridades desta semana')
+
+    await roteador.push('/planejamento/semana?inicio=2026-07-27')
+    await flushPromises()
+
+    expect(pagina.text()).not.toContain('Prioridades desta semana')
+    expect(chamadas.listarMateriasParaGeracao).toHaveBeenCalledTimes(1)
     expect(chamadas.obterPlanoSemanal).toHaveBeenLastCalledWith('2026-07-27')
   })
 

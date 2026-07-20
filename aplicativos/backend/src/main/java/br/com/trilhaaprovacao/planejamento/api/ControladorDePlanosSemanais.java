@@ -1,11 +1,17 @@
 package br.com.trilhaaprovacao.planejamento.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
+import br.com.trilhaaprovacao.compartilhado.api.RespostaDeErro;
 import br.com.trilhaaprovacao.planejamento.aplicacao.DisponibilidadeInformada;
 import br.com.trilhaaprovacao.planejamento.aplicacao.PrioridadeDeMateriaInformada;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeGeracaoDeterministica;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
 import br.com.trilhaaprovacao.planejamento.dominio.ConfiguracaoDaGeracaoDeterministica;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -72,6 +78,20 @@ public class ControladorDePlanosSemanais {
     }
 
     @GetMapping("/{identificador}/materias-para-geracao")
+    @Operation(
+            summary = "Lista as materias elegiveis para a geracao",
+            description = "Retorna as materias pessoais ativas do cargo selecionado no "
+                    + "concurso ativo, em ordem estavel, com as prioridades atuais do plano.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Materias elegiveis listadas.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDeMateriasParaGeracao.class))),
+        @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422",
+                description = "Concurso ativo, cargo selecionado ou materias elegiveis ausentes.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
     public RespostaDeMateriasParaGeracao listarMateriasParaGeracao(
             @PathVariable UUID identificador, Authentication autenticacao) {
         return RespostaDeMateriasParaGeracao.de(geracao.listarMaterias(
@@ -79,6 +99,24 @@ public class ControladorDePlanosSemanais {
     }
 
     @PutMapping("/{identificador}/prioridades-de-materias")
+    @Operation(
+            summary = "Substitui as prioridades das materias",
+            description = "Substitui as prioridades do plano em rascunho. A requisicao deve "
+                    + "conter cada materia elegivel uma unica vez.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Prioridades substituidas.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDeMateriasParaGeracao.class))),
+        @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Plano nao esta em rascunho.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422",
+                description = "Elegibilidade ou conjunto de prioridades invalido.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
     public RespostaDeMateriasParaGeracao alterarPrioridades(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeAlteracaoDasPrioridades requisicao,
@@ -92,6 +130,24 @@ public class ControladorDePlanosSemanais {
     }
 
     @PostMapping("/{identificador}/geracao-deterministica/previa")
+    @Operation(
+            summary = "Gera a previa deterministica da semana",
+            description = "Calcula a previa com a configuracao informada sem persistir novos "
+                    + "blocos no plano.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Previa calculada.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDaPreviaDaGeracao.class))),
+        @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Plano nao esta em rascunho.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422",
+                description = "Elegibilidade ou configuracao da geracao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
     public RespostaDaPreviaDaGeracao gerarPrevia(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDePreviaDaGeracao requisicao,
@@ -104,6 +160,25 @@ public class ControladorDePlanosSemanais {
     }
 
     @PostMapping("/{identificador}/geracao-deterministica")
+    @Operation(
+            summary = "Aplica a geracao deterministica ao plano",
+            description = "Persiste os blocos sugeridos e, quando confirmado, substitui somente "
+                    + "blocos gerados sem ajuste manual.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Geracao aplicada.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDaAplicacaoDaGeracao.class))),
+        @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409",
+                description = "Plano nao esta em rascunho ou exige confirmacao para regenerar.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422",
+                description = "Elegibilidade ou configuracao da geracao invalida.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
     public RespostaDaAplicacaoDaGeracao aplicarGeracao(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeAplicacaoDaGeracao requisicao,
