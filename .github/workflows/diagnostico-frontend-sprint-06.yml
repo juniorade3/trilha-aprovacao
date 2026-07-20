@@ -1,0 +1,31 @@
+name: Diagnostico frontend Sprint 06
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-06'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Instalar
+        working-directory: aplicativos/frontend
+        run: npm ci
+      - name: Capturar tipos
+        working-directory: aplicativos/frontend
+        run: npm run verificar-tipos > diagnostico-tipos.log 2>&1 || true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: diagnostico-tipos-sprint-06
+          path: aplicativos/frontend/diagnostico-tipos.log
