@@ -1,0 +1,66 @@
+name: Finalizar Ajustes Sprint 07
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  finalizar:
+    if: github.event.pull_request.head.ref == 'feature/planejamento-sprint-07' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/planejamento-sprint-07
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: aplicativos/frontend/package-lock.json
+      - name: Aplicar ajustes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pagina = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoSemanaPagina.vue')
+          texto = pagina.read_text()
+          antigo = '''            >{{ plano.estado }}</strong\n          >'''
+          novo = '''            >{{\n              plano.estado === 'ATIVO'\n                ? 'Ativo'\n                : plano.estado === 'RASCUNHO'\n                  ? 'Rascunho'\n                  : plano.estado === 'ENCERRADO'\n                    ? 'Encerrado'\n                    : 'Cancelado'\n            }}</strong\n          >'''
+          if antigo not in texto:
+              raise SystemExit('Estado bruto não encontrado')
+          pagina.write_text(texto.replace(antigo, novo, 1))
+
+          spec = Path('aplicativos/frontend/src/modulos/planejamento/PlanejamentoSemanaPagina.spec.ts')
+          texto = spec.read_text()
+          texto = texto.replace(
+              "expect(pagina.find('#disponibilidade-2026-07-20').exists()).toBe(false)",
+              "expect(pagina.find('#disponibilidade-2026-07-20').exists()).toBe(true)",
+              1,
+          )
+          texto = texto.replace(
+              "expect(pagina.find('[aria-label=\"Editar Banco de dados\"]').exists()).toBe(\n      false,\n    )",
+              "expect(pagina.find('[aria-label=\"Editar Banco de dados\"]').exists()).toBe(\n      true,\n    )",
+              1,
+          )
+          spec.write_text(texto)
+          PY
+      - name: Formatar
+        working-directory: aplicativos/frontend
+        run: |
+          npm ci
+          npm run formatar
+      - name: Versionar
+        run: |
+          rm -f .github/workflows/ajustar-frontend-sprint-07.yml
+          rm -f .github/workflows/diagnosticar-sprint-07.yml
+          rm -f .github/workflows/diagnosticar-frontend-sprint-07.yml
+          rm -f .github/workflows/finalizar-ajustes-sprint-07.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test: atualiza regressões para plano ativo editável"
+          git push origin HEAD:feature/planejamento-sprint-07
