@@ -65,6 +65,11 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{plano}/ordem-dos-blocos'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/ativacao'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/reagendamento'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/cancelamento'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/execucoes-de-bloco/{identificador}/correcao'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/encerramento'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/planos-semanais/{identificador}/cancelamento'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/planejamento/hoje'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/dashboard'].get").exists())
                 .andReturn().getResponse().getContentAsString();

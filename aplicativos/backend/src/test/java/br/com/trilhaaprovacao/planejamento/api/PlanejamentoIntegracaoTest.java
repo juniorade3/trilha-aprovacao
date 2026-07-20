@@ -308,7 +308,7 @@ class PlanejamentoIntegracaoTest {
     }
 
     @Test
-    void deveAtivarPlanoValidoDeFormaIdempotenteEBloquearEdicao() throws Exception {
+    void deveAtivarPlanoValidoEPermitirAjusteSemReduzirAbaixoDaCarga() throws Exception {
         MockHttpSession sessao = criarContaEEntrar("ativacao@example.com");
         String plano = criarPlano(sessao, SEGUNDA);
         api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
@@ -335,7 +335,92 @@ class PlanejamentoIntegracaoTest {
         api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
                         .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(disponibilidades(180)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isOk());
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(60)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("DISPONIBILIDADE_ABAIXO_DA_CARGA_PLANEJADA"));
+    }
+
+    @Test
+    void deveReagendarCancelarEEncerrarPlanoAtivoComSeguranca() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("replanejamento.a@example.com");
+        String plano = criarPlano(sessaoA, SEGUNDA);
+        api.perform(put("/api/v1/planos-semanais/{id}/disponibilidades", plano)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(disponibilidades(240)))
+                .andExpect(status().isOk());
+        String primeiro = criarBloco(
+                sessaoA, plano, "Primeiro", SEGUNDA, 60, 1, null, null);
+        String segundo = criarBloco(
+                sessaoA, plano, "Segundo", SEGUNDA, 60, 2, null, null);
+        String terceiro = criarBloco(
+                sessaoA, plano, "Terceiro", SEGUNDA, 60, 3, null, null);
+        api.perform(post("/api/v1/planos-semanais/{id}/ativacao", plano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk());
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/inicio", terceiro)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dataDeReferencia\":\"" + SEGUNDA + "\"}"))
+                .andExpect(status().isOk());
+        api.perform(post("/api/v1/planos-semanais/{id}/encerramento", plano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("PLANO_POSSUI_EXECUCAO_EM_ANDAMENTO"));
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/interrupcao", terceiro)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoExecutadaEmMinutos\":10}"))
+                .andExpect(status().isOk());
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/reagendamento", primeiro)
+                        .session(sessaoA).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"data\":\"" + SEGUNDA.plusDays(1)
+                                + "\",\"horarioPrevisto\":\"10:00\",\"ordem\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(SEGUNDA.plusDays(1).toString()))
+                .andExpect(jsonPath("$.quantidadeDeReagendamentos").value(1));
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/cancelamento", segundo)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("CANCELADO"));
+
+        MockHttpSession sessaoB = criarContaEEntrar("replanejamento.b@example.com");
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/reagendamento", primeiro)
+                        .session(sessaoB).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"data\":\"" + SEGUNDA
+                                + "\",\"ordem\":1}"))
+                .andExpect(status().isNotFound());
+        api.perform(post("/api/v1/planos-semanais/{id}/encerramento", plano)
+                        .session(sessaoA))
+                .andExpect(status().isForbidden());
+        api.perform(post("/api/v1/planos-semanais/{id}/encerramento", plano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("ENCERRADO"));
+        api.perform(get("/api/v1/planejamento/hoje")
+                        .param("data", SEGUNDA.toString()).session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("PLANO_ENCERRADO"));
+
+        LocalDate semanaSeguinte = SEGUNDA.plusWeeks(1);
+        String outroPlano = criarPlano(sessaoA, semanaSeguinte);
+        criarBloco(sessaoA, outroPlano, "Pendente", semanaSeguinte,
+                30, 1, null, null);
+        api.perform(post("/api/v1/planos-semanais/{id}/cancelamento", outroPlano)
+                        .session(sessaoA).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("CANCELADO"))
+                .andExpect(jsonPath("$.blocos[0].estado").value("CANCELADO"));
+        api.perform(get("/api/v1/planejamento/hoje")
+                        .param("data", semanaSeguinte.toString()).session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("PLANO_CANCELADO"));
     }
 
     @Test

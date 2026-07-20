@@ -55,6 +55,22 @@ public class ControladorDeBlocosDeEstudo {
                 requisicao.paraDados()));
     }
 
+    @PostMapping("/blocos-de-estudo/{identificador}/reagendamento")
+    public RespostaDeBlocoDeEstudo reagendar(@PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeReagendamentoDoBloco requisicao,
+            Authentication autenticacao) {
+        return RespostaDeBlocoDeEstudo.de(servico.reagendarBloco(
+                usuarioAtual.obter(autenticacao), identificador, requisicao.data(),
+                requisicao.horarioPrevisto(), requisicao.ordem()));
+    }
+
+    @PostMapping("/blocos-de-estudo/{identificador}/cancelamento")
+    public RespostaDeBlocoDeEstudo cancelar(@PathVariable UUID identificador,
+            Authentication autenticacao) {
+        return RespostaDeBlocoDeEstudo.de(servico.cancelarBloco(
+                usuarioAtual.obter(autenticacao), identificador));
+    }
+
     @DeleteMapping("/blocos-de-estudo/{identificador}")
     public ResponseEntity<Void> excluir(@PathVariable UUID identificador,
             Authentication autenticacao) {
@@ -119,6 +135,16 @@ public class ControladorDeBlocosDeEstudo {
                 usuarioAtual.obter(autenticacao), identificador,
                 requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
                 requisicao.identificadorDoTopico()));
+    }
+
+    @PutMapping("/execucoes-de-bloco/{identificador}/correcao")
+    public RespostaDaExecucaoDoBloco corrigirExecucao(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeCorrecaoDaExecucao requisicao,
+            Authentication autenticacao) {
+        return RespostaDaExecucaoDoBloco.de(servico.corrigirExecucao(
+                usuarioAtual.obter(autenticacao), identificador, requisicao.resultado(),
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
     }
 
     @PostMapping("/execucoes-de-bloco/{identificador}/registro-de-estudo")

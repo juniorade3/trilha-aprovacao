@@ -65,6 +65,20 @@ public class ControladorDePlanosSemanais {
                 usuarioAtual.obter(autenticacao), identificador, informadas));
     }
 
+    @PostMapping("/{identificador}/encerramento")
+    public RespostaDePlanoSemanal encerrar(@PathVariable UUID identificador,
+            Authentication autenticacao) {
+        return RespostaDePlanoSemanal.de(servico.encerrarPlano(
+                usuarioAtual.obter(autenticacao), identificador));
+    }
+
+    @PostMapping("/{identificador}/cancelamento")
+    public RespostaDePlanoSemanal cancelar(@PathVariable UUID identificador,
+            Authentication autenticacao) {
+        return RespostaDePlanoSemanal.de(servico.cancelarPlano(
+                usuarioAtual.obter(autenticacao), identificador));
+    }
+
     @PostMapping("/{identificador}/ativacao")
     public RespostaDePlanoSemanal ativar(@PathVariable UUID identificador,
             Authentication autenticacao) {

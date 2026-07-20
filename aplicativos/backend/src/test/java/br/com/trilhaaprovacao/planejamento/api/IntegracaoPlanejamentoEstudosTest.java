@@ -3,6 +3,7 @@ package br.com.trilhaaprovacao.planejamento.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -151,6 +152,41 @@ class IntegracaoPlanejamentoEstudosTest {
                         .doesNotExist());
 
         assertEquals(0, quantidadeDeRegistros());
+    }
+
+    @Test
+    void deveCorrigirExecucaoEEstudoVinculadoComRastreabilidade() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("correcao@example.com");
+        String materia = criarMateria(sessao, "Banco de dados");
+        String topico = criarTopico(sessao, materia, "Modelagem relacional");
+        String plano = criarPlanoAtivo(sessao);
+        String bloco = criarBloco(sessao, plano, "Estudar modelagem", materia, topico);
+        iniciar(sessao, bloco);
+        String resposta = concluir(sessao, bloco, 45, null);
+        String execucao = json.readTree(resposta).get("execucao")
+                .get("identificador").asString();
+        String registroOriginal = json.readTree(resposta).get("execucao")
+                .get("identificadorDoRegistroDeEstudo").asString();
+
+        api.perform(put("/api/v1/execucoes-de-bloco/{id}/correcao", execucao)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"resultado":"PARCIALMENTE_CONCLUIDO",
+                                 "duracaoExecutadaEmMinutos":30,
+                                 "observacao":"Duração corrigida"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bloco.estado")
+                        .value("PARCIALMENTE_CONCLUIDO"))
+                .andExpect(jsonPath("$.execucao.duracaoExecutadaEmMinutos").value(30))
+                .andExpect(jsonPath("$.execucao.identificadorDoRegistroDeEstudo")
+                        .isNotEmpty());
+
+        assertEquals("CORRIGIDO", banco.queryForObject("""
+                SELECT situacao FROM registros_de_estudo WHERE identificador = ?::uuid
+                """, String.class, registroOriginal));
+        assertEquals(2, quantidadeDeRegistros());
     }
 
     private String registrarNoHistorico(MockHttpSession sessao, String execucao,

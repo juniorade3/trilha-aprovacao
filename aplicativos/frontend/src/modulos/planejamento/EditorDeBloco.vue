@@ -19,6 +19,7 @@ const propriedades = defineProps<{
   topicos: Topico[]
   salvando: boolean
   erro?: string
+  edicaoDePlanoAtivo?: boolean
 }>()
 
 const emitir = defineEmits<{
@@ -156,6 +157,7 @@ function salvar() {
             v-model="formulario.data"
             class="form-select"
             required
+            :disabled="propriedades.edicaoDePlanoAtivo"
           >
             <option v-for="data in datasDaSemana" :key="data" :value="data">
               {{ data }}
@@ -231,6 +233,7 @@ function salvar() {
             min="1"
             :max="quantidadeMaximaNaData"
             required
+            :disabled="propriedades.edicaoDePlanoAtivo"
           />
         </div>
         <div>

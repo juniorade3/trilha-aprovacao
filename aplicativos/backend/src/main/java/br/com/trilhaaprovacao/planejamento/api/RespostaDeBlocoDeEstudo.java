@@ -21,6 +21,8 @@ public record RespostaDeBlocoDeEstudo(
         LocalTime horarioPrevisto,
         String observacao,
         EstadoDoBlocoDeEstudo estado,
+        int quantidadeDeReagendamentos,
+        OffsetDateTime reagendadoEm,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,
         long versao) {
@@ -32,6 +34,7 @@ public record RespostaDeBlocoDeEstudo(
                 bloco.tipoDeAtividade(), bloco.data(),
                 bloco.duracaoPrevistaEmMinutos(), bloco.ordem(),
                 bloco.horarioPrevisto(), bloco.observacao(), bloco.estado(),
+                bloco.quantidadeDeReagendamentos(), bloco.reagendadoEm(),
                 bloco.criadoEm(), bloco.atualizadoEm(), bloco.versao());
     }
 }

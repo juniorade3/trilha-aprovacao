@@ -37,8 +37,14 @@ public class ConsultaDoPlanejamentoDeHoje {
 
         PlanoSemanal plano = encontrado.get().paraDominio();
         if (!plano.estaAtivo()) {
+            EstadoDoPlanejamentoDeHoje estado = switch (plano.estado()) {
+                case RASCUNHO -> EstadoDoPlanejamentoDeHoje.PLANO_EM_RASCUNHO;
+                case ENCERRADO -> EstadoDoPlanejamentoDeHoje.PLANO_ENCERRADO;
+                case CANCELADO -> EstadoDoPlanejamentoDeHoje.PLANO_CANCELADO;
+                case ATIVO -> throw new IllegalStateException("Plano ativo esperado.");
+            };
             return new ResultadoDoPlanejamentoDeHoje(
-                    EstadoDoPlanejamentoDeHoje.PLANO_EM_RASCUNHO, data,
+                    estado, data,
                     plano.identificador(), plano.dataInicial(), 0, 0, null,
                     List.of(), List.of(), List.of());
         }
