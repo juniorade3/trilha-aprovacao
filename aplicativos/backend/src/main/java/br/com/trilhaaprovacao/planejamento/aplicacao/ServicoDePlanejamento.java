@@ -378,8 +378,10 @@ public class ServicoDePlanejamento {
                     atual.iniciadaEm(), duracao, observacao);
             novoRegistro = estudo.identificador();
         }
+        UUID registroCorrigido = novoRegistro;
         ExecucaoDoBloco corrigida = regra("EXECUCAO_DO_BLOCO_INVALIDA",
-                () -> atual.corrigir(resultado, duracao, observacao, novoRegistro, OffsetDateTime.now()));
+                () -> atual.corrigir(resultado, duracao, observacao,
+                        registroCorrigido, OffsetDateTime.now()));
         persistida.atualizarDe(corrigida);
         BlocoDeEstudoPersistido bloco = blocoPersistido(usuario, atual.identificadorDoBloco());
         blocos.flush();
