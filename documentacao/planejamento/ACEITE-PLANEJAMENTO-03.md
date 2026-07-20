@@ -19,6 +19,7 @@
 | frontend | 97 testes Vitest aprovados; tipos, lint, build e formatacao aprovados |
 | auditoria de dependencias | `npm audit` encontrou zero vulnerabilidades |
 | porta global | `make verificar` aprovado |
+| CI do PR | GitHub Actions run `29759549107`: estrutura/Compose, backend/migrations/arquitetura e frontend aprovados |
 
 ## Validacao manual executada
 
