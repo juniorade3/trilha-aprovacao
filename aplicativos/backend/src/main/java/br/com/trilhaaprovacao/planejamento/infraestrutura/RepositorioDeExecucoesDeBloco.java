@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface RepositorioDeExecucoesDeBloco
         extends JpaRepository<ExecucaoDoBlocoPersistida, UUID> {
     Optional<ExecucaoDoBlocoPersistida> findByIdentificadorDoBloco(UUID bloco);
-
     Optional<ExecucaoDoBlocoPersistida>
             findByIdentificadorDoUsuarioAndEncerradaEmIsNull(UUID usuario);
+    Optional<ExecucaoDoBlocoPersistida>
+            findByIdentificadorAndIdentificadorDoUsuario(UUID identificador, UUID usuario);
 }

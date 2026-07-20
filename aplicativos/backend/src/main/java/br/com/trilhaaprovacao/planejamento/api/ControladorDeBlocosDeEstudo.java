@@ -5,11 +5,13 @@ import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -80,6 +82,23 @@ public class ControladorDeBlocosDeEstudo {
                 requisicao.dataDeReferencia()));
     }
 
+
+    @GetMapping("/blocos-de-estudo/{identificador}/execucao")
+    public RespostaDaExecucaoDoBloco obterExecucao(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return RespostaDaExecucaoDoBloco.de(servico.obterExecucaoDoBloco(
+                usuarioAtual.obter(autenticacao), identificador));
+    }
+
+    @GetMapping("/blocos-de-estudo/{identificador}/topicos-para-registro")
+    public List<RespostaDeTopicoParaRegistro> listarTopicosParaRegistro(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return servico.listarTopicosParaRegistro(
+                usuarioAtual.obter(autenticacao), identificador).stream()
+                .map(RespostaDeTopicoParaRegistro::de).toList();
+    }
+
+
     @PostMapping("/blocos-de-estudo/{identificador}/conclusao")
     public RespostaDaExecucaoDoBloco concluir(
             @PathVariable UUID identificador,
@@ -87,7 +106,8 @@ public class ControladorDeBlocosDeEstudo {
             Authentication autenticacao) {
         return RespostaDaExecucaoDoBloco.de(servico.concluirBloco(
                 usuarioAtual.obter(autenticacao), identificador,
-                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
+                requisicao.identificadorDoTopico()));
     }
 
     @PostMapping("/blocos-de-estudo/{identificador}/interrupcao")
@@ -97,6 +117,18 @@ public class ControladorDeBlocosDeEstudo {
             Authentication autenticacao) {
         return RespostaDaExecucaoDoBloco.de(servico.interromperBloco(
                 usuarioAtual.obter(autenticacao), identificador,
-                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
+                requisicao.identificadorDoTopico()));
     }
+
+    @PostMapping("/execucoes-de-bloco/{identificador}/registro-de-estudo")
+    public RespostaDaExecucaoDoBloco registrarNoHistorico(
+            @PathVariable UUID identificador,
+            @RequestBody(required = false) RequisicaoDeRegistroNoHistorico requisicao,
+            Authentication autenticacao) {
+        UUID topico = requisicao == null ? null : requisicao.identificadorDoTopico();
+        return RespostaDaExecucaoDoBloco.de(servico.registrarExecucaoNoHistorico(
+                usuarioAtual.obter(autenticacao), identificador, topico));
+    }
+
 }

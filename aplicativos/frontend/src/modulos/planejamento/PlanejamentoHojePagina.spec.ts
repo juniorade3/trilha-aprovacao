@@ -10,6 +10,9 @@ const chamadas = vi.hoisted(() => ({
   iniciarBloco: vi.fn(),
   concluirBloco: vi.fn(),
   interromperBloco: vi.fn(),
+  listarTopicosParaRegistro: vi.fn(),
+  obterExecucaoDoBloco: vi.fn(),
+  registrarExecucaoNoHistorico: vi.fn(),
 }))
 
 vi.mock('./apiDePlanejamento', () => ({
@@ -18,6 +21,9 @@ vi.mock('./apiDePlanejamento', () => ({
   iniciarBloco: chamadas.iniciarBloco,
   concluirBloco: chamadas.concluirBloco,
   interromperBloco: chamadas.interromperBloco,
+  listarTopicosParaRegistro: chamadas.listarTopicosParaRegistro,
+  obterExecucaoDoBloco: chamadas.obterExecucaoDoBloco,
+  registrarExecucaoNoHistorico: chamadas.registrarExecucaoNoHistorico,
 }))
 
 import PlanejamentoHojePagina from './PlanejamentoHojePagina.vue'
@@ -79,6 +85,8 @@ describe('PlanejamentoHojePagina', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)
+    chamadas.obterExecucaoDoBloco.mockRejectedValue(new Error('sem execucao'))
+    chamadas.listarTopicosParaRegistro.mockResolvedValue([])
   })
 
   it('orienta a planejar quando nao existe plano', async () => {
@@ -194,6 +202,7 @@ describe('PlanejamentoHojePagina', () => {
     expect(chamadas.concluirBloco).toHaveBeenCalledWith(
       'bloco-1',
       15,
+      undefined,
       undefined,
     )
   })

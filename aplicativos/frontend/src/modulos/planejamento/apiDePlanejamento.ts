@@ -78,14 +78,28 @@ export interface ExecucaoDoBloco {
   duracaoExecutadaEmMinutos?: number
   resultado?: 'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO'
   observacao?: string
+  identificadorDoRegistroDeEstudo?: string
   criadoEm: string
   atualizadoEm: string
   versao: number
 }
 
+export interface RegistroDeEstudoDaExecucao {
+  identificador: string
+  identificadorDoTopico: string
+  dataHora: string
+  duracaoEmMinutos: number
+}
+
+export interface TopicoParaRegistro {
+  identificador: string
+  nome: string
+}
+
 export interface ResultadoDaExecucaoDoBloco {
   bloco: BlocoDeEstudo
   execucao: ExecucaoDoBloco
+  estudo?: RegistroDeEstudoDaExecucao
 }
 
 export interface DadosDoBlocoDeEstudo {
@@ -167,12 +181,17 @@ export function concluirBloco(
   identificador: string,
   duracaoExecutadaEmMinutos: number,
   observacao?: string,
+  identificadorDoTopico?: string,
 ): Promise<ResultadoDaExecucaoDoBloco> {
   return requisitar<ResultadoDaExecucaoDoBloco>(
     `/v1/blocos-de-estudo/${identificador}/conclusao`,
     {
       method: 'POST',
-      body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),
+      body: JSON.stringify({
+        duracaoExecutadaEmMinutos,
+        observacao,
+        identificadorDoTopico,
+      }),
     },
   )
 }
@@ -181,13 +200,44 @@ export function interromperBloco(
   identificador: string,
   duracaoExecutadaEmMinutos: number,
   observacao?: string,
+  identificadorDoTopico?: string,
 ): Promise<ResultadoDaExecucaoDoBloco> {
   return requisitar<ResultadoDaExecucaoDoBloco>(
     `/v1/blocos-de-estudo/${identificador}/interrupcao`,
     {
       method: 'POST',
-      body: JSON.stringify({ duracaoExecutadaEmMinutos, observacao }),
+      body: JSON.stringify({
+        duracaoExecutadaEmMinutos,
+        observacao,
+        identificadorDoTopico,
+      }),
     },
+  )
+}
+
+export function obterExecucaoDoBloco(
+  identificadorDoBloco: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/blocos-de-estudo/${identificadorDoBloco}/execucao`,
+  )
+}
+
+export function listarTopicosParaRegistro(
+  identificadorDoBloco: string,
+): Promise<TopicoParaRegistro[]> {
+  return requisitar<TopicoParaRegistro[]>(
+    `/v1/blocos-de-estudo/${identificadorDoBloco}/topicos-para-registro`,
+  )
+}
+
+export function registrarExecucaoNoHistorico(
+  identificadorDaExecucao: string,
+  identificadorDoTopico?: string,
+): Promise<ResultadoDaExecucaoDoBloco> {
+  return requisitar<ResultadoDaExecucaoDoBloco>(
+    `/v1/execucoes-de-bloco/${identificadorDaExecucao}/registro-de-estudo`,
+    { method: 'POST', body: JSON.stringify({ identificadorDoTopico }) },
   )
 }
 

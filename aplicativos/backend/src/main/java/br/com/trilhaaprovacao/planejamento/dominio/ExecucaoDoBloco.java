@@ -13,6 +13,7 @@ public record ExecucaoDoBloco(
         Integer duracaoExecutadaEmMinutos,
         ResultadoDaExecucao resultado,
         String observacao,
+        UUID identificadorDoRegistroDeEstudo,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,
         long versao) {
@@ -25,9 +26,9 @@ public record ExecucaoDoBloco(
         Objects.requireNonNull(criadoEm);
         Objects.requireNonNull(atualizadoEm);
         observacao = textoOpcional(observacao, 2000);
-
         if (encerradaEm == null) {
-            if (duracaoExecutadaEmMinutos != null || resultado != null || observacao != null) {
+            if (duracaoExecutadaEmMinutos != null || resultado != null
+                    || observacao != null || identificadorDoRegistroDeEstudo != null) {
                 throw new IllegalArgumentException(
                         "Execucao em andamento nao possui dados de encerramento.");
             }
@@ -46,10 +47,11 @@ public record ExecucaoDoBloco(
         }
     }
 
-    public static ExecucaoDoBloco iniciar(UUID usuario, UUID bloco, OffsetDateTime momento) {
+    public static ExecucaoDoBloco iniciar(UUID usuario, UUID bloco,
+            OffsetDateTime momento) {
         Objects.requireNonNull(momento);
         return new ExecucaoDoBloco(UUID.randomUUID(), usuario, bloco, momento,
-                null, null, null, null, momento, momento, 0);
+                null, null, null, null, null, momento, momento, 0);
     }
 
     public ExecucaoDoBloco encerrar(ResultadoDaExecucao novoResultado,
@@ -60,7 +62,27 @@ public record ExecucaoDoBloco(
         Objects.requireNonNull(momento);
         return new ExecucaoDoBloco(identificador, identificadorDoUsuario,
                 identificadorDoBloco, iniciadaEm, momento, duracao,
-                novoResultado, novaObservacao, criadoEm, momento, versao);
+                novoResultado, novaObservacao, identificadorDoRegistroDeEstudo,
+                criadoEm, momento, versao);
+    }
+
+    public ExecucaoDoBloco vincularRegistroDeEstudo(UUID registro,
+            OffsetDateTime momento) {
+        if (estaEmAndamento()) {
+            throw new IllegalStateException(
+                    "Somente execucao encerrada pode ser vinculada ao historico.");
+        }
+        Objects.requireNonNull(registro);
+        Objects.requireNonNull(momento);
+        if (identificadorDoRegistroDeEstudo != null) {
+            if (identificadorDoRegistroDeEstudo.equals(registro)) return this;
+            throw new IllegalStateException(
+                    "A execucao ja possui outro registro de estudo vinculado.");
+        }
+        return new ExecucaoDoBloco(identificador, identificadorDoUsuario,
+                identificadorDoBloco, iniciadaEm, encerradaEm,
+                duracaoExecutadaEmMinutos, resultado, observacao, registro,
+                criadoEm, momento, versao);
     }
 
     public boolean estaEmAndamento() {

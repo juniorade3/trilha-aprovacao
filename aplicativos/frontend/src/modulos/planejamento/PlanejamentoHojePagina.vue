@@ -10,11 +10,15 @@ import {
   concluirBloco,
   iniciarBloco,
   interromperBloco,
+  listarTopicosParaRegistro,
+  obterExecucaoDoBloco,
   obterExecucaoEmAndamento,
+  registrarExecucaoNoHistorico,
   obterPlanejamentoDeHoje,
   type BlocoDeEstudo,
   type PlanejamentoDeHoje,
   type ResultadoDaExecucaoDoBloco,
+  type TopicoParaRegistro,
 } from './apiDePlanejamento'
 
 const planejamento = ref<PlanejamentoDeHoje>()
@@ -26,6 +30,12 @@ const aviso = ref('')
 const acaoDeFinalizacao = ref<'CONCLUIR' | 'INTERROMPER'>()
 const duracaoExecutada = ref(1)
 const observacaoDaExecucao = ref('')
+const topicosParaRegistro = ref<TopicoParaRegistro[]>([])
+const identificadorDoTopico = ref('')
+const ultimoResultado = ref<ResultadoDaExecucaoDoBloco>()
+const execucoesRealizadas = ref<Record<string, ResultadoDaExecucaoDoBloco>>({})
+const blocoParaHistorico = ref<BlocoDeEstudo>()
+const registrandoHistorico = ref(false)
 const agora = ref(Date.now())
 let cancelamento: AbortController | undefined
 let temporizador: number | undefined
@@ -93,6 +103,23 @@ async function carregar() {
         execucaoAtual.value = undefined
       else throw causa
     }
+    const pares = await Promise.all(
+      planejamento.value.realizados.map(async (bloco) => {
+        try {
+          return [
+            bloco.identificador,
+            await obterExecucaoDoBloco(bloco.identificador),
+          ] as const
+        } catch {
+          return undefined
+        }
+      }),
+    )
+    execucoesRealizadas.value = Object.fromEntries(
+      pares.filter(
+        (par): par is readonly [string, ResultadoDaExecucaoDoBloco] => !!par,
+      ),
+    )
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
     erro.value =
@@ -139,8 +166,16 @@ async function iniciar(bloco: BlocoDeEstudo) {
   }
 }
 
-function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {
+async function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {
   acaoDeFinalizacao.value = acao
+  topicosParaRegistro.value = []
+  identificadorDoTopico.value = ''
+  const bloco = execucaoAtual.value?.bloco
+  if (bloco?.identificadorDaMateria && !bloco.identificadorDoTopico) {
+    topicosParaRegistro.value = await listarTopicosParaRegistro(
+      bloco.identificador,
+    )
+  }
   duracaoExecutada.value = Math.max(
     1,
     Math.round(segundosDecorridos.value / 60),
@@ -154,20 +189,25 @@ async function finalizar() {
   erro.value = ''
   try {
     const identificador = execucaoAtual.value.bloco.identificador
+    let resultado: ResultadoDaExecucaoDoBloco
     if (acaoDeFinalizacao.value === 'CONCLUIR')
-      await concluirBloco(
+      resultado = await concluirBloco(
         identificador,
         duracaoExecutada.value,
         observacaoDaExecucao.value || undefined,
+        identificadorDoTopico.value || undefined,
       )
     else
-      await interromperBloco(
+      resultado = await interromperBloco(
         identificador,
         duracaoExecutada.value,
         observacaoDaExecucao.value || undefined,
+        identificadorDoTopico.value || undefined,
       )
-    aviso.value =
-      acaoDeFinalizacao.value === 'CONCLUIR'
+    ultimoResultado.value = resultado
+    aviso.value = resultado.estudo
+      ? 'Bloco finalizado e estudo registrado no Histórico.'
+      : acaoDeFinalizacao.value === 'CONCLUIR'
         ? 'Bloco concluído.'
         : 'Bloco encerrado como parcialmente concluído.'
     execucaoAtual.value = undefined
@@ -180,6 +220,40 @@ async function finalizar() {
         : 'Não foi possível finalizar o bloco.'
   } finally {
     processando.value = false
+  }
+}
+
+async function abrirRegistroNoHistorico(bloco: BlocoDeEstudo) {
+  blocoParaHistorico.value = bloco
+  identificadorDoTopico.value = ''
+  topicosParaRegistro.value = await listarTopicosParaRegistro(
+    bloco.identificador,
+  )
+}
+
+async function registrarNoHistorico() {
+  if (!blocoParaHistorico.value) return
+  const resultado =
+    execucoesRealizadas.value[blocoParaHistorico.value.identificador]
+  if (!resultado) return
+  registrandoHistorico.value = true
+  erro.value = ''
+  try {
+    const vinculado = await registrarExecucaoNoHistorico(
+      resultado.execucao.identificador,
+      identificadorDoTopico.value || undefined,
+    )
+    ultimoResultado.value = vinculado
+    aviso.value = 'Estudo registrado no Histórico.'
+    blocoParaHistorico.value = undefined
+    await carregar()
+  } catch (causa) {
+    erro.value =
+      causa instanceof Error
+        ? causa.message
+        : 'Não foi possível registrar o estudo no Histórico.'
+  } finally {
+    registrandoHistorico.value = false
   }
 }
 
@@ -218,6 +292,13 @@ onBeforeUnmount(() => {
     <div v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</div>
     <div v-if="aviso" class="alert alert-success" role="status">
       {{ aviso }}
+      <RouterLink
+        v-if="ultimoResultado?.estudo"
+        class="alert-link ms-2"
+        to="/estudos"
+      >
+        Ver no Histórico
+      </RouterLink>
     </div>
 
     <EstadoDaPagina
@@ -429,6 +510,19 @@ onBeforeUnmount(() => {
                   : 'Parcialmente concluído'
               }}</small>
             </div>
+            <button
+              v-if="
+                execucoesRealizadas[bloco.identificador] &&
+                !execucoesRealizadas[bloco.identificador]?.execucao
+                  .identificadorDoRegistroDeEstudo &&
+                (bloco.identificadorDoTopico || bloco.identificadorDaMateria)
+              "
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              @click="abrirRegistroNoHistorico(bloco)"
+            >
+              Registrar no Histórico
+            </button>
           </li>
         </ol>
       </section>
@@ -442,9 +536,37 @@ onBeforeUnmount(() => {
           : 'Interromper bloco?'
       "
       etiqueta="Registrar execução"
-      descricao="Nesta sprint, a execução ainda não cria automaticamente um registro no Histórico de estudos."
+      descricao="Ao concluir, o estudo será registrado no Histórico quando houver um tópico."
       @fechar="acaoDeFinalizacao = undefined"
     >
+      <div
+        v-if="execucaoAtual.bloco.identificadorDoTopico"
+        class="alert alert-info"
+      >
+        O tópico planejado será usado no Histórico.
+      </div>
+      <div v-else-if="execucaoAtual.bloco.identificadorDaMateria" class="mb-3">
+        <label class="form-label" for="topico-da-execucao"
+          >Tópico estudado</label
+        >
+        <select
+          id="topico-da-execucao"
+          v-model="identificadorDoTopico"
+          class="form-select"
+        >
+          <option value="">Concluir sem registrar no Histórico</option>
+          <option
+            v-for="topico in topicosParaRegistro"
+            :key="topico.identificador"
+            :value="topico.identificador"
+          >
+            {{ topico.nome }}
+          </option>
+        </select>
+      </div>
+      <div v-else class="alert alert-secondary">
+        Esta atividade livre será concluída sem registro no Histórico.
+      </div>
       <div class="mb-3">
         <label class="form-label" for="duracao-executada"
           >Duração realizada em minutos</label
@@ -488,6 +610,62 @@ onBeforeUnmount(() => {
           @click="finalizar"
         >
           Registrar
+        </button>
+      </template>
+    </ModalDaAplicacao>
+
+    <ModalDaAplicacao
+      v-if="blocoParaHistorico"
+      titulo="Registrar no Histórico?"
+      etiqueta="Execução concluída"
+      descricao="Escolha o tópico estudado para criar um único registro no Histórico."
+      @fechar="blocoParaHistorico = undefined"
+    >
+      <div
+        v-if="blocoParaHistorico.identificadorDoTopico"
+        class="alert alert-info"
+      >
+        O tópico planejado será usado automaticamente.
+      </div>
+      <div v-else class="mb-3">
+        <label class="form-label" for="topico-do-historico"
+          >Tópico estudado</label
+        >
+        <select
+          id="topico-do-historico"
+          v-model="identificadorDoTopico"
+          class="form-select"
+          required
+        >
+          <option value="" disabled>Selecione</option>
+          <option
+            v-for="topico in topicosParaRegistro"
+            :key="topico.identificador"
+            :value="topico.identificador"
+          >
+            {{ topico.nome }}
+          </option>
+        </select>
+      </div>
+      <template #rodape>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="blocoParaHistorico = undefined"
+        >
+          Voltar
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="
+            registrandoHistorico ||
+            (!blocoParaHistorico.identificadorDoTopico &&
+              !identificadorDoTopico)
+          "
+          @click="registrarNoHistorico"
+        >
+          Registrar no Histórico
         </button>
       </template>
     </ModalDaAplicacao>

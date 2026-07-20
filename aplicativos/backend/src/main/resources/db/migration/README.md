@@ -13,3 +13,4 @@ As migrations versionadas acompanham as capacidades de dominio:
 
 O esquema e validado pelo Hibernate com `ddl-auto=validate`; nao ha criacao
 automatica de tabelas nem dados artificiais de demonstracao.
+- V9 vincula execucoes finalizadas a registros de estudo.

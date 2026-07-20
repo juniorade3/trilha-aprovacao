@@ -58,6 +58,25 @@ class ExecucaoDoBlocoTest {
                         OffsetDateTime.now()));
     }
 
+
+    @Test
+    void deveVincularUmUnicoRegistroDeEstudo() {
+        ExecucaoDoBloco encerrada = ExecucaoDoBloco.iniciar(
+                        UUID.randomUUID(), UUID.randomUUID(),
+                        OffsetDateTime.now().minusMinutes(10))
+                .encerrar(ResultadoDaExecucao.CONCLUIDO, 10, null,
+                        OffsetDateTime.now());
+        UUID registro = UUID.randomUUID();
+        ExecucaoDoBloco vinculada = encerrada.vincularRegistroDeEstudo(
+                registro, OffsetDateTime.now());
+        assertEquals(registro, vinculada.identificadorDoRegistroDeEstudo());
+        assertEquals(vinculada, vinculada.vincularRegistroDeEstudo(
+                registro, OffsetDateTime.now()));
+        assertThrows(IllegalStateException.class,
+                () -> vinculada.vincularRegistroDeEstudo(
+                        UUID.randomUUID(), OffsetDateTime.now()));
+    }
+
     private BlocoDeEstudo blocoPlanejado() {
         return BlocoDeEstudo.criar(UUID.randomUUID(), null, null,
                 "Teoria", TipoDeAtividade.TEORIA, LocalDate.now(),

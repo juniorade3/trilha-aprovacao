@@ -13,15 +13,16 @@ public record RespostaDeExecucaoDoBloco(
         Integer duracaoExecutadaEmMinutos,
         ResultadoDaExecucao resultado,
         String observacao,
+        UUID identificadorDoRegistroDeEstudo,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,
         long versao) {
-
     public static RespostaDeExecucaoDoBloco de(ExecucaoDoBloco execucao) {
         return new RespostaDeExecucaoDoBloco(execucao.identificador(),
                 execucao.identificadorDoBloco(), execucao.iniciadaEm(),
                 execucao.encerradaEm(), execucao.duracaoExecutadaEmMinutos(),
-                execucao.resultado(), execucao.observacao(), execucao.criadoEm(),
+                execucao.resultado(), execucao.observacao(),
+                execucao.identificadorDoRegistroDeEstudo(), execucao.criadoEm(),
                 execucao.atualizadoEm(), execucao.versao());
     }
 }

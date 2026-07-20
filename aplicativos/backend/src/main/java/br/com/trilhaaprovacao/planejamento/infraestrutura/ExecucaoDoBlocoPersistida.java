@@ -23,6 +23,7 @@ public class ExecucaoDoBlocoPersistida {
     @Column(name = "duracao_executada_em_minutos") private Integer duracaoExecutadaEmMinutos;
     @Enumerated(EnumType.STRING) @Column(length = 40) private ResultadoDaExecucao resultado;
     @Column(length = 2000) private String observacao;
+    @Column(name = "registro_de_estudo_id") private UUID identificadorDoRegistroDeEstudo;
     @Column(name = "criado_em", nullable = false) private OffsetDateTime criadoEm;
     @Column(name = "atualizado_em", nullable = false) private OffsetDateTime atualizadoEm;
     @Version private long versao;
@@ -45,6 +46,7 @@ public class ExecucaoDoBlocoPersistida {
         duracaoExecutadaEmMinutos = execucao.duracaoExecutadaEmMinutos();
         resultado = execucao.resultado();
         observacao = execucao.observacao();
+        identificadorDoRegistroDeEstudo = execucao.identificadorDoRegistroDeEstudo();
         atualizadoEm = execucao.atualizadoEm();
     }
 
@@ -57,6 +59,6 @@ public class ExecucaoDoBlocoPersistida {
         return new ExecucaoDoBloco(identificador, identificadorDoUsuario,
                 identificadorDoBloco, iniciadaEm, encerradaEm,
                 duracaoExecutadaEmMinutos, resultado, observacao,
-                criadoEm, atualizadoEm, versao);
+                identificadorDoRegistroDeEstudo, criadoEm, atualizadoEm, versao);
     }
 }

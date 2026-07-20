@@ -7,6 +7,8 @@ import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeMaterias;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
 import br.com.trilhaaprovacao.conteudos.dominio.Materia;
 import br.com.trilhaaprovacao.conteudos.dominio.TopicoDaMateria;
+import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;
+import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.BlocoDeEstudo;
 import br.com.trilhaaprovacao.planejamento.dominio.DisponibilidadeDoDia;
 import br.com.trilhaaprovacao.planejamento.dominio.ExecucaoDoBloco;
@@ -44,19 +46,22 @@ public class ServicoDePlanejamento {
     private final RepositorioDeExecucoesDeBloco execucoes;
     private final ServicoDeMaterias materias;
     private final ServicoDeTopicos topicos;
+    private final ServicoDeMateriaisEEstudos estudos;
 
     public ServicoDePlanejamento(RepositorioDePlanosSemanais planos,
             RepositorioDeDisponibilidadesDoDia disponibilidades,
             RepositorioDeBlocosDeEstudo blocos,
             RepositorioDeExecucoesDeBloco execucoes,
             ServicoDeMaterias materias,
-            ServicoDeTopicos topicos) {
+            ServicoDeTopicos topicos,
+            ServicoDeMateriaisEEstudos estudos) {
         this.planos = planos;
         this.disponibilidades = disponibilidades;
         this.blocos = blocos;
         this.execucoes = execucoes;
         this.materias = materias;
         this.topicos = topicos;
+        this.estudos = estudos;
     }
 
     @Transactional
@@ -284,16 +289,17 @@ public class ServicoDePlanejamento {
 
     @Transactional
     public ResultadoDaExecucaoDoBloco concluirBloco(UUID usuario, UUID bloco,
-            int duracao, String observacao) {
+            int duracao, String observacao, UUID identificadorDoTopico) {
         return finalizarBloco(usuario, bloco, ResultadoDaExecucao.CONCLUIDO,
-                duracao, observacao);
+                duracao, observacao, identificadorDoTopico);
     }
 
     @Transactional
     public ResultadoDaExecucaoDoBloco interromperBloco(UUID usuario, UUID bloco,
-            int duracao, String observacao) {
+            int duracao, String observacao, UUID identificadorDoTopico) {
         return finalizarBloco(usuario, bloco,
-                ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO, duracao, observacao);
+                ResultadoDaExecucao.PARCIALMENTE_CONCLUIDO, duracao,
+                observacao, identificadorDoTopico);
     }
 
     @Transactional(readOnly = true)
@@ -305,12 +311,58 @@ public class ServicoDePlanejamento {
                         "Nao existe execucao em andamento."));
         BlocoDeEstudoPersistido bloco = blocoPersistido(usuario,
                 execucao.paraDominio().identificadorDoBloco());
-        return new ResultadoDaExecucaoDoBloco(bloco.paraDominio(), execucao.paraDominio());
+        return resultadoDaExecucao(usuario, bloco, execucao);
     }
 
-    private ResultadoDaExecucaoDoBloco finalizarBloco(UUID usuario, UUID identificadorDoBloco,
-            ResultadoDaExecucao resultado, int duracao, String observacao) {
-        BlocoDeEstudoPersistido blocoPersistido = blocoPersistido(usuario, identificadorDoBloco);
+    @Transactional(readOnly = true)
+    public ResultadoDaExecucaoDoBloco obterExecucaoDoBloco(UUID usuario, UUID bloco) {
+        BlocoDeEstudoPersistido encontrado = blocoPersistido(usuario, bloco);
+        ExecucaoDoBlocoPersistida execucao = execucoes.findByIdentificadorDoBloco(bloco)
+                .filter(item -> item.paraDominio().identificadorDoUsuario().equals(usuario))
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA",
+                        "Execucao do bloco nao encontrada."));
+        return resultadoDaExecucao(usuario, encontrado, execucao);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TopicoDaMateria> listarTopicosParaRegistro(UUID usuario, UUID bloco) {
+        BlocoDeEstudo encontrado = blocoPersistido(usuario, bloco).paraDominio();
+        if (encontrado.identificadorDoTopico() != null) {
+            return List.of(topicos.obter(usuario, encontrado.identificadorDoTopico()));
+        }
+        if (encontrado.identificadorDaMateria() == null) return List.of();
+        return topicos.listar(usuario, encontrado.identificadorDaMateria(),
+                "", false, 0, 500).getContent();
+    }
+
+    @Transactional
+    public ResultadoDaExecucaoDoBloco registrarExecucaoNoHistorico(UUID usuario,
+            UUID identificadorDaExecucao, UUID identificadorDoTopico) {
+        ExecucaoDoBlocoPersistida execucao = execucoes
+                .findByIdentificadorAndIdentificadorDoUsuario(
+                        identificadorDaExecucao, usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA",
+                        "Execucao do bloco nao encontrada."));
+        BlocoDeEstudoPersistido bloco = blocoPersistido(usuario,
+                execucao.paraDominio().identificadorDoBloco());
+        if (execucao.paraDominio().estaEmAndamento()) {
+            throw new ConflitoDeDominio("EXECUCAO_AINDA_EM_ANDAMENTO",
+                    "Encerre a execucao antes de registra-la no historico.");
+        }
+        RegistroDeEstudo estudo = integrarComHistorico(
+                usuario, bloco.paraDominio(), execucao,
+                identificadorDoTopico, true);
+        return new ResultadoDaExecucaoDoBloco(
+                bloco.paraDominio(), execucao.paraDominio(), estudo);
+    }
+
+    private ResultadoDaExecucaoDoBloco finalizarBloco(UUID usuario,
+            UUID identificadorDoBloco, ResultadoDaExecucao resultado,
+            int duracao, String observacao, UUID identificadorDoTopico) {
+        BlocoDeEstudoPersistido blocoPersistido = blocoPersistido(
+                usuario, identificadorDoBloco);
         BlocoDeEstudo bloco = blocoPersistido.paraDominio();
         ExecucaoDoBlocoPersistida execucaoPersistida = execucoes
                 .findByIdentificadorDoBloco(identificadorDoBloco)
@@ -320,11 +372,14 @@ public class ServicoDePlanejamento {
                         "Execucao do bloco nao encontrada."));
         ExecucaoDoBloco execucao = execucaoPersistida.paraDominio();
         if (!execucao.estaEmAndamento()) {
-            if (execucao.equivaleAoEncerramento(resultado, duracao, observacao)) {
-                return new ResultadoDaExecucaoDoBloco(bloco, execucao);
+            if (!execucao.equivaleAoEncerramento(resultado, duracao, observacao)) {
+                throw new ConflitoDeDominio("EXECUCAO_JA_ENCERRADA",
+                        "A execucao ja foi encerrada com dados diferentes.");
             }
-            throw new ConflitoDeDominio("EXECUCAO_JA_ENCERRADA",
-                    "A execucao ja foi encerrada com dados diferentes.");
+            RegistroDeEstudo estudo = integrarComHistorico(usuario, bloco,
+                    execucaoPersistida, identificadorDoTopico, false);
+            return new ResultadoDaExecucaoDoBloco(bloco,
+                    execucaoPersistida.paraDominio(), estudo);
         }
         OffsetDateTime agora = OffsetDateTime.now();
         ExecucaoDoBloco encerrada = regra("EXECUCAO_DO_BLOCO_INVALIDA",
@@ -334,14 +389,97 @@ public class ServicoDePlanejamento {
             finalizado = resultado == ResultadoDaExecucao.CONCLUIDO
                     ? bloco.concluir() : bloco.concluirParcialmente();
         } catch (IllegalStateException excecao) {
-            throw new ConflitoDeDominio("BLOCO_NAO_FINALIZAVEL", excecao.getMessage());
+            throw new ConflitoDeDominio(
+                    "BLOCO_NAO_FINALIZAVEL", excecao.getMessage());
         }
         execucaoPersistida.atualizarDe(encerrada);
         blocoPersistido.atualizarDe(finalizado);
+        RegistroDeEstudo estudo = integrarComHistorico(usuario, finalizado,
+                execucaoPersistida, identificadorDoTopico, false);
         execucoes.flush();
         blocos.flush();
         return new ResultadoDaExecucaoDoBloco(blocoPersistido.paraDominio(),
-                execucaoPersistida.paraDominio());
+                execucaoPersistida.paraDominio(), estudo);
+    }
+
+    private RegistroDeEstudo integrarComHistorico(UUID usuario,
+            BlocoDeEstudo bloco, ExecucaoDoBlocoPersistida persistida,
+            UUID identificadorDoTopico, boolean exigirTopico) {
+        ExecucaoDoBloco execucao = persistida.paraDominio();
+        if (execucao.identificadorDoRegistroDeEstudo() != null) {
+            return estudos.obterEstudo(
+                    usuario, execucao.identificadorDoRegistroDeEstudo());
+        }
+        UUID topicoResolvido = resolverTopico(
+                usuario, bloco, identificadorDoTopico);
+        if (topicoResolvido == null) {
+            if (exigirTopico) {
+                throw new RegraDeDominio("TOPICO_NAO_INFORMADO",
+                        "Selecione um topico para registrar o estudo.");
+            }
+            return null;
+        }
+        RegistroDeEstudo estudo = estudos.registrarEstudo(usuario,
+                topicoResolvido, null, execucao.iniciadaEm(),
+                execucao.duracaoExecutadaEmMinutos(),
+                observacaoDoEstudo(bloco, execucao));
+        ExecucaoDoBloco vinculada;
+        try {
+            vinculada = execucao.vincularRegistroDeEstudo(
+                    estudo.identificador(), OffsetDateTime.now());
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio(
+                    "EXECUCAO_JA_VINCULADA", excecao.getMessage());
+        }
+        persistida.atualizarDe(vinculada);
+        execucoes.flush();
+        return estudo;
+    }
+
+    private UUID resolverTopico(UUID usuario, BlocoDeEstudo bloco,
+            UUID identificadorInformado) {
+        if (bloco.identificadorDoTopico() != null) {
+            if (identificadorInformado != null
+                    && !bloco.identificadorDoTopico().equals(identificadorInformado)) {
+                throw new RegraDeDominio("TOPICO_DIVERGENTE_DO_PLANEJADO",
+                        "O bloco ja possui um topico planejado.");
+            }
+            topicos.obter(usuario, bloco.identificadorDoTopico());
+            return bloco.identificadorDoTopico();
+        }
+        if (bloco.identificadorDaMateria() == null) {
+            if (identificadorInformado != null) {
+                throw new RegraDeDominio("TOPICO_NAO_APLICAVEL",
+                        "Atividade livre nao possui materia para vincular o topico.");
+            }
+            return null;
+        }
+        if (identificadorInformado == null) return null;
+        TopicoDaMateria topico = topicos.obter(usuario, identificadorInformado);
+        if (!topico.identificadorDaMateria().equals(
+                bloco.identificadorDaMateria())) {
+            throw new RegraDeDominio("TOPICO_INCOMPATIVEL_COM_MATERIA",
+                    "O topico deve pertencer a materia do bloco.");
+        }
+        return topico.identificador();
+    }
+
+    private String observacaoDoEstudo(BlocoDeEstudo bloco,
+            ExecucaoDoBloco execucao) {
+        String texto = execucao.observacao() == null
+                ? bloco.titulo()
+                : bloco.titulo() + " - " + execucao.observacao();
+        return texto.length() <= 2000 ? texto : texto.substring(0, 2000);
+    }
+
+    private ResultadoDaExecucaoDoBloco resultadoDaExecucao(UUID usuario,
+            BlocoDeEstudoPersistido bloco, ExecucaoDoBlocoPersistida execucao) {
+        RegistroDeEstudo estudo = execucao.paraDominio()
+                .identificadorDoRegistroDeEstudo() == null ? null
+                : estudos.obterEstudo(usuario, execucao.paraDominio()
+                        .identificadorDoRegistroDeEstudo());
+        return new ResultadoDaExecucaoDoBloco(
+                bloco.paraDominio(), execucao.paraDominio(), estudo);
     }
 
     private void validarConjuntoDeDias(PlanoSemanal plano,
