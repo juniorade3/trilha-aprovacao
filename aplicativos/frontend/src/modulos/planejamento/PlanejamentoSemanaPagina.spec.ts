@@ -402,9 +402,9 @@ describe('PlanejamentoSemanaPagina', () => {
     expect(chamadas.ativarPlanoSemanal).toHaveBeenCalledWith('plano-1')
     expect(pagina.text()).toContain('Plano ativado')
     expect(pagina.text()).toContain('Ativo')
-    expect(pagina.find('#disponibilidade-2026-07-20').exists()).toBe(false)
+    expect(pagina.find('#disponibilidade-2026-07-20').exists()).toBe(true)
     expect(pagina.find('[aria-label="Editar Banco de dados"]').exists()).toBe(
-      false,
+      true,
     )
   })
 

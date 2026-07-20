@@ -571,7 +571,15 @@ watch(
             :class="
               plano.estado === 'ATIVO' ? 'text-bg-success' : 'text-bg-light'
             "
-            >{{ plano.estado }}</strong
+            >{{
+              plano.estado === 'ATIVO'
+                ? 'Ativo'
+                : plano.estado === 'RASCUNHO'
+                  ? 'Rascunho'
+                  : plano.estado === 'ENCERRADO'
+                    ? 'Encerrado'
+                    : 'Cancelado'
+            }}</strong
           >
         </div>
         <div>
