@@ -91,6 +91,17 @@ class DashboardIntegracaoTest {
                         .value("SEM_CARGO_SELECIONADO"))
                 .andExpect(jsonPath("$.alertas[1].codigo")
                         .value("CONCURSO_SEM_PROVA"));
+
+        UUID concurso = banco.queryForObject(
+                "SELECT identificador FROM concursos WHERE usuario_id = ?",
+                UUID.class, usuario);
+        UUID cargo = inserirCargo(concurso, "Cargo selecionado", true);
+        inserirProva(cargo, "Prova sem edital");
+        api.perform(get("/api/v1/dashboard").session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertas.length()").value(1))
+                .andExpect(jsonPath("$.alertas[0].codigo")
+                        .value("SEM_EDITAL_PRINCIPAL"));
     }
 
     @Test
@@ -145,6 +156,19 @@ class DashboardIntegracaoTest {
                 .andExpect(jsonPath("$.alertas[0].codigo").value("GRUPO_SEM_MATERIA"))
                 .andExpect(jsonPath("$.alertas[1].codigo").value("ITEM_SEM_MAPEAMENTO"))
                 .andExpect(jsonPath("$.alertas[2].codigo").value("MATERIA_SEM_TOPICO"));
+
+        banco.update("UPDATE topicos_da_materia SET arquivado = TRUE WHERE identificador = ?",
+                topico);
+        api.perform(get("/api/v1/dashboard").session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantidadeDeTopicosExigidos").value(0))
+                .andExpect(jsonPath("$.quantidadeDeTopicosComEstudo").value(0))
+                .andExpect(jsonPath("$.quantidadeDeItensMapeados").value(0))
+                .andExpect(jsonPath("$.quantidadeDeItensSemMapeamento").value(2))
+                .andExpect(jsonPath("$.tempoEstudadoNaSemanaEmMinutos").value(0))
+                .andExpect(jsonPath("$.atividadeRecente").isEmpty());
+        banco.update("UPDATE topicos_da_materia SET arquivado = FALSE WHERE identificador = ?",
+                topico);
 
         api.perform(get("/api/v1/dashboard").session(sessaoB))
                 .andExpect(status().isOk())

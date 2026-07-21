@@ -235,5 +235,8 @@ describe('EstudosPagina', () => {
     expect(pagina.text()).toContain('75% de acertos')
     expect(pagina.text()).toContain('Confusão de conceitos (2 sessões)')
     expect(pagina.text()).toContain('Parcial')
+    expect(pagina.text()).toContain(
+      'Somente cargo selecionado e edital principal',
+    )
   })
 })

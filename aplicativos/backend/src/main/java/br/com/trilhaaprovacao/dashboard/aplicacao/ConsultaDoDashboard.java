@@ -3,6 +3,8 @@ package br.com.trilhaaprovacao.dashboard.aplicacao;
 import br.com.trilhaaprovacao.dashboard.aplicacao.ResultadoDoDashboard.AlertaDoDashboard;
 import br.com.trilhaaprovacao.dashboard.aplicacao.ResultadoDoDashboard.AtividadeRecente;
 import br.com.trilhaaprovacao.dashboard.aplicacao.ResultadoDoDashboard.ResumoDoConcursoAtivo;
+import br.com.trilhaaprovacao.concursos.aplicacao.ConsultaDoContextoDeConteudoExigido;
+import br.com.trilhaaprovacao.concursos.aplicacao.ContextoDeConteudoExigido;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -21,27 +23,28 @@ public class ConsultaDoDashboard {
     private static final ZoneId FUSO_HORARIO = ZoneId.of("America/Sao_Paulo");
 
     private final JdbcTemplate banco;
+    private final ConsultaDoContextoDeConteudoExigido contextos;
 
-    public ConsultaDoDashboard(JdbcTemplate banco) {
+    public ConsultaDoDashboard(JdbcTemplate banco,
+            ConsultaDoContextoDeConteudoExigido contextos) {
         this.banco = banco;
+        this.contextos = contextos;
     }
 
     @Transactional(readOnly = true)
     public ResultadoDoDashboard consultar(UUID usuario) {
-        Optional<ConcursoEncontrado> concursoEncontrado = encontrarConcursoAtivo(usuario);
-        if (concursoEncontrado.isEmpty()) {
+        Optional<ContextoDeConteudoExigido> contextoEncontrado = contextos.consultar(usuario);
+        if (contextoEncontrado.isEmpty()) {
             return new ResultadoDoDashboard(null, null, null, 0, 0, 0, 0,
                     0, 0, List.of(), List.of());
         }
 
-        ConcursoEncontrado concurso = concursoEncontrado.get();
-        Optional<CargoEncontrado> cargoEncontrado =
-                encontrarCargoSelecionado(concurso.identificador());
+        ContextoDeConteudoExigido contexto = contextoEncontrado.get();
         int quantidadeDeProvasDoConcurso =
-                contarProvasDoConcurso(concurso.identificador());
+                contarProvasDoConcurso(contexto.identificadorDoConcurso());
         List<AlertaDoDashboard> alertas = new ArrayList<>();
 
-        if (cargoEncontrado.isEmpty()) {
+        if (!contexto.possuiCargoSelecionado()) {
             alertas.add(alerta("SEM_CARGO_SELECIONADO", "Selecione um cargo",
                     "Escolha o cargo que orientará os conteúdos e as provas do painel."));
         }
@@ -51,17 +54,22 @@ public class ConsultaDoDashboard {
         }
 
         ResumoDoConcursoAtivo resumo = new ResumoDoConcursoAtivo(
-                concurso.identificador(), concurso.nome(), concurso.orgao(),
-                concurso.banca(), concurso.situacao(),
-                cargoEncontrado.map(CargoEncontrado::identificador).orElse(null),
-                cargoEncontrado.map(CargoEncontrado::nome).orElse(null));
+                contexto.identificadorDoConcurso(), contexto.nomeDoConcurso(),
+                contexto.orgaoDoConcurso(), contexto.bancaDoConcurso(),
+                contexto.situacaoDoConcurso(), contexto.identificadorDoCargo(),
+                contexto.nomeDoCargo());
 
-        if (cargoEncontrado.isEmpty()) {
+        if (!contexto.possuiCargoSelecionado()) {
             return new ResultadoDoDashboard(resumo, null, null, 0, 0, 0, 0,
                     0, 0, List.of(), List.copyOf(alertas));
         }
 
-        UUID cargo = cargoEncontrado.get().identificador();
+        if (!contexto.possuiEditalPrincipal()) {
+            alertas.add(alerta("SEM_EDITAL_PRINCIPAL", "Defina o edital principal",
+                    "Escolha o edital principal que orientará os conteúdos exigidos."));
+        }
+
+        UUID cargo = contexto.identificadorDoCargo();
         Optional<OffsetDateTime> proximaProva = encontrarProximaProva(cargo);
         LocalDate dataDaProximaProva = proximaProva
                 .map(data -> data.atZoneSameInstant(FUSO_HORARIO).toLocalDate())
@@ -71,12 +79,18 @@ public class ConsultaDoDashboard {
                 : java.time.temporal.ChronoUnit.DAYS.between(
                         LocalDate.now(FUSO_HORARIO), dataDaProximaProva);
 
+        if (!contexto.possuiEditalPrincipal()) {
+            return new ResultadoDoDashboard(resumo, dataDaProximaProva, diasAteAProva,
+                    0, 0, 0, 0, 0, 0, List.of(), List.copyOf(alertas));
+        }
+
+        UUID edital = contexto.identificadorDoEdital();
         int quantidadeDeMaterias = contarMaterias(cargo);
-        int quantidadeDeTopicosExigidos = contarTopicosExigidos(cargo);
-        int quantidadeDeTopicosComEstudo = contarTopicosComEstudo(cargo);
-        ContagemDeItens itens = contarItens(cargo);
-        int tempoNaSemana = somarTempoNaSemana(cargo);
-        List<AtividadeRecente> atividades = listarAtividadeRecente(cargo);
+        int quantidadeDeTopicosExigidos = contarTopicosExigidos(cargo, edital);
+        int quantidadeDeTopicosComEstudo = contarTopicosComEstudo(cargo, edital);
+        ContagemDeItens itens = contarItens(cargo, edital);
+        int tempoNaSemana = somarTempoNaSemana(cargo, edital);
+        List<AtividadeRecente> atividades = listarAtividadeRecente(cargo, edital);
         int gruposSemMateria = contarGruposSemMateria(cargo);
         int materiasSemTopico = contarMateriasSemTopico(cargo);
 
@@ -109,31 +123,6 @@ public class ConsultaDoDashboard {
                 atividades, List.copyOf(alertas));
     }
 
-    private Optional<ConcursoEncontrado> encontrarConcursoAtivo(UUID usuario) {
-        return banco.query("""
-                        SELECT identificador, nome, orgao, banca, situacao
-                        FROM concursos
-                        WHERE usuario_id = ? AND ativo = TRUE
-                        """,
-                (resultado, linha) -> new ConcursoEncontrado(
-                        resultado.getObject("identificador", UUID.class),
-                        resultado.getString("nome"), resultado.getString("orgao"),
-                        resultado.getString("banca"), resultado.getString("situacao")),
-                usuario).stream().findFirst();
-    }
-
-    private Optional<CargoEncontrado> encontrarCargoSelecionado(UUID concurso) {
-        return banco.query("""
-                        SELECT identificador, nome
-                        FROM cargos_do_concurso
-                        WHERE concurso_id = ? AND selecionado = TRUE
-                        """,
-                (resultado, linha) -> new CargoEncontrado(
-                        resultado.getObject("identificador", UUID.class),
-                        resultado.getString("nome")),
-                concurso).stream().findFirst();
-    }
-
     private int contarProvasDoConcurso(UUID concurso) {
         return numero("""
                 SELECT COUNT(*)
@@ -163,11 +152,12 @@ public class ConsultaDoDashboard {
                 FROM materias_da_prova mp
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
-                WHERE p.cargo_id = ?
+                JOIN materias m ON m.identificador = mp.materia_id
+                WHERE p.cargo_id = ? AND m.arquivada = FALSE
                 """, cargo);
     }
 
-    private int contarTopicosExigidos(UUID cargo) {
+    private int contarTopicosExigidos(UUID cargo, UUID edital) {
         return numero("""
                 SELECT COUNT(DISTINCT mapa.topico_da_materia_id)
                 FROM mapeamentos_de_itens_do_edital mapa
@@ -175,11 +165,16 @@ public class ConsultaDoDashboard {
                 JOIN materias_da_prova mp ON mp.identificador = i.materia_da_prova_id
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
-                WHERE p.cargo_id = ? AND mapa.confirmado = TRUE
-                """, cargo);
+                JOIN topicos_da_materia t
+                  ON t.identificador = mapa.topico_da_materia_id
+                JOIN materias m ON m.identificador = t.materia_id
+                WHERE p.cargo_id = ? AND i.edital_id = ?
+                  AND mapa.confirmado = TRUE AND t.arquivado = FALSE
+                  AND m.arquivada = FALSE
+                """, cargo, edital);
     }
 
-    private int contarTopicosComEstudo(UUID cargo) {
+    private int contarTopicosComEstudo(UUID cargo, UUID edital) {
         return numero("""
                 SELECT COUNT(DISTINCT mapa.topico_da_materia_id)
                 FROM mapeamentos_de_itens_do_edital mapa
@@ -187,38 +182,47 @@ public class ConsultaDoDashboard {
                 JOIN materias_da_prova mp ON mp.identificador = i.materia_da_prova_id
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
-                WHERE p.cargo_id = ? AND mapa.confirmado = TRUE
+                JOIN topicos_da_materia t
+                  ON t.identificador = mapa.topico_da_materia_id
+                JOIN materias m ON m.identificador = t.materia_id
+                WHERE p.cargo_id = ? AND i.edital_id = ?
+                  AND mapa.confirmado = TRUE AND t.arquivado = FALSE
+                  AND m.arquivada = FALSE
                   AND EXISTS (
                     SELECT 1 FROM registros_de_estudo r
                     WHERE r.topico_id = mapa.topico_da_materia_id
                       AND r.situacao = 'ATIVO'
                   )
-                """, cargo);
+                """, cargo, edital);
     }
 
-    private ContagemDeItens contarItens(UUID cargo) {
+    private ContagemDeItens contarItens(UUID cargo, UUID edital) {
         return banco.queryForObject("""
                 SELECT COUNT(*) AS total,
                        COUNT(*) FILTER (
                          WHERE EXISTS (
                            SELECT 1 FROM mapeamentos_de_itens_do_edital mapa
+                           JOIN topicos_da_materia t
+                             ON t.identificador = mapa.topico_da_materia_id
+                           JOIN materias m ON m.identificador = t.materia_id
                            WHERE mapa.item_do_edital_id = i.identificador
                              AND mapa.confirmado = TRUE
+                             AND t.arquivado = FALSE AND m.arquivada = FALSE
                          )
                        ) AS mapeados
                 FROM itens_do_edital i
                 JOIN materias_da_prova mp ON mp.identificador = i.materia_da_prova_id
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
-                WHERE p.cargo_id = ?
+                WHERE p.cargo_id = ? AND i.edital_id = ?
                 """, (resultado, linha) -> {
                     int total = resultado.getInt("total");
                     int mapeados = resultado.getInt("mapeados");
                     return new ContagemDeItens(mapeados, total - mapeados);
-                }, cargo);
+                }, cargo, edital);
     }
 
-    private int somarTempoNaSemana(UUID cargo) {
+    private int somarTempoNaSemana(UUID cargo, UUID edital) {
         LocalDate inicioDaSemana = LocalDate.now(FUSO_HORARIO)
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         OffsetDateTime inicio = inicioDaSemana.atStartOfDay(FUSO_HORARIO)
@@ -240,14 +244,19 @@ public class ConsultaDoDashboard {
                     JOIN grupos_de_conteudo g
                       ON g.identificador = mp.grupo_de_conteudo_id
                     JOIN provas p ON p.identificador = g.prova_id
+                    JOIN topicos_da_materia t
+                      ON t.identificador = mapa.topico_da_materia_id
+                    JOIN materias m ON m.identificador = t.materia_id
                     WHERE mapa.topico_da_materia_id = r.topico_id
                       AND mapa.confirmado = TRUE
+                      AND t.arquivado = FALSE AND m.arquivada = FALSE
                       AND p.cargo_id = ?
+                      AND i.edital_id = ?
                   )
-                """, inicio, fim, cargo);
+                """, inicio, fim, cargo, edital);
     }
 
-    private List<AtividadeRecente> listarAtividadeRecente(UUID cargo) {
+    private List<AtividadeRecente> listarAtividadeRecente(UUID cargo, UUID edital) {
         return banco.query("""
                 SELECT r.identificador, r.topico_id, t.nome AS nome_do_topico,
                        material.titulo AS titulo_do_material,
@@ -257,6 +266,7 @@ public class ConsultaDoDashboard {
                 LEFT JOIN materiais_de_estudo material
                   ON material.identificador = r.material_id
                 WHERE r.situacao = 'ATIVO'
+                  AND t.arquivado = FALSE
                   AND EXISTS (
                     SELECT 1
                     FROM mapeamentos_de_itens_do_edital mapa
@@ -267,9 +277,12 @@ public class ConsultaDoDashboard {
                     JOIN grupos_de_conteudo g
                       ON g.identificador = mp.grupo_de_conteudo_id
                     JOIN provas p ON p.identificador = g.prova_id
+                    JOIN materias m ON m.identificador = t.materia_id
                     WHERE mapa.topico_da_materia_id = r.topico_id
                       AND mapa.confirmado = TRUE
+                      AND m.arquivada = FALSE
                       AND p.cargo_id = ?
+                      AND i.edital_id = ?
                   )
                 ORDER BY r.data_hora DESC, r.criado_em DESC
                 LIMIT 6
@@ -279,7 +292,7 @@ public class ConsultaDoDashboard {
                     resultado.getString("nome_do_topico"),
                     resultado.getString("titulo_do_material"),
                     resultado.getObject("data_hora", OffsetDateTime.class),
-                    resultado.getInt("duracao_em_minutos")), cargo);
+                    resultado.getInt("duracao_em_minutos")), cargo, edital);
     }
 
     private int contarGruposSemMateria(UUID cargo) {
@@ -301,10 +314,11 @@ public class ConsultaDoDashboard {
                 FROM materias_da_prova mp
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
-                WHERE p.cargo_id = ?
+                JOIN materias m ON m.identificador = mp.materia_id
+                WHERE p.cargo_id = ? AND m.arquivada = FALSE
                   AND NOT EXISTS (
                     SELECT 1 FROM topicos_da_materia t
-                    WHERE t.materia_id = mp.materia_id
+                    WHERE t.materia_id = mp.materia_id AND t.arquivado = FALSE
                   )
                 """, cargo);
     }
@@ -320,13 +334,6 @@ public class ConsultaDoDashboard {
 
     private String quantidade(int valor, String singular, String plural) {
         return valor + " " + (valor == 1 ? singular : plural);
-    }
-
-    private record ConcursoEncontrado(
-            UUID identificador, String nome, String orgao, String banca, String situacao) {
-    }
-
-    private record CargoEncontrado(UUID identificador, String nome) {
     }
 
     private record ContagemDeItens(int mapeados, int semMapeamento) {

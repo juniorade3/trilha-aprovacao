@@ -21,6 +21,10 @@ function criarRoteador() {
       { path: '/estudos', component: { template: '<div />' } },
       { path: '/materiais', component: { template: '<div />' } },
       { path: '/planejamento/hoje', component: { template: '<div />' } },
+      {
+        path: '/planejamento/prioridades',
+        component: { template: '<div />' },
+      },
     ],
   })
 }
@@ -110,6 +114,9 @@ describe('InicioPagina', () => {
     expect(pagina.text()).toContain('Faltam 33 dias')
     expect(pagina.get('a[href="/planejamento/hoje"]').text()).toContain(
       'Ver plano de hoje',
+    )
+    expect(pagina.get('a[href="/planejamento/prioridades"]').text()).toContain(
+      'Ver lacunas',
     )
   })
 

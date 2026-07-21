@@ -523,7 +523,9 @@ onBeforeUnmount(() => {
             class="form-check-input"
             type="checkbox"
           />
-          <span class="form-check-label">Somente edital confirmado</span>
+          <span class="form-check-label">
+            Somente cargo selecionado e edital principal
+          </span>
         </label>
         <button
           class="btn btn-outline-primary"
@@ -550,7 +552,11 @@ onBeforeUnmount(() => {
       <EstadoDaPagina
         v-else-if="diagnosticos.length === 0"
         titulo="Nenhum tópico neste filtro"
-        descricao="Cadastre tópicos ativos ou remova o filtro de edital confirmado."
+        :descricao="
+          somenteExigidos
+            ? 'Defina o cargo selecionado e o edital principal, confirme os mapeamentos ou remova este filtro.'
+            : 'Cadastre tópicos pessoais ativos para iniciar o diagnóstico.'
+        "
         icone="bi-clipboard-data"
       />
       <div v-else class="table-responsive">

@@ -87,6 +87,7 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/execucoes-de-bloco/{identificador}/registro-de-estudo'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/evidencias/padroes-de-erro'].get.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/evidencias/diagnostico-de-topicos'].get.responses['422']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/priorizacao-de-topicos'].get.responses['422']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/estudos'].post.responses['422']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/estudos/{identificador}/correcao'].put.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/conclusao'].post.responses['404']").exists())
@@ -107,6 +108,7 @@ class DocumentacaoDaApiIntegracaoTest {
                 "Materiais e estudos",
                 "Planejamento",
                 "Evidências",
+                "Priorização de tópicos",
                 "Dashboard");
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/security/0/sessao")
                 .isMissingNode()).isFalse();
@@ -116,6 +118,9 @@ class DocumentacaoDaApiIntegracaoTest {
                 .isMissingNode()).isFalse();
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/responses/401")
                 .isMissingNode()).isFalse();
+
+        validarOperacaoDaPriorizacao(
+                documento.at("/paths/~1api~1v1~1priorizacao-de-topicos/get"));
 
         validarOperacaoDaGeracao(documento.at("/paths/~1api~1v1~1planos-semanais~1"
                         + "{identificador}~1materias-para-geracao/get"),
@@ -147,6 +152,27 @@ class DocumentacaoDaApiIntegracaoTest {
                         + "{identificador}~1historico-semanal/get"),
                 null, "RespostaDoHistoricoSemanal",
                 List.of("200", "400", "401", "403", "404", "409", "422"));
+    }
+
+    private void validarOperacaoDaPriorizacao(JsonNode operacao) {
+        assertThat(operacao.isMissingNode()).isFalse();
+        assertThat(operacao.path("summary").asString()).isNotBlank();
+        assertThat(operacao.path("description").asString()).isNotBlank();
+        assertThat(operacao.path("tags").valueStream().map(JsonNode::asString))
+                .contains("Priorização de tópicos");
+        assertThat(operacao.at("/security/0/sessao").isMissingNode()).isFalse();
+        assertThat(operacao.at("/security/0/csrf").isMissingNode()).isTrue();
+        assertThat(operacao.path("requestBody").isMissingNode()).isTrue();
+        assertThat(operacao.at("/responses/200/content").valueStream()
+                .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                .anyMatch(referencia ->
+                        referencia.endsWith("/RespostaDePriorizacaoDeTopicos"));
+        List.of("400", "401", "403", "404", "409", "422").forEach(codigo ->
+                assertThat(operacao.at("/responses/" + codigo + "/content")
+                        .valueStream()
+                        .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                        .as("resposta HTTP %s da priorizacao", codigo)
+                        .anyMatch(referencia -> referencia.endsWith("/RespostaDeErro")));
     }
 
     @Test

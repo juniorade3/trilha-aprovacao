@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
             </button>
             <RouterLink
               class="btn btn-outline-primary"
-              :to="`/concursos/${dashboard.concursoAtivo.identificador}?foco=mapeamentos`"
+              to="/planejamento/prioridades"
             >
               <i class="bi bi-bar-chart me-2" aria-hidden="true"></i>
               Ver lacunas

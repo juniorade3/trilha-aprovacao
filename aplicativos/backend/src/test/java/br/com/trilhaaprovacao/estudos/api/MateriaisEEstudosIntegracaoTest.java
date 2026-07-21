@@ -452,6 +452,12 @@ class MateriaisEEstudosIntegracaoTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"identificadorDoTopicoDaMateria\":\"" + topico + "\"}"))
                 .andExpect(status().isCreated());
+        api.perform(post("/api/v1/editais/{id}/definicao-como-principal", edital)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
+        api.perform(post("/api/v1/cargos/{id}/selecao", cargo)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
         api.perform(post("/api/v1/concursos/{id}/ativacao", concurso)
                         .session(sessao).with(csrf()))
                 .andExpect(status().isOk());

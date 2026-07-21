@@ -3647,12 +3647,19 @@ h2.titulo-editorial,
   display: flex;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   a {
     align-items: center;
     color: var(--cor-texto-secundario);
     display: inline-flex;
     font-weight: 700;
+    flex: none;
     gap: 0.45rem;
     padding: 0.8rem 0;
     text-decoration: none;

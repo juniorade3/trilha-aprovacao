@@ -50,13 +50,16 @@ describe('LoginPagina', () => {
     )
     await roteador.isReady()
     const pagina = mount(LoginPagina, {
+      attachTo: document.body,
       global: { plugins: [createPinia(), roteador] },
     })
 
     expect(pagina.text()).toContain('Sua sessão expirou')
+    expect(document.activeElement).toBe(pagina.get('#email').element)
     expect(roteador.currentRoute.value.query.redirecionar).toBe(
       '/materiais/material-1',
     )
+    pagina.unmount()
   })
 
   it('autentica, restaura a sessao e respeita o redirecionamento', async () => {
