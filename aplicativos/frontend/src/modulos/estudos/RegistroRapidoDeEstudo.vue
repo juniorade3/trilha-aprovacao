@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+} from 'vue'
 
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
 import CamposDeEvidencia from './CamposDeEvidencia.vue'
@@ -20,6 +27,12 @@ import {
   type TipoDeEstudo,
 } from './apiDeEstudos'
 
+const propriedades = defineProps<{
+  identificadorDaMateriaInicial?: string
+  identificadorDoTopicoInicial?: string
+  tipoDeEstudoInicial?: TipoDeEstudo
+}>()
+
 const emitir = defineEmits<{
   fechar: []
   registrado: []
@@ -32,6 +45,9 @@ const coberturas = ref<CoberturaDeTopico[]>([])
 const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
+const erroDeCarregamento = ref('')
+const botaoDeRepetir = ref<HTMLButtonElement>()
+const campoDoTipo = ref<HTMLSelectElement>()
 const cancelamento = new AbortController()
 const duracoesRapidas = [30, 50, 60, 90]
 const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
@@ -45,13 +61,13 @@ const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
 ]
 
 const formulario = reactive({
-  identificadorDaMateria: '',
-  identificadorDoTopico: '',
+  identificadorDaMateria: propriedades.identificadorDaMateriaInicial ?? '',
+  identificadorDoTopico: propriedades.identificadorDoTopicoInicial ?? '',
   identificadorDoMaterial: '',
   dataHora: dataHoraLocalAtual(),
   duracaoEmMinutos: 50,
   observacao: '',
-  tipoDeEstudo: 'TEORIA' as TipoDeEstudo,
+  tipoDeEstudo: propriedades.tipoDeEstudoInicial ?? ('TEORIA' as TipoDeEstudo),
   evidencia: { padroesDeErro: [] } as ModeloDeEvidencia,
 })
 
@@ -77,14 +93,72 @@ const materiaisDoTopico = computed(() => {
 })
 
 function dataHoraLocalAtual() {
-  const agora = new Date()
-  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
-  return agora.toISOString().slice(0, 16)
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date())
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
+    partes.find((parte) => parte.type === tipo)?.value ?? ''
+  return `${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}`
+}
+
+function paraInstanteDeSaoPaulo(valor: string) {
+  const correspondencia = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(
+    valor,
+  )
+  if (!correspondencia) throw new Error('Informe uma data e horario validos.')
+  const desejado = correspondencia.slice(1).map(Number)
+  let instante = Date.UTC(
+    desejado[0]!,
+    desejado[1]! - 1,
+    desejado[2]!,
+    desejado[3]!,
+    desejado[4]!,
+  )
+  const formatador = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    const partes = formatador.formatToParts(new Date(instante))
+    const numero = (tipo: Intl.DateTimeFormatPartTypes) =>
+      Number(partes.find((parte) => parte.type === tipo)?.value)
+    const exibidoComoUtc = Date.UTC(
+      numero('year'),
+      numero('month') - 1,
+      numero('day'),
+      numero('hour'),
+      numero('minute'),
+    )
+    const desejadoComoUtc = Date.UTC(
+      desejado[0]!,
+      desejado[1]! - 1,
+      desejado[2]!,
+      desejado[3]!,
+      desejado[4]!,
+    )
+    instante += desejadoComoUtc - exibidoComoUtc
+  }
+  return new Date(instante).toISOString()
 }
 
 async function carregar() {
   carregando.value = true
-  erro.value = ''
+  erroDeCarregamento.value = ''
+  materias.value = []
+  topicos.value = []
+  materiais.value = []
+  coberturas.value = []
   try {
     const [materiasObtidas, materiaisObtidos] = await Promise.all([
       listarTodasAsMaterias('', false, cancelamento.signal),
@@ -112,13 +186,20 @@ async function carregar() {
     coberturas.value = respostasDeCoberturas.flat()
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
-    erro.value =
+    erroDeCarregamento.value =
       causa instanceof Error
         ? causa.message
         : 'Não foi possível preparar o registro.'
   } finally {
     carregando.value = false
   }
+}
+
+async function repetirCarregamento() {
+  await carregar()
+  await nextTick()
+  if (erroDeCarregamento.value) botaoDeRepetir.value?.focus()
+  else campoDoTipo.value?.focus()
 }
 
 function ajustarTopico() {
@@ -137,7 +218,7 @@ async function salvar() {
     await registrarEstudo({
       identificadorDoTopico: formulario.identificadorDoTopico,
       identificadorDoMaterial: formulario.identificadorDoMaterial || undefined,
-      dataHora: new Date(formulario.dataHora).toISOString(),
+      dataHora: paraInstanteDeSaoPaulo(formulario.dataHora),
       duracaoEmMinutos: formulario.duracaoEmMinutos,
       observacao: formulario.observacao || undefined,
       tipoDeEstudo: formulario.tipoDeEstudo,
@@ -170,6 +251,19 @@ onBeforeUnmount(() => cancelamento.abort())
       Preparando seu catálogo...
     </div>
 
+    <div v-else-if="erroDeCarregamento" class="estado-do-modal" role="alert">
+      <i class="bi bi-cloud-slash" aria-hidden="true"></i>
+      <p>{{ erroDeCarregamento }}</p>
+      <button
+        ref="botaoDeRepetir"
+        class="btn btn-outline-primary"
+        type="button"
+        @click="repetirCarregamento"
+      >
+        Tentar novamente
+      </button>
+    </div>
+
     <form v-else id="registro-rapido-de-estudo" @submit.prevent="salvar">
       <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
       <div v-if="materias.length === 0" class="nota-contextual">
@@ -182,7 +276,7 @@ onBeforeUnmount(() => cancelamento.abort())
       <div class="formulario-da-aplicacao">
         <label>
           <span>Tipo de estudo</span>
-          <select v-model="formulario.tipoDeEstudo" required>
+          <select ref="campoDoTipo" v-model="formulario.tipoDeEstudo" required>
             <option
               v-for="tipo in tiposDeEstudo"
               :key="tipo.valor"

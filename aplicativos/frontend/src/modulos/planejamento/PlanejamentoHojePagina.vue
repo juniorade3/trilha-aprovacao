@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
@@ -11,6 +12,11 @@ import {
   type ModeloDeEvidencia,
 } from '@/modulos/estudos/apiDeEstudos'
 import NavegacaoDoPlanejamento from './NavegacaoDoPlanejamento.vue'
+import {
+  consultarRevisoesEspacadas,
+  type AgendaDeRevisoesEspacadas,
+  type RevisaoEspacada,
+} from './apiDeRevisoesEspacadas'
 import {
   concluirBloco,
   iniciarBloco,
@@ -30,10 +36,17 @@ import {
 } from './apiDePlanejamento'
 
 const planejamento = ref<PlanejamentoDeHoje>()
+const roteador = useRouter()
+const agendaDeRevisoes = ref<AgendaDeRevisoesEspacadas>()
 const execucaoAtual = ref<ResultadoDaExecucaoDoBloco>()
 const carregando = ref(true)
+const carregandoRevisoes = ref(true)
 const processando = ref(false)
 const erro = ref('')
+const erroDasRevisoes = ref('')
+const contextoDasRevisoesIncompleto = ref(false)
+const tituloDasRevisoes = ref<HTMLElement>()
+const botaoDeRepetirRevisoes = ref<HTMLButtonElement>()
 const conflito = ref(false)
 const aviso = ref('')
 const acaoDeFinalizacao = ref<'CONCLUIR' | 'INTERROMPER'>()
@@ -60,14 +73,19 @@ const evidenciaDaExecucao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
 const evidenciaDaCorrecao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
 const agora = ref(Date.now())
 let cancelamento: AbortController | undefined
+let cancelamentoDasRevisoes: AbortController | undefined
 let temporizador: number | undefined
 
 function dataLocalAtual() {
-  const data = new Date()
-  const ano = data.getFullYear()
-  const mes = String(data.getMonth() + 1).padStart(2, '0')
-  const dia = String(data.getDate()).padStart(2, '0')
-  return `${ano}-${mes}-${dia}`
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
+    partes.find((parte) => parte.type === tipo)?.value ?? ''
+  return `${valor('year')}-${valor('month')}-${valor('day')}`
 }
 
 const dataConsultada = dataLocalAtual()
@@ -76,7 +94,14 @@ const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: 'long',
   year: 'numeric',
-}).format(new Date(`${dataConsultada}T12:00:00`))
+  timeZone: 'America/Sao_Paulo',
+}).format(new Date(`${dataConsultada}T12:00:00-03:00`))
+
+const revisoesDeHoje = computed(() =>
+  (agendaDeRevisoes.value?.revisoes ?? []).filter(
+    (revisao) => revisao.situacao !== 'FUTURA',
+  ),
+)
 
 const linkDaSemana = computed(() => ({
   path: '/planejamento/semana',
@@ -237,6 +262,97 @@ async function carregar() {
   }
 }
 
+async function carregarRevisoes() {
+  cancelamentoDasRevisoes?.abort()
+  const requisicao = new AbortController()
+  cancelamentoDasRevisoes = requisicao
+  carregandoRevisoes.value = true
+  erroDasRevisoes.value = ''
+  contextoDasRevisoesIncompleto.value = false
+  try {
+    agendaDeRevisoes.value = await consultarRevisoesEspacadas(
+      dataConsultada,
+      dataConsultada,
+      requisicao.signal,
+    )
+  } catch (causa) {
+    if (causa instanceof DOMException && causa.name === 'AbortError') return
+    agendaDeRevisoes.value = undefined
+    if (causa instanceof ErroDaApi && causa.status === 422) {
+      contextoDasRevisoesIncompleto.value = true
+      return
+    }
+    erroDasRevisoes.value =
+      causa instanceof ErroDaApi && causa.status === 401
+        ? 'Sua sessão expirou. Entre novamente para consultar as revisões.'
+        : causa instanceof Error
+          ? causa.message
+          : 'Não foi possível consultar as revisões de hoje.'
+  } finally {
+    if (cancelamentoDasRevisoes === requisicao) carregandoRevisoes.value = false
+  }
+}
+
+async function recarregarPlanejamentoERevisoes() {
+  await Promise.all([carregar(), carregarRevisoes()])
+}
+
+async function atualizarRevisoesAposEstudo() {
+  await carregarRevisoes()
+  await nextTick()
+  tituloDasRevisoes.value?.focus()
+}
+
+async function repetirConsultaDasRevisoes() {
+  await carregarRevisoes()
+  await nextTick()
+  if (erroDasRevisoes.value) botaoDeRepetirRevisoes.value?.focus()
+  else tituloDasRevisoes.value?.focus()
+}
+
+function formatarDataCurta(data: string) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(`${data}T12:00:00-03:00`))
+}
+
+function descricaoDaSituacaoDaRevisao(revisao: RevisaoEspacada) {
+  if (revisao.situacao === 'JA_PLANEJADA')
+    return revisao.blocoAberto
+      ? `Já planejada para ${formatarDataCurta(revisao.blocoAberto.data)}`
+      : 'Já planejada'
+  if (revisao.situacao === 'VENCIDA')
+    return `Vencida há ${revisao.diasEmAtraso} ${
+      revisao.diasEmAtraso === 1 ? 'dia' : 'dias'
+    }`
+  return 'Devida hoje'
+}
+
+function abrirRegistroDaRevisao(revisao: RevisaoEspacada) {
+  window.dispatchEvent(
+    new CustomEvent('abrir-registro-rapido', {
+      detail: {
+        identificadorDaMateria: revisao.identificadorDaMateria,
+        identificadorDoTopico: revisao.identificadorDoTopico,
+        tipoDeEstudo: 'REVISAO',
+      },
+    }),
+  )
+}
+
+async function irParaBlocoDaRevisao(revisao: RevisaoEspacada) {
+  if (!revisao.blocoAberto) return
+  await roteador.push({
+    path: '/planejamento/semana',
+    query: {
+      inicio: revisao.blocoAberto.dataInicialDoPlano,
+      foco: revisao.blocoAberto.identificador,
+    },
+  })
+}
+
 function registrarErro(causa: unknown, mensagemPadrao: string) {
   conflito.value = causa instanceof ErroDaApi && causa.status === 409
   erro.value = causa instanceof Error ? causa.message : mensagemPadrao
@@ -267,7 +383,7 @@ async function iniciar(bloco: BlocoDeEstudo) {
     agora.value = Date.now()
     aviso.value =
       'Bloco iniciado. O cronômetro continuará mesmo após recarregar.'
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível iniciar o bloco.')
   } finally {
@@ -324,7 +440,7 @@ async function finalizar() {
         : 'Bloco encerrado como parcialmente concluído.'
     execucaoAtual.value = undefined
     acaoDeFinalizacao.value = undefined
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível finalizar o bloco.')
   } finally {
@@ -356,7 +472,7 @@ async function registrarNoHistorico() {
     ultimoResultado.value = vinculado
     aviso.value = 'Estudo registrado no Histórico.'
     blocoParaHistorico.value = undefined
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível registrar o estudo no Histórico.')
   } finally {
@@ -385,7 +501,7 @@ async function confirmarReagendamento() {
     )
     blocoParaReagendar.value = undefined
     aviso.value = 'Bloco reagendado dentro desta semana.'
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível reagendar.')
   } finally {
@@ -402,7 +518,7 @@ async function confirmarCancelamento() {
     await cancelarBloco(blocoParaCancelar.value.identificador)
     blocoParaCancelar.value = undefined
     aviso.value = 'Bloco cancelado e preservado no planejamento.'
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível cancelar.')
   } finally {
@@ -463,7 +579,7 @@ async function confirmarCorrecao() {
     execucaoParaCorrigir.value = undefined
     aviso.value =
       'Execução corrigida; o Histórico foi atualizado quando vinculado.'
-    await carregar()
+    await recarregarPlanejamentoERevisoes()
   } catch (causa) {
     registrarErro(causa, 'Não foi possível corrigir a execução.')
   } finally {
@@ -473,6 +589,8 @@ async function confirmarCorrecao() {
 
 onMounted(() => {
   carregar()
+  carregarRevisoes()
+  window.addEventListener('estudo-registrado', atualizarRevisoesAposEstudo)
   temporizador = window.setInterval(() => {
     agora.value = Date.now()
   }, 1000)
@@ -480,6 +598,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cancelamento?.abort()
+  cancelamentoDasRevisoes?.abort()
+  window.removeEventListener('estudo-registrado', atualizarRevisoesAposEstudo)
   window.clearInterval(temporizador)
 })
 </script>
@@ -524,6 +644,113 @@ onBeforeUnmount(() => {
         Ver no Histórico
       </RouterLink>
     </div>
+
+    <section
+      class="card fila-de-revisoes-de-hoje"
+      aria-labelledby="titulo-das-revisoes-de-hoje"
+      aria-live="polite"
+    >
+      <header>
+        <div>
+          <p class="sobretitulo-da-pagina">Memória em dia</p>
+          <h2
+            id="titulo-das-revisoes-de-hoje"
+            ref="tituloDasRevisoes"
+            tabindex="-1"
+          >
+            Revisões de hoje
+          </h2>
+        </div>
+        <span v-if="!carregandoRevisoes" class="quantidade-de-revisoes">
+          {{ revisoesDeHoje.length }}
+        </span>
+      </header>
+
+      <p v-if="carregandoRevisoes" class="estado-das-revisoes">
+        <span
+          class="spinner-border spinner-border-sm"
+          aria-hidden="true"
+        ></span>
+        Calculando sua fila...
+      </p>
+
+      <div v-else-if="erroDasRevisoes" class="alert alert-danger mb-0">
+        {{ erroDasRevisoes }}
+        <button
+          v-if="!erroDasRevisoes.includes('sessão expirou')"
+          ref="botaoDeRepetirRevisoes"
+          class="btn btn-sm btn-outline-danger ms-2"
+          type="button"
+          @click="repetirConsultaDasRevisoes"
+        >
+          Tentar novamente
+        </button>
+      </div>
+
+      <div
+        v-else-if="contextoDasRevisoesIncompleto"
+        class="estado-das-revisoes"
+      >
+        <i class="bi bi-bullseye" aria-hidden="true"></i>
+        <p>
+          <strong>Complete o contexto do concurso.</strong>
+          <span>
+            Ative um concurso, selecione o cargo e defina o edital principal
+            para calcular as revisões exigidas.
+          </span>
+        </p>
+        <RouterLink class="btn btn-sm btn-outline-primary" to="/concursos">
+          Revisar concurso
+        </RouterLink>
+      </div>
+
+      <p v-else-if="revisoesDeHoje.length === 0" class="estado-das-revisoes">
+        <i class="bi bi-check2-circle" aria-hidden="true"></i>
+        Nenhuma revisão vencida ou devida hoje.
+      </p>
+
+      <ol v-else class="lista-de-revisoes-de-hoje">
+        <li
+          v-for="revisao in revisoesDeHoje"
+          :key="revisao.identificadorDoTopico"
+        >
+          <div class="identificacao-da-revisao">
+            <span
+              class="situacao-da-revisao"
+              :class="`situacao-${revisao.situacao.toLowerCase()}`"
+            >
+              {{ descricaoDaSituacaoDaRevisao(revisao) }}
+            </span>
+            <strong>{{ revisao.nomeDoTopico }}</strong>
+            <small>
+              {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+              intervalo de {{ revisao.intervaloEmDias }} dias
+            </small>
+            <small v-if="revisao.ultimaRecordacao">
+              Última recordação: {{ revisao.ultimaRecordacao }}/5
+            </small>
+          </div>
+          <button
+            v-if="!revisao.blocoAberto"
+            class="btn btn-sm btn-primary"
+            type="button"
+            :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
+            @click="abrirRegistroDaRevisao(revisao)"
+          >
+            Revisar agora
+          </button>
+          <button
+            v-else
+            class="btn btn-sm btn-outline-primary"
+            type="button"
+            :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
+            @click="irParaBlocoDaRevisao(revisao)"
+          >
+            Ir para o bloco
+          </button>
+        </li>
+      </ol>
+    </section>
 
     <EstadoDaPagina
       v-if="carregando"

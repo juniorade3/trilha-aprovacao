@@ -5,11 +5,19 @@ import { useRouter } from 'vue-router'
 import { usarSessao } from '@/aplicacao/estado/sessao'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 import RegistroRapidoDeEstudo from '@/modulos/estudos/RegistroRapidoDeEstudo.vue'
+import type { TipoDeEstudo } from '@/modulos/estudos/apiDeEstudos'
+
+interface DadosIniciaisDoRegistroRapido {
+  identificadorDaMateria?: string
+  identificadorDoTopico?: string
+  tipoDeEstudo?: TipoDeEstudo
+}
 
 const sessao = usarSessao()
 const roteador = useRouter()
 const menuAberto = ref(false)
 const registroRapidoAberto = ref(false)
+const dadosIniciaisDoRegistroRapido = ref<DadosIniciaisDoRegistroRapido>()
 const aviso = ref('')
 let temporizadorDoAviso: number | undefined
 
@@ -28,6 +36,7 @@ async function sair() {
 
 function estudoRegistrado() {
   registroRapidoAberto.value = false
+  dadosIniciaisDoRegistroRapido.value = undefined
   aviso.value = 'Estudo registrado. Seu progresso foi atualizado.'
   window.dispatchEvent(new CustomEvent('estudo-registrado'))
   window.clearTimeout(temporizadorDoAviso)
@@ -36,8 +45,17 @@ function estudoRegistrado() {
   }, 3500)
 }
 
-function abrirRegistroRapido() {
+function abrirRegistroRapido(evento?: Event) {
+  dadosIniciaisDoRegistroRapido.value =
+    evento instanceof CustomEvent
+      ? (evento.detail as DadosIniciaisDoRegistroRapido | undefined)
+      : undefined
   registroRapidoAberto.value = true
+}
+
+function fecharRegistroRapido() {
+  registroRapidoAberto.value = false
+  dadosIniciaisDoRegistroRapido.value = undefined
 }
 
 onMounted(() => {
@@ -77,7 +95,7 @@ onBeforeUnmount(() => {
         <button
           class="acao-global-de-estudo"
           type="button"
-          @click="registroRapidoAberto = true"
+          @click="abrirRegistroRapido()"
         >
           <i class="bi bi-pencil-square" aria-hidden="true"></i>
           Registrar estudo
@@ -131,14 +149,21 @@ onBeforeUnmount(() => {
       type="button"
       aria-label="Registrar estudo"
       title="Registrar estudo"
-      @click="registroRapidoAberto = true"
+      @click="abrirRegistroRapido()"
     >
       <i class="bi bi-plus-lg" aria-hidden="true"></i>
     </button>
 
     <RegistroRapidoDeEstudo
       v-if="registroRapidoAberto"
-      @fechar="registroRapidoAberto = false"
+      :identificador-da-materia-inicial="
+        dadosIniciaisDoRegistroRapido?.identificadorDaMateria
+      "
+      :identificador-do-topico-inicial="
+        dadosIniciaisDoRegistroRapido?.identificadorDoTopico
+      "
+      :tipo-de-estudo-inicial="dadosIniciaisDoRegistroRapido?.tipoDeEstudo"
+      @fechar="fecharRegistroRapido"
       @registrado="estudoRegistrado"
     />
 
