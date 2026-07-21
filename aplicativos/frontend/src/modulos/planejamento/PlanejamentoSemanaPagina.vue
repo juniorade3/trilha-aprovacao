@@ -226,6 +226,20 @@ async function carregar() {
   } finally {
     carregando.value = false
   }
+  await focarBlocoSolicitado()
+}
+
+async function focarBlocoSolicitado() {
+  const identificador = rota.query.foco
+  if (
+    typeof identificador !== 'string' ||
+    !plano.value?.blocos.some((bloco) => bloco.identificador === identificador)
+  )
+    return
+  await nextTick()
+  document
+    .getElementById(`bloco-planejado-${identificador}`)
+    ?.focus({ preventScroll: false })
 }
 
 function blocosDaData(data: string) {
@@ -587,6 +601,8 @@ watch(
   },
   { immediate: true },
 )
+
+watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
 </script>
 
 <template>
@@ -863,7 +879,9 @@ watch(
             <ol v-if="blocosDaData(data).length" class="lista-de-blocos-do-dia">
               <li
                 v-for="(bloco, posicao) in blocosDaData(data)"
+                :id="`bloco-planejado-${bloco.identificador}`"
                 :key="bloco.identificador"
+                tabindex="-1"
               >
                 <div class="conteudo-do-bloco-planejado">
                   <span class="ordem-do-bloco">{{ bloco.ordem }}</span>
@@ -1285,6 +1303,11 @@ watch(
   border: 1px solid var(--bs-border-color);
   border-radius: 1rem;
   background: var(--bs-body-bg);
+}
+
+.lista-de-blocos-do-dia > li:focus-visible {
+  outline: 3px solid rgba(13, 125, 115, 0.45);
+  outline-offset: 3px;
 }
 
 .grade-do-historico-semanal {

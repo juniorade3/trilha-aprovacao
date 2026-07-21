@@ -122,7 +122,7 @@ function blocoDeEstudo(
   }
 }
 
-async function montarPagina() {
+async function montarPagina(foco?: string) {
   const roteador = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -133,7 +133,10 @@ async function montarPagina() {
       { path: '/estudos', component: { template: '<div>Histórico</div>' } },
     ],
   })
-  await roteador.push(`/planejamento/semana?inicio=${inicio}`)
+  await roteador.push({
+    path: '/planejamento/semana',
+    query: { inicio, ...(foco ? { foco } : {}) },
+  })
   await roteador.isReady()
   const pagina = mount(PlanejamentoSemanaPagina, {
     attachTo: document.body,
@@ -396,6 +399,21 @@ describe('PlanejamentoSemanaPagina', () => {
 
     expect(roteador.currentRoute.value.query.inicio).toBe('2026-07-27')
     expect(chamadas.obterPlanoSemanal).toHaveBeenLastCalledWith('2026-07-27')
+  })
+
+  it('foca de forma acessivel o bloco indicado na URL da semana', async () => {
+    const bloco = blocoDeEstudo('bloco-revisao', 'Revisão planejada', 1)
+    chamadas.obterPlanoSemanal.mockResolvedValue(planoSemanal(180, [bloco]))
+
+    const { pagina, roteador } = await montarPagina('bloco-revisao')
+
+    const elemento = pagina.get('#bloco-planejado-bloco-revisao')
+    expect(elemento.attributes('tabindex')).toBe('-1')
+    expect(document.activeElement).toBe(elemento.element)
+    expect(roteador.currentRoute.value.query).toEqual({
+      inicio,
+      foco: 'bloco-revisao',
+    })
   })
 
   it('fecha a geracao aberta antes de carregar outra semana', async () => {

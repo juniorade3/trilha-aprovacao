@@ -68,6 +68,8 @@ public class ConfiguracaoDaDocumentacaoDaApi {
                                 "Resultados de aprendizagem e diagnóstico objetivo por tópico."),
                         new Tag().name("Priorização de tópicos").description(
                                 "Lacunas e ranking consultivo dos topicos exigidos."),
+                        new Tag().name("Revisões espaçadas").description(
+                                "Agenda deterministica de revisoes dos topicos exigidos."),
                         new Tag().name("Dashboard").description("Visão objetiva do concurso ativo.")));
     }
 

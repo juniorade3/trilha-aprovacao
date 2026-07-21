@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 
@@ -18,6 +18,7 @@ const chamadas = vi.hoisted(() => ({
   cancelarBloco: vi.fn(),
   reagendarBloco: vi.fn(),
   corrigirExecucao: vi.fn(),
+  consultarRevisoesEspacadas: vi.fn(),
 }))
 
 vi.mock('./apiDePlanejamento', () => ({
@@ -32,6 +33,10 @@ vi.mock('./apiDePlanejamento', () => ({
   cancelarBloco: chamadas.cancelarBloco,
   reagendarBloco: chamadas.reagendarBloco,
   corrigirExecucao: chamadas.corrigirExecucao,
+}))
+
+vi.mock('./apiDeRevisoesEspacadas', () => ({
+  consultarRevisoesEspacadas: chamadas.consultarRevisoesEspacadas,
 }))
 
 import PlanejamentoHojePagina from './PlanejamentoHojePagina.vue'
@@ -70,6 +75,26 @@ function diaPlanejado() {
   }
 }
 
+function revisaoEspacada(
+  situacao: 'VENCIDA' | 'DEVIDA_HOJE' | 'JA_PLANEJADA' = 'DEVIDA_HOJE',
+) {
+  return {
+    identificadorDoTopico: 'topico-1',
+    nomeDoTopico: 'Direitos fundamentais',
+    identificadorDaMateria: 'materia-1',
+    nomeDaMateria: 'Direito Constitucional',
+    etapa: 2,
+    intervaloEmDias: 7,
+    dataDevida: '2026-07-21',
+    diasEmAtraso: situacao === 'VENCIDA' ? 3 : 0,
+    ultimaRevisao: '2026-07-14T10:00:00-03:00',
+    ultimaRecordacao: 3,
+    situacao,
+  }
+}
+
+const paginasMontadas: ReturnType<typeof mount>[] = []
+
 async function montar() {
   const roteador = createRouter({
     history: createMemoryHistory(),
@@ -82,16 +107,23 @@ async function montar() {
   await roteador.push('/planejamento/hoje')
   await roteador.isReady()
   const pagina = mount(PlanejamentoHojePagina, {
+    attachTo: document.body,
     global: {
       plugins: [roteador],
       stubs: { teleport: true },
     },
   })
+  paginasMontadas.push(pagina)
   await flushPromises()
   return pagina
 }
 
 describe('PlanejamentoHojePagina', () => {
+  afterEach(() => {
+    for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)
@@ -100,6 +132,195 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.cancelarBloco.mockResolvedValue(undefined)
     chamadas.reagendarBloco.mockResolvedValue(undefined)
     chamadas.corrigirExecucao.mockResolvedValue(undefined)
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-21',
+      revisoes: [],
+    })
+  })
+
+  it('mostra a fila vazia sem interferir no planejamento', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+
+    const pagina = await montar()
+
+    expect(pagina.text()).toContain('Revisões de hoje')
+    expect(pagina.text()).toContain('Nenhuma revisão vencida ou devida hoje')
+    expect(pagina.text()).toContain('Primeiro bloco')
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+    const [referencia, ate] = chamadas.consultarRevisoesEspacadas.mock.calls[0]!
+    expect(ate).toBe(referencia)
+  })
+
+  it('usa a data civil de Sao Paulo perto da virada em UTC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-22T02:30:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+
+    await montar()
+
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledWith(
+      '2026-07-21',
+      '2026-07-21',
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('abre o registro rapido preenchido para revisao vencida ou devida', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-21',
+      revisoes: [
+        revisaoEspacada('VENCIDA'),
+        {
+          ...revisaoEspacada(),
+          identificadorDoTopico: 'topico-2',
+          nomeDoTopico: 'Controle de constitucionalidade',
+        },
+      ],
+    })
+    const detalhes: unknown[] = []
+    const aoAbrir = (evento: Event) =>
+      detalhes.push((evento as CustomEvent).detail)
+    window.addEventListener('abrir-registro-rapido', aoAbrir, { once: true })
+
+    const pagina = await montar()
+
+    expect(pagina.text()).toContain('Vencida há 3 dias')
+    expect(pagina.text()).toContain('Devida hoje')
+    expect(
+      pagina.get('[aria-label="Revisar agora: Direitos fundamentais"]'),
+    ).toBeTruthy()
+    await pagina
+      .findAll('button')
+      .find((item) => item.text() === 'Revisar agora')!
+      .trigger('click')
+
+    expect(detalhes).toEqual([
+      {
+        identificadorDaMateria: 'materia-1',
+        identificadorDoTopico: 'topico-1',
+        tipoDeEstudo: 'REVISAO',
+      },
+    ])
+  })
+
+  it('navega para a semana e informa o bloco que deve receber foco', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-21',
+      revisoes: [
+        {
+          ...revisaoEspacada('JA_PLANEJADA'),
+          blocoAberto: {
+            identificador: 'bloco-revisao',
+            identificadorDoPlano: 'plano-1',
+            dataInicialDoPlano: '2026-07-20',
+            data: '2026-07-23',
+            estado: 'PLANEJADO',
+          },
+        },
+      ],
+    })
+    const pagina = await montar()
+
+    expect(pagina.text()).toContain('Já planejada para 23 de jul.')
+    expect(
+      pagina.get('[aria-label="Ir para o bloco: Direitos fundamentais"]'),
+    ).toBeTruthy()
+    await pagina
+      .findAll('button')
+      .find((item) => item.text() === 'Ir para o bloco')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(pagina.vm.$router.currentRoute.value.query).toEqual({
+      inicio: '2026-07-20',
+      foco: 'bloco-revisao',
+    })
+  })
+
+  it('isola contexto incompleto e erro de rede do planejamento principal', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockRejectedValueOnce(
+      new ErroDaApi(422, 'Contexto incompleto.'),
+    )
+    const incompleto = await montar()
+
+    expect(incompleto.text()).toContain('Complete o contexto do concurso')
+    expect(incompleto.text()).toContain('Primeiro bloco')
+    incompleto.unmount()
+
+    chamadas.consultarRevisoesEspacadas
+      .mockRejectedValueOnce(new Error('Agenda indisponível'))
+      .mockResolvedValueOnce({
+        dataDeReferencia: '2026-07-21',
+        ate: '2026-07-21',
+        revisoes: [],
+      })
+    const rede = await montar()
+    expect(rede.text()).toContain('Agenda indisponível')
+    expect(rede.text()).toContain('Primeiro bloco')
+    await rede
+      .findAll('button')
+      .find((item) => item.text() === 'Tentar novamente')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(rede.text()).toContain('Nenhuma revisão vencida ou devida hoje')
+    expect(document.activeElement).toBe(
+      rede.get('#titulo-das-revisoes-de-hoje').element,
+    )
+  })
+
+  it('explica a sessao expirada e recalcula depois de um estudo registrado', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockRejectedValueOnce(
+      new ErroDaApi(401, 'Não autenticado.'),
+    )
+    const expirada = await montar()
+    expect(expirada.text()).toContain('Sua sessão expirou')
+    expect(
+      expirada
+        .findAll('button')
+        .some((item) => item.text() === 'Tentar novamente'),
+    ).toBe(false)
+    expirada.unmount()
+
+    chamadas.consultarRevisoesEspacadas
+      .mockResolvedValueOnce({
+        dataDeReferencia: '2026-07-21',
+        ate: '2026-07-21',
+        revisoes: [revisaoEspacada()],
+      })
+      .mockResolvedValueOnce({
+        dataDeReferencia: '2026-07-21',
+        ate: '2026-07-21',
+        revisoes: [],
+      })
+    const atualizada = await montar()
+    const botaoRemovido = atualizada.get(
+      '[aria-label="Revisar agora: Direitos fundamentais"]',
+    )
+    ;(botaoRemovido.element as HTMLButtonElement).focus()
+    window.dispatchEvent(new CustomEvent('estudo-registrado'))
+    await flushPromises()
+
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(3)
+    expect(
+      atualizada
+        .find('[aria-label="Revisar agora: Direitos fundamentais"]')
+        .exists(),
+    ).toBe(false)
+    expect(document.activeElement).toBe(
+      atualizada.get('#titulo-das-revisoes-de-hoje').element,
+    )
   })
 
   it('orienta a planejar quando nao existe plano', async () => {
@@ -232,6 +453,7 @@ describe('PlanejamentoHojePagina', () => {
       'bloco-1',
       expect.any(String),
     )
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(2)
   })
 
   it('oferece recarregar os dados depois de conflito', async () => {
@@ -306,6 +528,46 @@ describe('PlanejamentoHojePagina', () => {
       undefined,
       undefined,
     )
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(2)
+  })
+
+  it('recalcula as revisoes depois de interromper uma execucao', async () => {
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue({
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: new Date(Date.now() - 120_000).toISOString(),
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        versao: 0,
+      },
+    })
+    chamadas.interromperBloco.mockResolvedValue({})
+
+    const pagina = await montar()
+    await pagina
+      .findAll('.bloco-em-andamento button')
+      .find((botao) => botao.text() === 'Interromper')!
+      .trigger('click')
+    await pagina.get('#duracao-executada').setValue(10)
+    await pagina
+      .findAll('.rodape-do-modal button')
+      .find((botao) => botao.text() === 'Registrar')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.interromperBloco).toHaveBeenCalledWith(
+      'bloco-1',
+      10,
+      undefined,
+      undefined,
+    )
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(2)
   })
 
   it('separa blocos atrasados e permite inicia-los', async () => {
@@ -368,6 +630,7 @@ describe('PlanejamentoHojePagina', () => {
       .trigger('click')
     await flushPromises()
     expect(chamadas.cancelarBloco).toHaveBeenCalledWith('bloco-1')
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(3)
   })
 
   it('corrige uma execucao finalizada', async () => {
@@ -416,5 +679,6 @@ describe('PlanejamentoHojePagina', () => {
       undefined,
       undefined,
     )
+    expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledTimes(2)
   })
 })
