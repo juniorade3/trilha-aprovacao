@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 import { usarSessao } from '@/aplicacao/estado/sessao'
@@ -11,6 +10,7 @@ const erro = ref('')
 const enviando = ref(false)
 const exibirSenha = ref(false)
 const lembrar = ref(false)
+const campoDeEmail = ref<HTMLInputElement>()
 const rota = useRoute()
 const roteador = useRouter()
 const sessao = usarSessao()
@@ -19,6 +19,8 @@ const avisoDeSessao = computed(() =>
     ? 'Sua sessão expirou. Entre novamente para continuar de onde parou.'
     : '',
 )
+onMounted(() => campoDeEmail.value?.focus())
+
 async function entrar() {
   erro.value = ''
   enviando.value = true
@@ -56,6 +58,7 @@ async function entrar() {
         <label class="form-label" for="email">E-mail</label
         ><input
           id="email"
+          ref="campoDeEmail"
           v-model="email"
           class="form-control mb-3"
           type="email"

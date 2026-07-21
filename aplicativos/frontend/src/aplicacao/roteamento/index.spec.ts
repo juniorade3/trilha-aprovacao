@@ -66,6 +66,9 @@ describe('protegerRotas', () => {
     ).toBe('/planejamento/hoje')
     expect(roteador.resolve('/planejamento/hoje').matched).not.toHaveLength(0)
     expect(roteador.resolve('/planejamento/semana').matched).not.toHaveLength(0)
+    expect(
+      roteador.resolve('/planejamento/prioridades').matched,
+    ).not.toHaveLength(0)
     const rotaDeNovoEstudo = roteador.resolve('/estudos/novo')
     expect(rotaDeNovoEstudo.matched).not.toHaveLength(0)
     expect(

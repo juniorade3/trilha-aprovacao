@@ -142,6 +142,9 @@ class FluxoCompletoIntegracaoTest {
         String edital = criar(sessao,
                 "/api/v1/concursos/" + concurso + "/editais",
                 "{\"titulo\":\"Edital " + sufixo + "\"}");
+        api.perform(post("/api/v1/editais/{id}/definicao-como-principal", edital)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
         String cargo = criar(sessao,
                 "/api/v1/concursos/" + concurso + "/cargos",
                 """

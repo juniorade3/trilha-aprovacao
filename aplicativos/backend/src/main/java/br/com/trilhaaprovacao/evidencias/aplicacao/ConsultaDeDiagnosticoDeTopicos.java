@@ -34,13 +34,31 @@ public class ConsultaDeDiagnosticoDeTopicos {
         Map<UUID, List<PadraoRepetido>> repetidos = padroesRepetidos(
                 usuario, referencia, materia, somenteExigidos);
         return banco.query("""
-                WITH topicos_exigidos AS (
+                WITH contexto_oficial AS (
+                    SELECT cargo.identificador AS cargo_id,
+                           ed.identificador AS edital_id
+                    FROM concursos c
+                    JOIN cargos_do_concurso cargo
+                      ON cargo.concurso_id = c.identificador
+                     AND cargo.selecionado = TRUE
+                    JOIN editais ed
+                      ON ed.concurso_id = c.identificador
+                     AND ed.principal = TRUE
+                    WHERE c.usuario_id = ? AND c.ativo = TRUE
+                ), topicos_exigidos AS (
                     SELECT DISTINCT mapa.topico_da_materia_id AS topico_id
-                    FROM mapeamentos_de_itens_do_edital mapa
-                    JOIN itens_do_edital i ON i.identificador = mapa.item_do_edital_id
-                    JOIN editais ed ON ed.identificador = i.edital_id
-                    JOIN concursos c ON c.identificador = ed.concurso_id
-                    WHERE c.usuario_id = ? AND c.ativo = TRUE AND mapa.confirmado = TRUE
+                    FROM contexto_oficial contexto
+                    JOIN itens_do_edital i ON i.edital_id = contexto.edital_id
+                    JOIN materias_da_prova mp
+                      ON mp.identificador = i.materia_da_prova_id
+                    JOIN grupos_de_conteudo g
+                      ON g.identificador = mp.grupo_de_conteudo_id
+                    JOIN provas p
+                      ON p.identificador = g.prova_id
+                     AND p.cargo_id = contexto.cargo_id
+                    JOIN mapeamentos_de_itens_do_edital mapa
+                      ON mapa.item_do_edital_id = i.identificador
+                     AND mapa.confirmado = TRUE
                 ), fatos AS (
                     SELECT r.topico_id, r.data_hora, r.tipo_de_estudo,
                            e.identificador AS evidencia_id,
@@ -127,13 +145,31 @@ public class ConsultaDeDiagnosticoDeTopicos {
             LocalDate referencia, UUID materia, boolean somenteExigidos) {
         var mapa = new HashMap<UUID, List<PadraoRepetido>>();
         banco.query("""
-                WITH topicos_exigidos AS (
+                WITH contexto_oficial AS (
+                    SELECT cargo.identificador AS cargo_id,
+                           ed.identificador AS edital_id
+                    FROM concursos c
+                    JOIN cargos_do_concurso cargo
+                      ON cargo.concurso_id = c.identificador
+                     AND cargo.selecionado = TRUE
+                    JOIN editais ed
+                      ON ed.concurso_id = c.identificador
+                     AND ed.principal = TRUE
+                    WHERE c.usuario_id = ? AND c.ativo = TRUE
+                ), topicos_exigidos AS (
                     SELECT DISTINCT mapa.topico_da_materia_id AS topico_id
-                    FROM mapeamentos_de_itens_do_edital mapa
-                    JOIN itens_do_edital i ON i.identificador = mapa.item_do_edital_id
-                    JOIN editais ed ON ed.identificador = i.edital_id
-                    JOIN concursos c ON c.identificador = ed.concurso_id
-                    WHERE c.usuario_id = ? AND c.ativo = TRUE AND mapa.confirmado = TRUE
+                    FROM contexto_oficial contexto
+                    JOIN itens_do_edital i ON i.edital_id = contexto.edital_id
+                    JOIN materias_da_prova mp
+                      ON mp.identificador = i.materia_da_prova_id
+                    JOIN grupos_de_conteudo g
+                      ON g.identificador = mp.grupo_de_conteudo_id
+                    JOIN provas p
+                      ON p.identificador = g.prova_id
+                     AND p.cargo_id = contexto.cargo_id
+                    JOIN mapeamentos_de_itens_do_edital mapa
+                      ON mapa.item_do_edital_id = i.identificador
+                     AND mapa.confirmado = TRUE
                 )
                 SELECT p.topico_id, p.identificador, p.descricao,
                        COUNT(DISTINCT e.identificador) AS evidencias,
@@ -145,6 +181,7 @@ public class ConsultaDeDiagnosticoDeTopicos {
                 JOIN topicos_da_materia t ON t.identificador = p.topico_id
                 LEFT JOIN topicos_exigidos te ON te.topico_id = p.topico_id
                 WHERE p.usuario_id = ? AND r.situacao = 'ATIVO'
+                  AND r.topico_id = p.topico_id
                   AND (r.data_hora AT TIME ZONE 'America/Sao_Paulo')::date <= ?
                   AND (CAST(? AS UUID) IS NULL OR t.materia_id = CAST(? AS UUID))
                   AND (NOT ? OR te.topico_id IS NOT NULL)

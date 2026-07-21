@@ -19,6 +19,7 @@ import MateriaisDeEstudoPagina from '@/modulos/estudos/MateriaisDeEstudoPagina.v
 import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
 import PlanejamentoSemanaPagina from '@/modulos/planejamento/PlanejamentoSemanaPagina.vue'
 import PlanejamentoHojePagina from '@/modulos/planejamento/PlanejamentoHojePagina.vue'
+import PriorizacaoDeTopicosPagina from '@/modulos/planejamento/PriorizacaoDeTopicosPagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -80,6 +81,11 @@ const roteador = createRouter({
           path: 'planejamento/semana',
           name: 'planejamento-semana',
           component: PlanejamentoSemanaPagina,
+        },
+        {
+          path: 'planejamento/prioridades',
+          name: 'planejamento-prioridades',
+          component: PriorizacaoDeTopicosPagina,
         },
         {
           path: 'materiais/:identificador',
