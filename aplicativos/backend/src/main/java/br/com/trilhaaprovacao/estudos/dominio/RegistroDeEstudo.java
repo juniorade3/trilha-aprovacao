@@ -9,6 +9,7 @@ public record RegistroDeEstudo(
         UUID identificadorDoTopico,
         UUID identificadorDoMaterial,
         UUID identificadorDoRegistroDeOrigem,
+        TipoDeEstudo tipoDeEstudo,
         OffsetDateTime dataHora,
         int duracaoEmMinutos,
         String observacao,
@@ -20,6 +21,7 @@ public record RegistroDeEstudo(
     public RegistroDeEstudo {
         Objects.requireNonNull(identificador);
         Objects.requireNonNull(identificadorDoTopico);
+        Objects.requireNonNull(tipoDeEstudo);
         Objects.requireNonNull(dataHora);
         if (duracaoEmMinutos < 1 || duracaoEmMinutos > 1440) {
             throw new IllegalArgumentException(
@@ -31,12 +33,18 @@ public record RegistroDeEstudo(
         Objects.requireNonNull(atualizadoEm);
     }
 
-    public static RegistroDeEstudo criar(UUID topico, UUID material,
+    public static RegistroDeEstudo criar(UUID topico, UUID material, TipoDeEstudo tipoDeEstudo,
             OffsetDateTime dataHora, int duracao, String observacao) {
         OffsetDateTime agora = OffsetDateTime.now();
-        return new RegistroDeEstudo(UUID.randomUUID(), topico, material, null,
+        return new RegistroDeEstudo(UUID.randomUUID(), topico, material, null, tipoDeEstudo,
                 dataHora, duracao, observacao, SituacaoDoRegistroDeEstudo.ATIVO,
                 agora, agora, 0);
+    }
+
+    public static RegistroDeEstudo criar(UUID topico, UUID material,
+            OffsetDateTime dataHora, int duracao, String observacao) {
+        return criar(topico, material, TipoDeEstudo.OUTRA,
+                dataHora, duracao, observacao);
     }
 
     public RegistroDeEstudo encerrarComoCorrigido() {
@@ -49,18 +57,24 @@ public record RegistroDeEstudo(
         return comSituacao(SituacaoDoRegistroDeEstudo.CANCELADO);
     }
 
-    public RegistroDeEstudo criarCorrecao(UUID topico, UUID material,
+    public RegistroDeEstudo criarCorrecao(UUID topico, UUID material, TipoDeEstudo novoTipo,
             OffsetDateTime novaDataHora, int novaDuracao, String novaObservacao) {
         exigirAtivo();
         OffsetDateTime agora = OffsetDateTime.now();
         return new RegistroDeEstudo(UUID.randomUUID(), topico, material,
-                identificador, novaDataHora, novaDuracao, novaObservacao,
+                identificador, novoTipo, novaDataHora, novaDuracao, novaObservacao,
                 SituacaoDoRegistroDeEstudo.ATIVO, agora, agora, 0);
+    }
+
+    public RegistroDeEstudo criarCorrecao(UUID topico, UUID material,
+            OffsetDateTime novaDataHora, int novaDuracao, String novaObservacao) {
+        return criarCorrecao(topico, material, tipoDeEstudo,
+                novaDataHora, novaDuracao, novaObservacao);
     }
 
     private RegistroDeEstudo comSituacao(SituacaoDoRegistroDeEstudo novaSituacao) {
         return new RegistroDeEstudo(identificador, identificadorDoTopico,
-                identificadorDoMaterial, identificadorDoRegistroDeOrigem, dataHora,
+                identificadorDoMaterial, identificadorDoRegistroDeOrigem, tipoDeEstudo, dataHora,
                 duracaoEmMinutos, observacao, novaSituacao, criadoEm,
                 OffsetDateTime.now(), versao);
     }

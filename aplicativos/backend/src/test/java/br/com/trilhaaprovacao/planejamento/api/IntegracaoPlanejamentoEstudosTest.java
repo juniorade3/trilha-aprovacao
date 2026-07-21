@@ -184,12 +184,41 @@ class IntegracaoPlanejamentoEstudosTest {
 
         iniciar(sessao, ajustado);
         String conclusao = concluir(sessao, ajustado, 45, topicoA);
+        org.assertj.core.api.Assertions.assertThat(json.readTree(conclusao)
+                .get("evidencia").get("quantidadeDeErros").asInt()).isEqualTo(2);
         String registro = json.readTree(conclusao).get("estudo")
                 .get("identificador").asString();
         String repeticao = concluir(sessao, ajustado, 45, topicoA);
         org.assertj.core.api.Assertions.assertThat(json.readTree(repeticao).get("estudo")
                 .get("identificador").asString()).isEqualTo(registro);
         assertEquals(1, quantidadeDeRegistros());
+        assertEquals(1, banco.queryForObject(
+                "SELECT COUNT(*) FROM evidencias_de_aprendizagem", Integer.class));
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", ajustado)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoExecutadaEmMinutos":45,
+                                 "observacao":"Execução concluída",
+                                 "identificadorDoTopico":"%s",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                 "quantidadeDeQuestoes":10,"quantidadeDeAcertos":7}}}
+                                """.formatted(topicoA)))
+                .andExpect(status().isConflict());
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", ajustado)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoExecutadaEmMinutos":45,
+                                 "observacao":"Execução concluída",
+                                 "identificadorDoTopico":"%s",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":10,"quantidadeDeAcertos":8},
+                                   "padroesDeErro":[
+                                     {"descricao":"Erro de sinal",
+                                      "quantidadeDeOcorrencias":1},
+                                     {"descricao":" erro  de sinal ",
+                                      "quantidadeDeOcorrencias":1}]}}
+                                """.formatted(topicoA)))
+                .andExpect(status().isConflict());
 
         api.perform(get("/api/v1/estudos").session(sessao))
                 .andExpect(status().isOk())
@@ -215,6 +244,7 @@ class IntegracaoPlanejamentoEstudosTest {
         MockHttpSession sessao = criarContaEEntrar("integracao@example.com");
         String materia = criarMateria(sessao, "Auditoria");
         String topico = criarTopico(sessao, materia, "Risco de auditoria");
+        String outroTopico = criarTopico(sessao, materia, "Evidência de auditoria");
         String plano = criarPlanoAtivo(sessao);
         String bloco = criarBloco(sessao, plano, "Estudar riscos", materia, topico);
 
@@ -229,13 +259,30 @@ class IntegracaoPlanejamentoEstudosTest {
                         .content("""
                                 {
                                   "duracaoExecutadaEmMinutos":45,
-                                  "observacao":"Execução concluída"
+                                  "observacao":"Execução concluída",
+                                  "evidencia":{"resultadoDeQuestoes":{
+                                    "quantidadeDeQuestoes":10,
+                                    "quantidadeDeAcertos":8
+                                  }}
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.execucao.identificadorDoRegistroDeEstudo")
                         .value(registro))
                 .andExpect(jsonPath("$.estudo.identificadorDoTopico").value(topico));
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", bloco)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoExecutadaEmMinutos":45,
+                                 "observacao":"Execução concluída",
+                                 "identificadorDoTopico":"%s",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":10,
+                                   "quantidadeDeAcertos":8}}}
+                                """.formatted(outroTopico)))
+                .andExpect(status().isConflict());
 
         assertEquals(1, quantidadeDeRegistros());
         assertEquals(registro, banco.queryForObject("""
@@ -254,11 +301,21 @@ class IntegracaoPlanejamentoEstudosTest {
         String bloco = criarBloco(sessaoA, plano, "Resolver questões", materia, null);
 
         iniciar(sessaoA, bloco);
-        String resposta = concluir(sessaoA, bloco, 30, null);
+        String resposta = concluirSemEvidencia(sessaoA, bloco, 30, null);
         String execucao = json.readTree(resposta).get("execucao")
                 .get("identificador").asString();
 
         assertEquals(0, quantidadeDeRegistros());
+
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", bloco)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoExecutadaEmMinutos":30,
+                                 "observacao":"Execução concluída",
+                                 "identificadorDoTopico":"%s"}
+                                """.formatted(topico)))
+                .andExpect(status().isConflict());
 
         String primeiraVinculacao = registrarNoHistorico(
                 sessaoA, execucao, topico, status().isOk());
@@ -338,6 +395,76 @@ class IntegracaoPlanejamentoEstudosTest {
     }
 
     @Test
+    void deveCriarEstudoEEvidenciaAoCorrigirInterrupcaoSemTopico() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("correcao.sem.topico@example.com");
+        String materia = criarMateria(sessao, "Contabilidade");
+        String topico = criarTopico(sessao, materia, "Balanço patrimonial");
+        String plano = criarPlanoAtivo(sessao);
+        String bloco = adicionarBloco(
+                sessao, plano, "Resolver balanços", materia, null, 1, "QUESTOES");
+        ativarPlano(sessao, plano);
+        iniciar(sessao, bloco);
+        api.perform(post("/api/v1/blocos-de-estudo/{id}/interrupcao", bloco)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoExecutadaEmMinutos":10,
+                                 "observacao":"Resultado incompleto",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":12}}}
+                                """))
+                .andExpect(status().isBadRequest());
+        String interrompida = api.perform(
+                        post("/api/v1/blocos-de-estudo/{id}/interrupcao", bloco)
+                                .session(sessao).with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {"duracaoExecutadaEmMinutos":10,
+                                         "observacao":"Interrompida"}
+                                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estudo").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        String execucao = json.readTree(interrompida).get("execucao")
+                .get("identificador").asString();
+
+        api.perform(put("/api/v1/execucoes-de-bloco/{id}/correcao", execucao)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"resultado":"CONCLUIDO",
+                                 "duracaoExecutadaEmMinutos":25,
+                                 "observacao":"Correção sem tópico",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":12,
+                                   "quantidadeDeAcertos":9}}}
+                                """))
+                .andExpect(status().isUnprocessableEntity());
+        assertEquals(0, quantidadeDeRegistros());
+
+        api.perform(put("/api/v1/execucoes-de-bloco/{id}/correcao", execucao)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"resultado":"CONCLUIDO",
+                                 "duracaoExecutadaEmMinutos":25,
+                                 "observacao":"Correção concluída",
+                                 "identificadorDoTopico":"%s",
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":12,
+                                   "quantidadeDeAcertos":9}}}
+                                """.formatted(topico)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bloco.estado").value("CONCLUIDO"))
+                .andExpect(jsonPath("$.estudo.identificadorDoTopico").value(topico))
+                .andExpect(jsonPath("$.evidencia.quantidadeDeErros").value(3));
+
+        assertEquals(1, quantidadeDeRegistros());
+        assertEquals(1, banco.queryForObject(
+                "SELECT count(*) FROM evidencias_de_aprendizagem", Integer.class));
+    }
+
+    @Test
     void deveRecuperarExecucaoAposNovaConsultaEBloquearSegundoInicio() throws Exception {
         MockHttpSession sessaoA = criarContaEEntrar("retomada.a@example.com");
         String plano = criarPlanoAtivo(sessaoA);
@@ -414,6 +541,23 @@ class IntegracaoPlanejamentoEstudosTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"duracaoExecutadaEmMinutos\":" + duracao
                                 + ",\"observacao\":\"Execução concluída\""
+                                + campoDoTopico
+                                + ",\"evidencia\":{\"resultadoDeQuestoes\":{"
+                                + "\"quantidadeDeQuestoes\":10,"
+                                + "\"quantidadeDeAcertos\":8}}}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private String concluirSemEvidencia(MockHttpSession sessao, String bloco, int duracao,
+            String topico) throws Exception {
+        String campoDoTopico = topico == null ? "" :
+                ",\"identificadorDoTopico\":\"" + topico + "\"";
+        return api.perform(post("/api/v1/blocos-de-estudo/{id}/conclusao", bloco)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoExecutadaEmMinutos\":" + duracao
+                                + ",\"observacao\":\"Execução concluída\""
                                 + campoDoTopico + "}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -455,6 +599,11 @@ class IntegracaoPlanejamentoEstudosTest {
 
     private String adicionarBloco(MockHttpSession sessao, String plano, String titulo,
             String materia, String topico, int ordem) throws Exception {
+        return adicionarBloco(sessao, plano, titulo, materia, topico, ordem, "TEORIA");
+    }
+
+    private String adicionarBloco(MockHttpSession sessao, String plano, String titulo,
+            String materia, String topico, int ordem, String tipo) throws Exception {
         String referencias = materia == null ? "" :
                 ",\"identificadorDaMateria\":\"" + materia + "\""
                         + (topico == null ? "" :
@@ -463,7 +612,7 @@ class IntegracaoPlanejamentoEstudosTest {
                         .session(sessao).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titulo\":\"" + titulo
-                                + "\",\"tipoDeAtividade\":\"TEORIA\""
+                                + "\",\"tipoDeAtividade\":\"" + tipo + "\""
                                 + ",\"data\":\"" + SEGUNDA + "\""
                                 + ",\"duracaoPrevistaEmMinutos\":60,\"ordem\":" + ordem
                                 + referencias + "}"))

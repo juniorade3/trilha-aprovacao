@@ -12,6 +12,7 @@ const chamadas = vi.hoisted(() => ({
   registrarEstudo: vi.fn(),
   listarTodasAsMaterias: vi.fn(),
   listarTodosOsTopicos: vi.fn(),
+  consultarDiagnosticoDeTopicos: vi.fn(),
 }))
 
 vi.mock('./apiDeEstudos', () => ({
@@ -21,6 +22,9 @@ vi.mock('./apiDeEstudos', () => ({
   listarTodosOsEstudos: chamadas.listarTodosOsEstudos,
   listarTodosOsMateriaisDeEstudo: chamadas.listarTodosOsMateriaisDeEstudo,
   registrarEstudo: chamadas.registrarEstudo,
+  consultarDiagnosticoDeTopicos: chamadas.consultarDiagnosticoDeTopicos,
+  paraEvidencia: vi.fn(() => undefined),
+  sugerirPadroesDeErro: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
   listarTodasAsMaterias: chamadas.listarTodasAsMaterias,
@@ -42,6 +46,7 @@ const registro = {
   criadoEm: '2026-07-18T10:00:00Z',
   atualizadoEm: '2026-07-18T10:00:00Z',
   versao: 0,
+  tipoDeEstudo: 'REVISAO',
 }
 const materia = {
   identificador: 'materia-1',
@@ -82,6 +87,7 @@ describe('EstudosPagina', () => {
       ...registro,
       situacao: 'CANCELADO',
     })
+    chamadas.consultarDiagnosticoDeTopicos.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -198,5 +204,36 @@ describe('EstudosPagina', () => {
     await flushPromises()
 
     expect(chamadas.cancelarEstudo).toHaveBeenCalledWith('estudo-1')
+  })
+
+  it('mostra diagnostico objetivo e padrões repetidos', async () => {
+    chamadas.consultarDiagnosticoDeTopicos.mockResolvedValue([
+      {
+        identificadorDoTopico: 'topico-1',
+        nomeDoTopico: 'Direitos fundamentais',
+        identificadorDaMateria: 'materia-1',
+        nomeDaMateria: 'Direito Constitucional',
+        exigidoNoConcursoAtivo: true,
+        quantidadeDeEvidencias: 2,
+        totaisHistoricos: { questoes: 20, acertos: 15, erros: 5 },
+        totaisDosUltimosTrintaDias: { questoes: 20, acertos: 15, erros: 5 },
+        percentualRecenteDeAcertos: 75,
+        resultadoDaUltimaRevisao: 'PARCIAL',
+        padroesDeErroRepetidos: [
+          {
+            identificador: 'padrao-1',
+            descricao: 'Confusão de conceitos',
+            quantidadeDeEvidencias: 2,
+            quantidadeDeOcorrencias: 3,
+          },
+        ],
+      },
+    ])
+    const pagina = mount(EstudosPagina)
+    await flushPromises()
+
+    expect(pagina.text()).toContain('75% de acertos')
+    expect(pagina.text()).toContain('Confusão de conceitos (2 sessões)')
+    expect(pagina.text()).toContain('Parcial')
   })
 })

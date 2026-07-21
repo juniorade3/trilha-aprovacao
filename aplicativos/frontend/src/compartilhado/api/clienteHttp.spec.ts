@@ -7,6 +7,51 @@ import { criarRequisicaoCancelavel, ErroDaApi, requisitar } from './clienteHttp'
 describe('clienteHttp', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('renova o CSRF depois que a sessão expira', async () => {
+    const buscar = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ token: 'csrf-antigo' }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ mensagem: 'Sessão expirada' }), {
+          status: 401,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ token: 'csrf-novo' }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ identificador: 'estudo-1' }), {
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ mensagem: 'Sessão expirada' }), {
+          status: 401,
+        }),
+      )
+    vi.stubGlobal('fetch', buscar)
+    await expect(
+      requisitar('/v1/estudos', { method: 'POST', body: '{}' }),
+    ).rejects.toMatchObject({ status: 401 })
+
+    await requisitar('/v1/estudos', { method: 'POST', body: '{}' })
+
+    expect(buscar).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/autenticacao/csrf',
+      expect.objectContaining({ credentials: 'include' }),
+    )
+    expect(
+      new Headers(buscar.mock.calls[3]?.[1]?.headers).get('X-XSRF-TOKEN'),
+    ).toBe('csrf-novo')
+    await expect(requisitar('/v1/autenticacao/sessao')).rejects.toMatchObject({
+      status: 401,
+    })
   })
 
   it('envia credenciais e CSRF em requisicoes mutaveis', async () => {

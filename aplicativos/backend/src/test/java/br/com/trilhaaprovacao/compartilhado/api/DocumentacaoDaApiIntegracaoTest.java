@@ -85,6 +85,13 @@ class DocumentacaoDaApiIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/conclusao'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/interrupcao'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/execucoes-de-bloco/{identificador}/registro-de-estudo'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/evidencias/padroes-de-erro'].get.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/evidencias/diagnostico-de-topicos'].get.responses['422']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/estudos'].post.responses['422']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/estudos/{identificador}/correcao'].put.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/conclusao'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/blocos-de-estudo/{identificador}/interrupcao'].post.responses['422']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/execucoes-de-bloco/{identificador}/correcao'].put.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/dashboard'].get").exists())
                 .andReturn().getResponse().getContentAsString();
 
@@ -99,6 +106,7 @@ class DocumentacaoDaApiIntegracaoTest {
                 "Conteúdo programático",
                 "Materiais e estudos",
                 "Planejamento",
+                "Evidências",
                 "Dashboard");
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/security/0/sessao")
                 .isMissingNode()).isFalse();

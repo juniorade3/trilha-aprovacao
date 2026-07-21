@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.estudos.infraestrutura;
 
 import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
 import br.com.trilhaaprovacao.estudos.dominio.SituacaoDoRegistroDeEstudo;
+import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -19,6 +20,8 @@ public class RegistroDeEstudoPersistido {
     @Column(name = "topico_id", nullable = false) private UUID identificadorDoTopico;
     @Column(name = "material_id") private UUID identificadorDoMaterial;
     @Column(name = "registro_de_origem_id") private UUID identificadorDoRegistroDeOrigem;
+    @Enumerated(EnumType.STRING) @Column(name = "tipo_de_estudo", nullable = false)
+    private TipoDeEstudo tipoDeEstudo;
     @Column(name = "data_hora", nullable = false) private OffsetDateTime dataHora;
     @Column(name = "duracao_em_minutos", nullable = false) private int duracaoEmMinutos;
     @Column(length = 2000) private String observacao;
@@ -36,6 +39,7 @@ public class RegistroDeEstudoPersistido {
         identificadorDoTopico = registro.identificadorDoTopico();
         identificadorDoMaterial = registro.identificadorDoMaterial();
         identificadorDoRegistroDeOrigem = registro.identificadorDoRegistroDeOrigem();
+        tipoDeEstudo = registro.tipoDeEstudo();
         dataHora = registro.dataHora();
         duracaoEmMinutos = registro.duracaoEmMinutos();
         observacao = registro.observacao();
@@ -51,7 +55,7 @@ public class RegistroDeEstudoPersistido {
 
     public RegistroDeEstudo paraDominio() {
         return new RegistroDeEstudo(identificador, identificadorDoTopico,
-                identificadorDoMaterial, identificadorDoRegistroDeOrigem, dataHora,
+                identificadorDoMaterial, identificadorDoRegistroDeOrigem, tipoDeEstudo, dataHora,
                 duracaoEmMinutos, observacao, situacao, criadoEm, atualizadoEm, versao);
     }
 

@@ -10,6 +10,10 @@ import br.com.trilhaaprovacao.estudos.dominio.CoberturaDeTopicoPorMaterial;
 import br.com.trilhaaprovacao.estudos.dominio.MaterialDeEstudo;
 import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
 import br.com.trilhaaprovacao.estudos.dominio.TipoDeMaterial;
+import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
+import br.com.trilhaaprovacao.evidencias.aplicacao.DadosDaEvidencia;
+import br.com.trilhaaprovacao.evidencias.aplicacao.ServicoDeEvidenciasDeAprendizagem;
+import br.com.trilhaaprovacao.evidencias.dominio.EvidenciaDeAprendizagem;
 import br.com.trilhaaprovacao.estudos.infraestrutura.CoberturaDeTopicoPersistida;
 import br.com.trilhaaprovacao.estudos.infraestrutura.MaterialDeEstudoPersistido;
 import br.com.trilhaaprovacao.estudos.infraestrutura.RegistroDeEstudoPersistido;
@@ -33,18 +37,21 @@ public class ServicoDeMateriaisEEstudos {
     private final RepositorioDeRegistrosDeEstudo registros;
     private final ServicoDeTopicos topicos;
     private final ServicoDeMaterias materiasDoCatalogo;
+    private final ServicoDeEvidenciasDeAprendizagem evidencias;
 
     public ServicoDeMateriaisEEstudos(
             RepositorioDeMateriaisDeEstudo materiais,
             RepositorioDeCoberturasDeTopicos coberturas,
             RepositorioDeRegistrosDeEstudo registros,
             ServicoDeTopicos topicos,
-            ServicoDeMaterias materiasDoCatalogo) {
+            ServicoDeMaterias materiasDoCatalogo,
+            ServicoDeEvidenciasDeAprendizagem evidencias) {
         this.materiais = materiais;
         this.coberturas = coberturas;
         this.registros = registros;
         this.topicos = topicos;
         this.materiasDoCatalogo = materiasDoCatalogo;
+        this.evidencias = evidencias;
     }
 
     @Transactional
@@ -149,11 +156,24 @@ public class ServicoDeMateriaisEEstudos {
     @Transactional
     public RegistroDeEstudo registrarEstudo(UUID usuario, UUID topico, UUID material,
             OffsetDateTime dataHora, int duracao, String observacao) {
+        return registrarEstudo(usuario, topico, material, TipoDeEstudo.OUTRA,
+                dataHora, duracao, observacao, null, true);
+    }
+
+    @Transactional
+    public RegistroDeEstudo registrarEstudo(UUID usuario, UUID topico, UUID material,
+            TipoDeEstudo tipo, OffsetDateTime dataHora, int duracao, String observacao,
+            DadosDaEvidencia dadosDaEvidencia, boolean exigirResultado) {
         validarEstudo(usuario, topico, material);
+        TipoDeEstudo tipoEfetivo = tipo == null ? TipoDeEstudo.OUTRA : tipo;
         RegistroDeEstudo registro = regra("REGISTRO_DE_ESTUDO_INVALIDO",
                 () -> RegistroDeEstudo.criar(
-                        topico, material, dataHora, duracao, observacao));
-        return registros.save(new RegistroDeEstudoPersistido(registro)).paraDominio();
+                        topico, material, tipoEfetivo, dataHora, duracao, observacao));
+        RegistroDeEstudo salvo = registros.saveAndFlush(
+                new RegistroDeEstudoPersistido(registro)).paraDominio();
+        evidencias.registrar(usuario, topico, salvo.identificador(), tipoEfetivo,
+                dadosDaEvidencia, exigirResultado);
+        return salvo;
     }
 
     @Transactional(readOnly = true)
@@ -170,20 +190,40 @@ public class ServicoDeMateriaisEEstudos {
         return registroPersistido(usuario, identificador).paraDominio();
     }
 
+    @Transactional(readOnly = true)
+    public EvidenciaDeAprendizagem obterEvidencia(UUID usuario, UUID registro) {
+        registroPersistido(usuario, registro);
+        return evidencias.obterPorRegistro(registro).orElse(null);
+    }
+
     @Transactional
     public RegistroDeEstudo corrigirEstudo(UUID usuario, UUID identificador,
             UUID topico, UUID material, OffsetDateTime dataHora,
             int duracao, String observacao) {
+        RegistroDeEstudo anterior = registroPersistido(usuario, identificador).paraDominio();
+        return corrigirEstudo(usuario, identificador, topico, material,
+                anterior.tipoDeEstudo(), dataHora, duracao, observacao, null, false);
+    }
+
+    @Transactional
+    public RegistroDeEstudo corrigirEstudo(UUID usuario, UUID identificador,
+            UUID topico, UUID material, TipoDeEstudo tipo, OffsetDateTime dataHora,
+            int duracao, String observacao, DadosDaEvidencia dadosDaEvidencia,
+            boolean exigirResultado) {
         RegistroDeEstudoPersistido original = registroPersistido(usuario, identificador);
         validarEstudo(usuario, topico, material);
         RegistroDeEstudo correcao = regra("REGISTRO_DE_ESTUDO_INVALIDO",
                 () -> original.paraDominio().criarCorrecao(
-                        topico, material, dataHora, duracao, observacao));
+                        topico, material, tipo, dataHora, duracao, observacao));
         RegistroDeEstudo encerrado = regra("REGISTRO_DE_ESTUDO_INVALIDO",
                 () -> original.paraDominio().encerrarComoCorrigido());
         original.atualizarDe(encerrado);
         registros.flush();
-        return registros.save(new RegistroDeEstudoPersistido(correcao)).paraDominio();
+        RegistroDeEstudo salvo = registros.saveAndFlush(
+                new RegistroDeEstudoPersistido(correcao)).paraDominio();
+        evidencias.registrar(usuario, topico, salvo.identificador(), tipo,
+                dadosDaEvidencia, exigirResultado);
+        return salvo;
     }
 
     @Transactional

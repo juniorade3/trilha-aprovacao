@@ -64,6 +64,8 @@ public class ConfiguracaoDaDocumentacaoDaApi {
                         new Tag().name("Materiais e estudos").description("Materiais, coberturas e registros de estudo."),
                         new Tag().name("Planejamento").description(
                                 "Planos semanais, blocos, execucoes e replanejamento manual."),
+                        new Tag().name("Evidências").description(
+                                "Resultados de aprendizagem e diagnóstico objetivo por tópico."),
                         new Tag().name("Dashboard").description("Visão objetiva do concurso ativo.")));
     }
 

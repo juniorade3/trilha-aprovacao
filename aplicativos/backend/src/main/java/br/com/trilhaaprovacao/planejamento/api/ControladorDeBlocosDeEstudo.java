@@ -2,6 +2,9 @@ package br.com.trilhaaprovacao.planejamento.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -116,6 +119,16 @@ public class ControladorDeBlocosDeEstudo {
 
 
     @PostMapping("/blocos-de-estudo/{identificador}/conclusao")
+    @Operation(summary = "Conclui bloco e registra estudo e evidência quando aplicável")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bloco concluído."),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada."),
+            @ApiResponse(responseCode = "403", description = "Acesso recusado."),
+            @ApiResponse(responseCode = "404", description = "Bloco, execução ou tópico não encontrado."),
+            @ApiResponse(responseCode = "409", description = "Execução já encerrada com dados diferentes."),
+            @ApiResponse(responseCode = "422", description = "Evidência ou regra de negócio inválida.")
+    })
     public RespostaDaExecucaoDoBloco concluir(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeFinalizacaoDaExecucao requisicao,
@@ -123,10 +136,21 @@ public class ControladorDeBlocosDeEstudo {
         return RespostaDaExecucaoDoBloco.de(servico.concluirBloco(
                 usuarioAtual.obter(autenticacao), identificador,
                 requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
-                requisicao.identificadorDoTopico()));
+                requisicao.identificadorDoTopico(),
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados()));
     }
 
     @PostMapping("/blocos-de-estudo/{identificador}/interrupcao")
+    @Operation(summary = "Interrompe bloco com evidência opcional")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bloco interrompido."),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada."),
+            @ApiResponse(responseCode = "403", description = "Acesso recusado."),
+            @ApiResponse(responseCode = "404", description = "Bloco, execução ou tópico não encontrado."),
+            @ApiResponse(responseCode = "409", description = "Execução já encerrada com dados diferentes."),
+            @ApiResponse(responseCode = "422", description = "Evidência ou regra de negócio inválida.")
+    })
     public RespostaDaExecucaoDoBloco interromper(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeFinalizacaoDaExecucao requisicao,
@@ -134,17 +158,30 @@ public class ControladorDeBlocosDeEstudo {
         return RespostaDaExecucaoDoBloco.de(servico.interromperBloco(
                 usuarioAtual.obter(autenticacao), identificador,
                 requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
-                requisicao.identificadorDoTopico()));
+                requisicao.identificadorDoTopico(),
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados()));
     }
 
     @PutMapping("/execucoes-de-bloco/{identificador}/correcao")
+    @Operation(summary = "Corrige execução preservando estudo e evidência anteriores")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Execução corrigida."),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada."),
+            @ApiResponse(responseCode = "403", description = "Acesso recusado."),
+            @ApiResponse(responseCode = "404", description = "Execução ou tópico não encontrado."),
+            @ApiResponse(responseCode = "409", description = "Conflito de estado."),
+            @ApiResponse(responseCode = "422", description = "Evidência ou regra de negócio inválida.")
+    })
     public RespostaDaExecucaoDoBloco corrigirExecucao(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeCorrecaoDaExecucao requisicao,
             Authentication autenticacao) {
         return RespostaDaExecucaoDoBloco.de(servico.corrigirExecucao(
                 usuarioAtual.obter(autenticacao), identificador, requisicao.resultado(),
-                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao()));
+                requisicao.duracaoExecutadaEmMinutos(), requisicao.observacao(),
+                requisicao.identificadorDoTopico(),
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados()));
     }
 
     @PostMapping("/execucoes-de-bloco/{identificador}/registro-de-estudo")

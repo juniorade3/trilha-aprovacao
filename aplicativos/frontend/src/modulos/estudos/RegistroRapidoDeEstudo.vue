@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import CamposDeEvidencia from './CamposDeEvidencia.vue'
 import {
   listarTodasAsMaterias,
   listarTodosOsTopicos,
@@ -12,8 +13,11 @@ import {
   listarCoberturas,
   listarTodosOsMateriaisDeEstudo,
   registrarEstudo,
+  paraEvidencia,
   type CoberturaDeTopico,
   type MaterialDeEstudo,
+  type ModeloDeEvidencia,
+  type TipoDeEstudo,
 } from './apiDeEstudos'
 
 const emitir = defineEmits<{
@@ -30,6 +34,15 @@ const salvando = ref(false)
 const erro = ref('')
 const cancelamento = new AbortController()
 const duracoesRapidas = [30, 50, 60, 90]
+const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
+  { valor: 'TEORIA', rotulo: 'Teoria' },
+  { valor: 'QUESTOES', rotulo: 'Questões' },
+  { valor: 'REVISAO', rotulo: 'Revisão' },
+  { valor: 'CADERNO_DE_ERROS', rotulo: 'Caderno de erros' },
+  { valor: 'SIMULADO', rotulo: 'Simulado' },
+  { valor: 'DISCURSIVA', rotulo: 'Discursiva' },
+  { valor: 'OUTRA', rotulo: 'Outra' },
+]
 
 const formulario = reactive({
   identificadorDaMateria: '',
@@ -38,6 +51,8 @@ const formulario = reactive({
   dataHora: dataHoraLocalAtual(),
   duracaoEmMinutos: 50,
   observacao: '',
+  tipoDeEstudo: 'TEORIA' as TipoDeEstudo,
+  evidencia: { padroesDeErro: [] } as ModeloDeEvidencia,
 })
 
 const topicosDaMateria = computed(() =>
@@ -125,6 +140,8 @@ async function salvar() {
       dataHora: new Date(formulario.dataHora).toISOString(),
       duracaoEmMinutos: formulario.duracaoEmMinutos,
       observacao: formulario.observacao || undefined,
+      tipoDeEstudo: formulario.tipoDeEstudo,
+      evidencia: paraEvidencia(formulario.evidencia),
     })
     emitir('registrado')
   } catch (causa) {
@@ -163,6 +180,18 @@ onBeforeUnmount(() => cancelamento.abort())
         </p>
       </div>
       <div class="formulario-da-aplicacao">
+        <label>
+          <span>Tipo de estudo</span>
+          <select v-model="formulario.tipoDeEstudo" required>
+            <option
+              v-for="tipo in tiposDeEstudo"
+              :key="tipo.valor"
+              :value="tipo.valor"
+            >
+              {{ tipo.rotulo }}
+            </option>
+          </select>
+        </label>
         <label>
           <span>Matéria</span>
           <select
@@ -252,6 +281,11 @@ onBeforeUnmount(() => cancelamento.abort())
             </button>
           </div>
         </fieldset>
+        <CamposDeEvidencia
+          v-model="formulario.evidencia"
+          :tipo="formulario.tipoDeEstudo"
+          :identificador-do-topico="formulario.identificadorDoTopico"
+        />
         <label>
           <span>Observação <em>opcional</em></span>
           <textarea

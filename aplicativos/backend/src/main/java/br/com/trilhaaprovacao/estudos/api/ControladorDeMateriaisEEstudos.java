@@ -5,6 +5,11 @@ import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
 import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;
 import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
+import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
+import br.com.trilhaaprovacao.evidencias.aplicacao.ServicoDeEvidenciasDeAprendizagem;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -33,14 +38,17 @@ public class ControladorDeMateriaisEEstudos {
     private final ServicoDeMateriaisEEstudos servico;
     private final ServicoDeTopicos topicos;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
+    private final ServicoDeEvidenciasDeAprendizagem evidencias;
 
     public ControladorDeMateriaisEEstudos(
             ServicoDeMateriaisEEstudos servico,
             ServicoDeTopicos topicos,
-            IdentidadeDoUsuarioAtual usuarioAtual) {
+            IdentidadeDoUsuarioAtual usuarioAtual,
+            ServicoDeEvidenciasDeAprendizagem evidencias) {
         this.servico = servico;
         this.topicos = topicos;
         this.usuarioAtual = usuarioAtual;
+        this.evidencias = evidencias;
     }
 
     @PostMapping("/materiais")
@@ -137,14 +145,25 @@ public class ControladorDeMateriaisEEstudos {
     }
 
     @PostMapping("/estudos")
+    @Operation(summary = "Registra estudo e sua evidência de aprendizagem")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Estudo registrado."),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada."),
+            @ApiResponse(responseCode = "403", description = "Acesso recusado."),
+            @ApiResponse(responseCode = "404", description = "Tópico ou material não encontrado."),
+            @ApiResponse(responseCode = "409", description = "Conflito de estado."),
+            @ApiResponse(responseCode = "422", description = "Evidência ou regra de negócio inválida.")
+    })
     public ResponseEntity<RespostaDeRegistroDeEstudo> registrarEstudo(
             @Valid @RequestBody RequisicaoDeRegistroDeEstudo requisicao,
             Authentication autenticacao) {
         UUID usuario = usuario(autenticacao);
         var registro = servico.registrarEstudo(usuario,
                 requisicao.identificadorDoTopico(), requisicao.identificadorDoMaterial(),
-                requisicao.dataHora(), requisicao.duracaoEmMinutos(),
-                requisicao.observacao());
+                requisicao.tipoDeEstudo() == null ? TipoDeEstudo.OUTRA : requisicao.tipoDeEstudo(),
+                requisicao.dataHora(), requisicao.duracaoEmMinutos(), requisicao.observacao(),
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados(), true);
         return ResponseEntity.created(
                         URI.create("/api/v1/estudos/" + registro.identificador()))
                 .body(respostaDoRegistro(usuario, registro));
@@ -173,15 +192,31 @@ public class ControladorDeMateriaisEEstudos {
     }
 
     @PutMapping("/estudos/{identificador}/correcao")
+    @Operation(summary = "Corrige estudo preservando o fato e a evidência anteriores")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Correção registrada."),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada."),
+            @ApiResponse(responseCode = "403", description = "Acesso recusado."),
+            @ApiResponse(responseCode = "404", description = "Estudo, tópico ou material não encontrado."),
+            @ApiResponse(responseCode = "409", description = "Conflito de estado."),
+            @ApiResponse(responseCode = "422", description = "Evidência ou regra de negócio inválida.")
+    })
     public RespostaDeRegistroDeEstudo corrigirEstudo(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeRegistroDeEstudo requisicao,
             Authentication autenticacao) {
         UUID usuario = usuario(autenticacao);
+        TipoDeEstudo tipoDeEstudo = requisicao.tipoDeEstudo() == null
+                ? servico.obterEstudo(usuario, identificador).tipoDeEstudo()
+                : requisicao.tipoDeEstudo();
         return respostaDoRegistro(usuario, servico.corrigirEstudo(usuario,
                 identificador, requisicao.identificadorDoTopico(),
-                requisicao.identificadorDoMaterial(), requisicao.dataHora(),
-                requisicao.duracaoEmMinutos(), requisicao.observacao()));
+                requisicao.identificadorDoMaterial(),
+                tipoDeEstudo,
+                requisicao.dataHora(),
+                requisicao.duracaoEmMinutos(), requisicao.observacao(),
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados(), true));
     }
 
     @PostMapping("/estudos/{identificador}/cancelamento")
@@ -200,8 +235,8 @@ public class ControladorDeMateriaisEEstudos {
                 ? null
                 : servico.obterMaterial(
                         usuario, registro.identificadorDoMaterial()).titulo();
-        return RespostaDeRegistroDeEstudo.de(
-                registro, nomeDoTopico, tituloDoMaterial);
+        return RespostaDeRegistroDeEstudo.de(registro, nomeDoTopico, tituloDoMaterial,
+                evidencias.obterPorRegistro(registro.identificador()).orElse(null));
     }
 
     private UUID usuario(Authentication autenticacao) {
