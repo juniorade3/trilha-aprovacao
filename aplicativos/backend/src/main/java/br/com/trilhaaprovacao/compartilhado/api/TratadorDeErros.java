@@ -13,6 +13,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -65,7 +66,9 @@ public class TratadorDeErros {
                 "Existem parametros invalidos.", detalhes, requisicao);
     }
 
-    @ExceptionHandler({MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
+    @ExceptionHandler({MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class,
+            HttpMessageNotReadableException.class})
     ResponseEntity<RespostaDeErro> tratarEntradaIlegivel(HttpServletRequest requisicao) {
         return resposta(HttpStatus.BAD_REQUEST, "ENTRADA_INVALIDA",
                 "A requisicao possui formato invalido.", List.of(), requisicao);

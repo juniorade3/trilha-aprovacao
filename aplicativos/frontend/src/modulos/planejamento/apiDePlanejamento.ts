@@ -1,4 +1,5 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
+import type { EvidenciaDeAprendizagem } from '@/modulos/estudos/apiDeEstudos'
 
 export type EstadoDoPlanoSemanal =
   'RASCUNHO' | 'ATIVO' | 'ENCERRADO' | 'CANCELADO'
@@ -112,6 +113,7 @@ export interface ResultadoDaExecucaoDoBloco {
   bloco: BlocoDeEstudo
   execucao: ExecucaoDoBloco
   estudo?: RegistroDeEstudoDaExecucao
+  evidencia?: EvidenciaDeAprendizagem
 }
 
 export interface DadosDoBlocoDeEstudo {
@@ -349,6 +351,7 @@ export function concluirBloco(
   duracaoExecutadaEmMinutos: number,
   observacao?: string,
   identificadorDoTopico?: string,
+  evidencia?: EvidenciaDeAprendizagem,
 ): Promise<ResultadoDaExecucaoDoBloco> {
   return requisitar<ResultadoDaExecucaoDoBloco>(
     `/v1/blocos-de-estudo/${identificador}/conclusao`,
@@ -358,6 +361,7 @@ export function concluirBloco(
         duracaoExecutadaEmMinutos,
         observacao,
         identificadorDoTopico,
+        evidencia,
       }),
     },
   )
@@ -368,6 +372,7 @@ export function interromperBloco(
   duracaoExecutadaEmMinutos: number,
   observacao?: string,
   identificadorDoTopico?: string,
+  evidencia?: EvidenciaDeAprendizagem,
 ): Promise<ResultadoDaExecucaoDoBloco> {
   return requisitar<ResultadoDaExecucaoDoBloco>(
     `/v1/blocos-de-estudo/${identificador}/interrupcao`,
@@ -377,6 +382,7 @@ export function interromperBloco(
         duracaoExecutadaEmMinutos,
         observacao,
         identificadorDoTopico,
+        evidencia,
       }),
     },
   )
@@ -622,6 +628,8 @@ export function corrigirExecucao(
   resultado: 'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO',
   duracaoExecutadaEmMinutos: number,
   observacao?: string,
+  identificadorDoTopico?: string,
+  evidencia?: EvidenciaDeAprendizagem,
 ): Promise<ResultadoDaExecucaoDoBloco> {
   return requisitar<ResultadoDaExecucaoDoBloco>(
     `/v1/execucoes-de-bloco/${identificador}/correcao`,
@@ -631,6 +639,8 @@ export function corrigirExecucao(
         resultado,
         duracaoExecutadaEmMinutos,
         observacao,
+        identificadorDoTopico,
+        evidencia,
       }),
     },
   )

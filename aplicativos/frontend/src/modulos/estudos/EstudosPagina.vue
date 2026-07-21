@@ -12,6 +12,7 @@ import BarraDeProgresso from '@/compartilhado/componentes/BarraDeProgresso.vue'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import CamposDeEvidencia from './CamposDeEvidencia.vue'
 import {
   listarTodasAsMaterias,
   listarTodosOsTopicos,
@@ -20,14 +21,19 @@ import {
 } from '@/modulos/materias/apiDeConteudos'
 import {
   cancelarEstudo,
+  consultarDiagnosticoDeTopicos,
   corrigirEstudo,
   listarCoberturas,
   listarTodosOsEstudos,
   listarTodosOsMateriaisDeEstudo,
   registrarEstudo,
+  paraEvidencia,
   type CoberturaDeTopico,
   type MaterialDeEstudo,
+  type DiagnosticoDeTopico,
+  type ModeloDeEvidencia,
   type RegistroDeEstudo,
+  type TipoDeEstudo,
 } from './apiDeEstudos'
 
 const propriedades = withDefaults(
@@ -46,6 +52,11 @@ const materias = ref<Materia[]>([])
 const topicos = ref<Topico[]>([])
 const materiais = ref<MaterialDeEstudo[]>([])
 const coberturas = ref<CoberturaDeTopico[]>([])
+const diagnosticos = ref<DiagnosticoDeTopico[]>([])
+const carregandoDiagnostico = ref(true)
+const erroDoDiagnostico = ref('')
+const materiaDoDiagnostico = ref('')
+const somenteExigidos = ref(false)
 const carregando = ref(true)
 const salvando = ref(false)
 const erro = ref('')
@@ -59,7 +70,18 @@ const formulario = reactive({
   dataHora: dataHoraLocalAtual(),
   duracaoEmMinutos: 60,
   observacao: '',
+  tipoDeEstudo: 'TEORIA' as TipoDeEstudo,
+  evidencia: { padroesDeErro: [] } as ModeloDeEvidencia,
 })
+const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
+  { valor: 'TEORIA', rotulo: 'Teoria' },
+  { valor: 'QUESTOES', rotulo: 'Questões' },
+  { valor: 'REVISAO', rotulo: 'Revisão' },
+  { valor: 'CADERNO_DE_ERROS', rotulo: 'Caderno de erros' },
+  { valor: 'SIMULADO', rotulo: 'Simulado' },
+  { valor: 'DISCURSIVA', rotulo: 'Discursiva' },
+  { valor: 'OUTRA', rotulo: 'Outra' },
+]
 let cancelamento: AbortController | undefined
 
 const topicosDaMateria = computed(() =>
@@ -214,6 +236,7 @@ async function carregar() {
       ),
     )
     coberturas.value = respostasDeCoberturas.flat()
+    await carregarDiagnostico(requisicao.signal)
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
     erro.value =
@@ -222,6 +245,33 @@ async function carregar() {
         : 'Não foi possível carregar os estudos.'
   } finally {
     if (cancelamento === requisicao) carregando.value = false
+  }
+}
+
+function dataLocalAtual() {
+  const agora = new Date()
+  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
+  return agora.toISOString().slice(0, 10)
+}
+
+async function carregarDiagnostico(sinal?: AbortSignal) {
+  carregandoDiagnostico.value = true
+  erroDoDiagnostico.value = ''
+  try {
+    diagnosticos.value = await consultarDiagnosticoDeTopicos(
+      dataLocalAtual(),
+      materiaDoDiagnostico.value || undefined,
+      somenteExigidos.value,
+      sinal,
+    )
+  } catch (causa) {
+    if (causa instanceof DOMException && causa.name === 'AbortError') return
+    erroDoDiagnostico.value =
+      causa instanceof Error
+        ? causa.message
+        : 'Não foi possível carregar o diagnóstico.'
+  } finally {
+    carregandoDiagnostico.value = false
   }
 }
 
@@ -234,6 +284,8 @@ function limparFormulario() {
     dataHora: dataHoraLocalAtual(),
     duracaoEmMinutos: 60,
     observacao: '',
+    tipoDeEstudo: 'TEORIA',
+    evidencia: { padroesDeErro: [] },
   })
 }
 
@@ -253,6 +305,8 @@ function dadosDoFormulario() {
     dataHora: new Date(formulario.dataHora).toISOString(),
     duracaoEmMinutos: formulario.duracaoEmMinutos,
     observacao: formulario.observacao || undefined,
+    tipoDeEstudo: formulario.tipoDeEstudo,
+    evidencia: paraEvidencia(formulario.evidencia),
   }
 }
 
@@ -288,6 +342,18 @@ function corrigir(registro: RegistroDeEstudo) {
     dataHora: dataHoraParaCampoLocal(registro.dataHora),
     duracaoEmMinutos: registro.duracaoEmMinutos,
     observacao: registro.observacao ?? '',
+    tipoDeEstudo: registro.tipoDeEstudo ?? 'OUTRA',
+    evidencia: {
+      quantidadeDeQuestoes:
+        registro.evidencia?.resultadoDeQuestoes?.quantidadeDeQuestoes,
+      quantidadeDeAcertos:
+        registro.evidencia?.resultadoDeQuestoes?.quantidadeDeAcertos,
+      nivelDeRecordacao: registro.evidencia?.nivelDeRecordacao,
+      dificuldadePercebida: registro.evidencia?.dificuldadePercebida,
+      padroesDeErro:
+        registro.evidencia?.padroesDeErro?.map((padrao) => ({ ...padrao })) ??
+        [],
+    },
   })
   formularioAberto.value = true
 }
@@ -336,6 +402,17 @@ function rotuloDaSituacao(registro: RegistroDeEstudo) {
     CANCELADO: 'Cancelado',
   }
   return rotulos[registro.situacao]
+}
+
+function rotuloDaRevisao(
+  resultado?: DiagnosticoDeTopico['resultadoDaUltimaRevisao'],
+) {
+  if (!resultado) return 'Sem revisão avaliada'
+  return {
+    PRECISA_REFORCO: 'Precisa reforço',
+    PARCIAL: 'Parcial',
+    CONSOLIDADA: 'Consolidada',
+  }[resultado]
 }
 
 function abrirRegistroRapido() {
@@ -410,6 +487,134 @@ onBeforeUnmount(() => {
           <small>estudadas na semana</small>
         </div>
       </article>
+    </section>
+
+    <section class="card mb-4" aria-labelledby="titulo-diagnostico-de-topicos">
+      <header class="cabecalho-do-cartao-da-jornada">
+        <div>
+          <span class="rotulo-discreto">Evidências objetivas</span>
+          <h2 id="titulo-diagnostico-de-topicos">Diagnóstico por tópico</h2>
+          <p class="mb-0">
+            A janela recente inclui hoje e os 29 dias anteriores. Registros
+            corrigidos ou cancelados não entram nos indicadores.
+          </p>
+        </div>
+      </header>
+      <form
+        class="d-flex flex-wrap align-items-end gap-3 mb-3"
+        @submit.prevent="carregarDiagnostico()"
+      >
+        <label class="form-label mb-0">
+          <span>Matéria</span>
+          <select v-model="materiaDoDiagnostico" class="form-select">
+            <option value="">Todas as matérias</option>
+            <option
+              v-for="materia in materias"
+              :key="materia.identificador"
+              :value="materia.identificador"
+            >
+              {{ materia.nome }}
+            </option>
+          </select>
+        </label>
+        <label class="form-check mb-2">
+          <input
+            v-model="somenteExigidos"
+            class="form-check-input"
+            type="checkbox"
+          />
+          <span class="form-check-label">Somente edital confirmado</span>
+        </label>
+        <button
+          class="btn btn-outline-primary"
+          :disabled="carregandoDiagnostico"
+        >
+          Aplicar filtros
+        </button>
+      </form>
+      <p v-if="erroDoDiagnostico" class="alert alert-danger" role="alert">
+        {{ erroDoDiagnostico }}
+        <button
+          class="btn btn-sm btn-outline-danger ms-2"
+          type="button"
+          @click="carregarDiagnostico()"
+        >
+          Tentar novamente
+        </button>
+      </p>
+      <EstadoDaPagina
+        v-else-if="carregandoDiagnostico"
+        titulo="Calculando diagnóstico..."
+        carregando
+      />
+      <EstadoDaPagina
+        v-else-if="diagnosticos.length === 0"
+        titulo="Nenhum tópico neste filtro"
+        descricao="Cadastre tópicos ativos ou remova o filtro de edital confirmado."
+        icone="bi-clipboard-data"
+      />
+      <div v-else class="table-responsive">
+        <table class="table align-middle">
+          <caption class="visually-hidden">
+            Indicadores objetivos por tópico
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Tópico</th>
+              <th scope="col">Últimos 30 dias</th>
+              <th scope="col">Recordação / dificuldade</th>
+              <th scope="col">Última revisão</th>
+              <th scope="col">Erros repetidos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in diagnosticos" :key="item.identificadorDoTopico">
+              <th scope="row">
+                <span class="d-block">{{ item.nomeDoTopico }}</span>
+                <small>{{ item.nomeDaMateria }}</small>
+                <span
+                  v-if="item.exigidoNoConcursoAtivo"
+                  class="badge text-bg-light ms-2"
+                  >Edital</span
+                >
+              </th>
+              <td>
+                <strong v-if="item.percentualRecenteDeAcertos != null"
+                  >{{ item.percentualRecenteDeAcertos }}% de acertos</strong
+                >
+                <span v-else>Sem questões</span>
+                <small class="d-block">
+                  {{ item.totaisDosUltimosTrintaDias.questoes }} questões ·
+                  {{ item.totaisDosUltimosTrintaDias.erros }} erros
+                </small>
+              </td>
+              <td>
+                <span
+                  >{{ item.ultimaRecordacao ?? '—' }} /
+                  {{ item.ultimaDificuldade ?? '—' }}</span
+                >
+                <small class="d-block"
+                  >médias recentes: {{ item.mediaRecenteDeRecordacao ?? '—' }} /
+                  {{ item.mediaRecenteDeDificuldade ?? '—' }}</small
+                >
+              </td>
+              <td>{{ rotuloDaRevisao(item.resultadoDaUltimaRevisao) }}</td>
+              <td>
+                <span v-if="!item.padroesDeErroRepetidos.length">Nenhum</span>
+                <ul v-else class="mb-0 ps-3">
+                  <li
+                    v-for="padrao in item.padroesDeErroRepetidos"
+                    :key="padrao.identificador"
+                  >
+                    {{ padrao.descricao }} ({{ padrao.quantidadeDeEvidencias }}
+                    sessões)
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <div class="estrutura-do-historico">
@@ -576,6 +781,18 @@ onBeforeUnmount(() => {
         @submit.prevent="salvar"
       >
         <label>
+          <span>Tipo de estudo</span>
+          <select v-model="formulario.tipoDeEstudo" required>
+            <option
+              v-for="tipo in tiposDeEstudo"
+              :key="tipo.valor"
+              :value="tipo.valor"
+            >
+              {{ tipo.rotulo }}
+            </option>
+          </select>
+        </label>
+        <label>
           <span>Matéria</span>
           <select
             id="materia-estudo"
@@ -649,6 +866,11 @@ onBeforeUnmount(() => {
             />
           </label>
         </div>
+        <CamposDeEvidencia
+          v-model="formulario.evidencia"
+          :tipo="formulario.tipoDeEstudo"
+          :identificador-do-topico="formulario.identificadorDoTopico"
+        />
         <label>
           <span>Observação <em>opcional</em></span>
           <textarea

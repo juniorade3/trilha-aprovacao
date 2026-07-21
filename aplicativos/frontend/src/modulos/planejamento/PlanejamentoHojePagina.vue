@@ -5,6 +5,11 @@ import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import CamposDeEvidencia from '@/modulos/estudos/CamposDeEvidencia.vue'
+import {
+  paraEvidencia,
+  type ModeloDeEvidencia,
+} from '@/modulos/estudos/apiDeEstudos'
 import NavegacaoDoPlanejamento from './NavegacaoDoPlanejamento.vue'
 import {
   concluirBloco,
@@ -51,6 +56,8 @@ const resultadoCorrigido = ref<'CONCLUIDO' | 'PARCIALMENTE_CONCLUIDO'>(
 )
 const duracaoCorrigida = ref(1)
 const observacaoCorrigida = ref('')
+const evidenciaDaExecucao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
+const evidenciaDaCorrecao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
 const agora = ref(Date.now())
 let cancelamento: AbortController | undefined
 let temporizador: number | undefined
@@ -107,6 +114,80 @@ const cronometro = computed(() => {
   return [horas, minutos, segundos]
     .map((valor) => String(valor).padStart(2, '0'))
     .join(':')
+})
+
+const tipoExigeEvidencia = computed(() => {
+  const tipo = execucaoAtual.value?.bloco.tipoDeAtividade
+  return ['QUESTOES', 'SIMULADO', 'CADERNO_DE_ERROS', 'REVISAO'].includes(
+    tipo ?? '',
+  )
+})
+
+const finalizacaoValida = computed(() => {
+  const bloco = execucaoAtual.value?.bloco
+  if (!bloco) return true
+  if (!bloco.identificadorDaMateria && !bloco.identificadorDoTopico) return true
+  if (
+    bloco.identificadorDaMateria &&
+    !bloco.identificadorDoTopico &&
+    (paraEvidencia(evidenciaDaExecucao.value) ||
+      (acaoDeFinalizacao.value === 'CONCLUIR' && tipoExigeEvidencia.value)) &&
+    !identificadorDoTopico.value
+  )
+    return false
+  if (acaoDeFinalizacao.value === 'INTERROMPER') return true
+  if (
+    ['QUESTOES', 'SIMULADO', 'CADERNO_DE_ERROS'].includes(bloco.tipoDeAtividade)
+  ) {
+    const questoes = evidenciaDaExecucao.value.quantidadeDeQuestoes
+    const acertos = evidenciaDaExecucao.value.quantidadeDeAcertos
+    return (
+      questoes != null &&
+      questoes > 0 &&
+      acertos != null &&
+      acertos >= 0 &&
+      acertos <= questoes
+    )
+  }
+  return (
+    bloco.tipoDeAtividade !== 'REVISAO' ||
+    (evidenciaDaExecucao.value.nivelDeRecordacao ?? 0) >= 1
+  )
+})
+
+const correcaoValida = computed(() => {
+  if (!execucaoParaCorrigir.value) return true
+  const bloco = execucaoParaCorrigir.value.bloco
+  if (!bloco.identificadorDaMateria && !bloco.identificadorDoTopico) return true
+  const tipo = bloco.tipoDeAtividade
+  if (
+    bloco.identificadorDaMateria &&
+    !bloco.identificadorDoTopico &&
+    !execucaoParaCorrigir.value.estudo?.identificadorDoTopico &&
+    (paraEvidencia(evidenciaDaCorrecao.value) ||
+      (resultadoCorrigido.value === 'CONCLUIDO' &&
+        ['QUESTOES', 'SIMULADO', 'CADERNO_DE_ERROS', 'REVISAO'].includes(
+          tipo,
+        ))) &&
+    !identificadorDoTopico.value
+  )
+    return false
+  if (resultadoCorrigido.value === 'PARCIALMENTE_CONCLUIDO') return true
+  if (['QUESTOES', 'SIMULADO', 'CADERNO_DE_ERROS'].includes(tipo)) {
+    const questoes = evidenciaDaCorrecao.value.quantidadeDeQuestoes
+    const acertos = evidenciaDaCorrecao.value.quantidadeDeAcertos
+    return (
+      questoes != null &&
+      questoes > 0 &&
+      acertos != null &&
+      acertos >= 0 &&
+      acertos <= questoes
+    )
+  }
+  return (
+    tipo !== 'REVISAO' ||
+    (evidenciaDaCorrecao.value.nivelDeRecordacao ?? 0) >= 1
+  )
 })
 
 async function carregar() {
@@ -209,6 +290,7 @@ async function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {
     Math.round(segundosDecorridos.value / 60),
   )
   observacaoDaExecucao.value = ''
+  evidenciaDaExecucao.value = { padroesDeErro: [] }
 }
 
 async function finalizar() {
@@ -218,21 +300,22 @@ async function finalizar() {
   conflito.value = false
   try {
     const identificador = execucaoAtual.value.bloco.identificador
+    const evidencia = paraEvidencia(evidenciaDaExecucao.value)
     let resultado: ResultadoDaExecucaoDoBloco
+    const argumentos = [
+      identificador,
+      duracaoExecutada.value,
+      observacaoDaExecucao.value || undefined,
+      identificadorDoTopico.value || undefined,
+    ] as const
     if (acaoDeFinalizacao.value === 'CONCLUIR')
-      resultado = await concluirBloco(
-        identificador,
-        duracaoExecutada.value,
-        observacaoDaExecucao.value || undefined,
-        identificadorDoTopico.value || undefined,
-      )
+      resultado = evidencia
+        ? await concluirBloco(...argumentos, evidencia)
+        : await concluirBloco(...argumentos)
     else
-      resultado = await interromperBloco(
-        identificador,
-        duracaoExecutada.value,
-        observacaoDaExecucao.value || undefined,
-        identificadorDoTopico.value || undefined,
-      )
+      resultado = evidencia
+        ? await interromperBloco(...argumentos, evidencia)
+        : await interromperBloco(...argumentos)
     ultimoResultado.value = resultado
     aviso.value = resultado.estudo
       ? 'Bloco finalizado e estudo registrado no Histórico.'
@@ -327,13 +410,36 @@ async function confirmarCancelamento() {
   }
 }
 
-function abrirCorrecao(bloco: BlocoDeEstudo) {
+async function abrirCorrecao(bloco: BlocoDeEstudo) {
   const resultado = execucoesRealizadas.value[bloco.identificador]
   if (!resultado) return
+  topicosParaRegistro.value = []
+  identificadorDoTopico.value =
+    resultado.estudo?.identificadorDoTopico ?? bloco.identificadorDoTopico ?? ''
+  if (
+    bloco.identificadorDaMateria &&
+    !bloco.identificadorDoTopico &&
+    !resultado.estudo?.identificadorDoTopico
+  ) {
+    topicosParaRegistro.value = await listarTopicosParaRegistro(
+      bloco.identificador,
+    )
+  }
   execucaoParaCorrigir.value = resultado
   resultadoCorrigido.value = resultado.execucao.resultado ?? 'CONCLUIDO'
   duracaoCorrigida.value = resultado.execucao.duracaoExecutadaEmMinutos ?? 1
   observacaoCorrigida.value = resultado.execucao.observacao ?? ''
+  evidenciaDaCorrecao.value = {
+    quantidadeDeQuestoes:
+      resultado.evidencia?.resultadoDeQuestoes?.quantidadeDeQuestoes,
+    quantidadeDeAcertos:
+      resultado.evidencia?.resultadoDeQuestoes?.quantidadeDeAcertos,
+    nivelDeRecordacao: resultado.evidencia?.nivelDeRecordacao,
+    dificuldadePercebida: resultado.evidencia?.dificuldadePercebida,
+    padroesDeErro:
+      resultado.evidencia?.padroesDeErro?.map((padrao) => ({ ...padrao })) ??
+      [],
+  }
 }
 
 async function confirmarCorrecao() {
@@ -342,11 +448,17 @@ async function confirmarCorrecao() {
   erro.value = ''
   conflito.value = false
   try {
-    ultimoResultado.value = await corrigirExecucao(
+    const argumentos = [
       execucaoParaCorrigir.value.execucao.identificador,
       resultadoCorrigido.value,
       Number(duracaoCorrigida.value),
       observacaoCorrigida.value || undefined,
+    ] as const
+    const evidencia = paraEvidencia(evidenciaDaCorrecao.value)
+    ultimoResultado.value = await corrigirExecucao(
+      ...argumentos,
+      identificadorDoTopico.value || undefined,
+      evidencia,
     )
     execucaoParaCorrigir.value = undefined
     aviso.value =
@@ -751,7 +863,16 @@ onBeforeUnmount(() => {
           v-model="identificadorDoTopico"
           class="form-select"
         >
-          <option value="">Concluir sem registrar no Histórico</option>
+          <option
+            value=""
+            :disabled="acaoDeFinalizacao === 'CONCLUIR' && tipoExigeEvidencia"
+          >
+            {{
+              acaoDeFinalizacao === 'CONCLUIR' && tipoExigeEvidencia
+                ? 'Selecione o tópico para registrar o resultado'
+                : 'Concluir sem registrar no Histórico'
+            }}
+          </option>
           <option
             v-for="topico in topicosParaRegistro"
             :key="topico.identificador"
@@ -778,6 +899,18 @@ onBeforeUnmount(() => {
           required
         />
       </div>
+      <CamposDeEvidencia
+        v-if="
+          execucaoAtual.bloco.identificadorDaMateria ||
+          execucaoAtual.bloco.identificadorDoTopico
+        "
+        v-model="evidenciaDaExecucao"
+        :tipo="execucaoAtual.bloco.tipoDeAtividade"
+        :identificador-do-topico="
+          execucaoAtual.bloco.identificadorDoTopico || identificadorDoTopico
+        "
+        :interrupcao="acaoDeFinalizacao === 'INTERROMPER'"
+      />
       <div>
         <label class="form-label" for="observacao-execucao"
           >Observação opcional</label
@@ -802,7 +935,10 @@ onBeforeUnmount(() => {
           class="btn btn-primary"
           type="button"
           :disabled="
-            processando || duracaoExecutada < 1 || duracaoExecutada > 1440
+            processando ||
+            duracaoExecutada < 1 ||
+            duracaoExecutada > 1440 ||
+            !finalizacaoValida
           "
           @click="finalizar"
         >
@@ -1002,6 +1138,55 @@ onBeforeUnmount(() => {
           rows="3"
         ></textarea>
       </div>
+      <div
+        v-if="
+          execucaoParaCorrigir.bloco.identificadorDaMateria &&
+          !execucaoParaCorrigir.bloco.identificadorDoTopico &&
+          !execucaoParaCorrigir.estudo?.identificadorDoTopico
+        "
+        class="mb-3"
+      >
+        <label class="form-label" for="topico-da-correcao"
+          >Tópico estudado</label
+        >
+        <select
+          id="topico-da-correcao"
+          v-model="identificadorDoTopico"
+          class="form-select"
+        >
+          <option value="">Corrigir sem registrar no Histórico</option>
+          <option
+            v-for="topico in topicosParaRegistro"
+            :key="topico.identificador"
+            :value="topico.identificador"
+          >
+            {{ topico.nome }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-else-if="
+          !execucaoParaCorrigir.bloco.identificadorDaMateria &&
+          !execucaoParaCorrigir.bloco.identificadorDoTopico
+        "
+        class="alert alert-secondary"
+      >
+        Esta atividade livre será corrigida sem evidência por tópico.
+      </div>
+      <CamposDeEvidencia
+        v-if="
+          execucaoParaCorrigir.bloco.identificadorDaMateria ||
+          execucaoParaCorrigir.bloco.identificadorDoTopico
+        "
+        v-model="evidenciaDaCorrecao"
+        :tipo="execucaoParaCorrigir.bloco.tipoDeAtividade"
+        :identificador-do-topico="
+          execucaoParaCorrigir.estudo?.identificadorDoTopico ||
+          execucaoParaCorrigir.bloco.identificadorDoTopico ||
+          identificadorDoTopico
+        "
+        :interrupcao="resultadoCorrigido === 'PARCIALMENTE_CONCLUIDO'"
+      />
       <template #rodape>
         <button
           class="btn btn-outline-secondary"
@@ -1014,7 +1199,10 @@ onBeforeUnmount(() => {
           class="btn btn-primary"
           type="button"
           :disabled="
-            processando || duracaoCorrigida < 1 || duracaoCorrigida > 1440
+            processando ||
+            duracaoCorrigida < 1 ||
+            duracaoCorrigida > 1440 ||
+            !correcaoValida
           "
           @click="confirmarCorrecao"
         >

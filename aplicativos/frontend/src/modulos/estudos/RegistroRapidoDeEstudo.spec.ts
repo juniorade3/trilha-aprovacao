@@ -19,6 +19,10 @@ vi.mock('./apiDeEstudos', () => ({
   listarTodosOsMateriaisDeEstudo: chamadas.listarTodosOsMateriaisDeEstudo,
   listarCoberturas: chamadas.listarCoberturas,
   registrarEstudo: chamadas.registrarEstudo,
+  paraEvidencia: vi.fn((modelo) =>
+    modelo.dificuldadePercebida ? modelo : undefined,
+  ),
+  sugerirPadroesDeErro: vi.fn().mockResolvedValue([]),
 }))
 
 import RegistroRapidoDeEstudo from './RegistroRapidoDeEstudo.vue'
@@ -78,15 +82,15 @@ describe('RegistroRapidoDeEstudo', () => {
     })
     await flushPromises()
 
-    await componente.findAll('select')[0]!.setValue('materia-1')
+    await componente.findAll('select')[1]!.setValue('materia-1')
     await flushPromises()
-    await componente.findAll('select')[1]!.setValue('topico-1')
+    await componente.findAll('select')[2]!.setValue('topico-1')
     await flushPromises()
 
     expect(componente.text()).toContain('Curso de Constitucional')
     expect(componente.text()).not.toContain('Material sem cobertura')
 
-    await componente.findAll('select')[2]!.setValue('material-1')
+    await componente.findAll('select')[3]!.setValue('material-1')
     await componente.get('#registro-rapido-de-estudo').trigger('submit')
     await flushPromises()
 

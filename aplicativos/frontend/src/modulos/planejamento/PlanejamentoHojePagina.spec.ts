@@ -413,6 +413,8 @@ describe('PlanejamentoHojePagina', () => {
       'PARCIALMENTE_CONCLUIDO',
       20,
       undefined,
+      undefined,
+      undefined,
     )
   })
 })

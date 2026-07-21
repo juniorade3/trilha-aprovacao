@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -206,6 +207,166 @@ class MateriaisEEstudosIntegracaoTest {
         api.perform(get("/api/v1/estudos")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void deveRegistrarEvidenciasDiagnosticarEIsolarPadroes() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("evidencia.a@example.com");
+        String materia = criarMateria(sessaoA, "Matematica");
+        String topico = criarTopico(sessaoA, materia, "Equacoes");
+
+        api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDeEstudoComEvidencia(
+                                topico, "2026-07-01T10:00:00-03:00", 10, 7,
+                                "Erro de sinal", 2)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tipoDeEstudo").value("QUESTOES"))
+                .andExpect(jsonPath("$.evidencia.quantidadeDeErros").value(3));
+        api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDeEstudoComEvidencia(
+                                topico, "2026-07-20T11:00:00-03:00", 20, 16,
+                                "  erro   de sinal ", 1)))
+                .andExpect(status().isCreated());
+
+        api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"identificadorDoTopico":"%s","tipoDeEstudo":"QUESTOES",
+                                 "dataHora":"2026-07-20T12:00:00-03:00",
+                                 "duracaoEmMinutos":30}
+                                """.formatted(topico)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("RESULTADO_DE_QUESTOES_OBRIGATORIO"));
+        for (String tipo : List.of("SIMULADO", "CADERNO_DE_ERROS")) {
+            api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"identificadorDoTopico":"%s","tipoDeEstudo":"%s",
+                                     "dataHora":"2026-07-20T12:00:00-03:00",
+                                     "duracaoEmMinutos":30}
+                                    """.formatted(topico, tipo)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.codigo")
+                            .value("RESULTADO_DE_QUESTOES_OBRIGATORIO"));
+        }
+        api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"identificadorDoTopico":"%s","tipoDeEstudo":"REVISAO",
+                                 "dataHora":"2026-07-20T12:00:00-03:00",
+                                 "duracaoEmMinutos":30}
+                                """.formatted(topico)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("RECORDACAO_OBRIGATORIA"));
+        api.perform(post("/api/v1/estudos").session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"identificadorDoTopico":"%s","tipoDeEstudo":"QUESTOES",
+                                 "dataHora":"2026-07-20T12:00:00-03:00",
+                                 "duracaoEmMinutos":30,
+                                 "evidencia":{"resultadoDeQuestoes":{
+                                   "quantidadeDeQuestoes":1,"quantidadeDeAcertos":0},
+                                   "padroesDeErro":[null]}}
+                                """.formatted(topico)))
+                .andExpect(status().isBadRequest());
+
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos")
+                        .param("dataDeReferencia", "2026-07-20").session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nomeDoTopico").value("Equacoes"))
+                .andExpect(jsonPath("$[0].quantidadeDeEvidencias").value(2))
+                .andExpect(jsonPath("$[0].totaisDosUltimosTrintaDias.questoes").value(30))
+                .andExpect(jsonPath("$[0].totaisDosUltimosTrintaDias.acertos").value(23))
+                .andExpect(jsonPath("$[0].percentualRecenteDeAcertos").value(76.67))
+                .andExpect(jsonPath("$[0].padroesDeErroRepetidos[0].quantidadeDeEvidencias")
+                        .value(2));
+        api.perform(get("/api/v1/evidencias/padroes-de-erro")
+                        .param("identificadorDoTopico", topico).session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("Erro de sinal"));
+
+        MockHttpSession sessaoB = criarContaEEntrar("evidencia.b@example.com");
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos")
+                        .param("dataDeReferencia", "2026-07-20").session(sessaoB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        api.perform(get("/api/v1/evidencias/padroes-de-erro")
+                        .param("identificadorDoTopico", topico).session(sessaoB))
+                .andExpect(status().isNotFound());
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos")
+                        .param("dataDeReferencia", "2026-07-20")
+                        .param("identificadorDaMateria", materia).session(sessaoB))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveDiagnosticarJanelaInclusivaSomenteComFatosAtivosERevisoes()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("janela.evidencias@example.com");
+        String materia = criarMateria(sessao, "Estatistica");
+        String topico = criarTopico(sessao, materia, "Probabilidade");
+        criarTopico(sessao, materia, "Sem evidencias");
+
+        registrarEvidencia(sessao, corpoDeEstudoComEvidencia(
+                topico, "2026-06-20T10:00:00-03:00", 10, 9, "Cálculo", 1));
+        registrarEvidencia(sessao, corpoDeEstudoComEvidencia(
+                topico, "2026-06-21T10:00:00-03:00", 10, 5, "Cálculo", 1));
+        registrarEvidencia(sessao, corpoDeEstudoComEvidencia(
+                topico, "2026-07-20T10:00:00-03:00", 10, 8, "Cálculo", 1));
+        String cancelado = registrarEvidencia(sessao, corpoDeEstudoComEvidencia(
+                topico, "2026-07-10T10:00:00-03:00", 100, 0, "Cálculo", 1));
+        api.perform(post("/api/v1/estudos/{id}/cancelamento", cancelado)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
+        String corrigido = registrarEvidencia(sessao, corpoDeEstudoComEvidencia(
+                topico, "2026-07-11T10:00:00-03:00", 100, 0, "Cálculo", 1));
+        api.perform(put("/api/v1/estudos/{id}/correcao", corrigido)
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDeEstudoComEvidencia(
+                                topico, "2026-07-12T10:00:00-03:00",
+                                5, 4, "Cálculo", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipoDeEstudo").value("QUESTOES"));
+        registrarEvidencia(sessao, corpoDeRevisao(
+                topico, "2026-06-21T18:00:00-03:00", 2, 5));
+        registrarEvidencia(sessao, corpoDeRevisao(
+                topico, "2026-07-20T18:00:00-03:00", 4, 3));
+
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos")
+                        .param("dataDeReferencia", "2026-07-20").session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].nomeDoTopico").value("Probabilidade"))
+                .andExpect(jsonPath("$[0].quantidadeDeEvidencias").value(6))
+                .andExpect(jsonPath("$[0].totaisHistoricos.questoes").value(35))
+                .andExpect(jsonPath("$[0].totaisHistoricos.acertos").value(26))
+                .andExpect(jsonPath("$[0].totaisDosUltimosTrintaDias.questoes").value(25))
+                .andExpect(jsonPath("$[0].totaisDosUltimosTrintaDias.acertos").value(17))
+                .andExpect(jsonPath("$[0].percentualRecenteDeAcertos").value(68.00))
+                .andExpect(jsonPath("$[0].ultimaRecordacao").value(4))
+                .andExpect(jsonPath("$[0].mediaRecenteDeRecordacao").value(3.00))
+                .andExpect(jsonPath("$[0].ultimaDificuldade").value(3))
+                .andExpect(jsonPath("$[0].mediaRecenteDeDificuldade").value(4.00))
+                .andExpect(jsonPath("$[0].resultadoDaUltimaRevisao")
+                        .value("CONSOLIDADA"))
+                .andExpect(jsonPath("$[1].nomeDoTopico").value("Sem evidencias"))
+                .andExpect(jsonPath("$[1].quantidadeDeEvidencias").value(0));
+
+        mapearTopicoEmConcurso(sessao, materia, topico, "janela");
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos")
+                        .param("dataDeReferencia", "2026-07-20")
+                        .param("identificadorDaMateria", materia)
+                        .param("somenteExigidosNoConcursoAtivo", "true")
+                        .session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].identificadorDoTopico").value(topico))
+                .andExpect(jsonPath("$[0].exigidoNoConcursoAtivo").value(true));
+        api.perform(get("/api/v1/evidencias/diagnostico-de-topicos").session(sessao))
+                .andExpect(status().isBadRequest());
+    }
+
     private MockHttpSession criarContaEEntrar(String email) throws Exception {
         api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -291,6 +452,9 @@ class MateriaisEEstudosIntegracaoTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"identificadorDoTopicoDaMateria\":\"" + topico + "\"}"))
                 .andExpect(status().isCreated());
+        api.perform(post("/api/v1/concursos/{id}/ativacao", concurso)
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isOk());
     }
 
     private String criar(MockHttpSession sessao, String caminho, String corpo)
@@ -315,6 +479,35 @@ class MateriaisEEstudosIntegracaoTest {
                  "dataHora":"2026-07-18T10:00:00-03:00",
                  "duracaoEmMinutos":%d,"observacao":"Sessao de estudo"}
                 """.formatted(topico, materialJson, duracao);
+    }
+
+    private String corpoDeEstudoComEvidencia(String topico, String dataHora,
+            int questoes, int acertos, String padrao, int ocorrencias) {
+        return """
+                {"identificadorDoTopico":"%s","tipoDeEstudo":"QUESTOES",
+                 "dataHora":"%s","duracaoEmMinutos":45,
+                 "evidencia":{"resultadoDeQuestoes":{"quantidadeDeQuestoes":%d,
+                 "quantidadeDeAcertos":%d},"dificuldadePercebida":4,
+                 "padroesDeErro":[{"descricao":"%s","quantidadeDeOcorrencias":%d}]}}
+                """.formatted(topico, dataHora, questoes, acertos, padrao, ocorrencias);
+    }
+
+    private String corpoDeRevisao(String topico, String dataHora,
+            int recordacao, int dificuldade) {
+        return """
+                {"identificadorDoTopico":"%s","tipoDeEstudo":"REVISAO",
+                 "dataHora":"%s","duracaoEmMinutos":30,
+                 "evidencia":{"nivelDeRecordacao":%d,"dificuldadePercebida":%d}}
+                """.formatted(topico, dataHora, recordacao, dificuldade);
+    }
+
+    private String registrarEvidencia(MockHttpSession sessao, String corpo)
+            throws Exception {
+        return identificador(api.perform(post("/api/v1/estudos")
+                        .session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString());
     }
 
     private String identificador(String resposta) {

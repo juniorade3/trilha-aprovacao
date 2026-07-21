@@ -3,6 +3,65 @@ import type { RespostaPaginada } from '@/modulos/materias/apiDeConteudos'
 
 export type TipoDeMaterial = 'AULA' | 'PDF' | 'OUTRO'
 export type SituacaoDoRegistroDeEstudo = 'ATIVO' | 'CORRIGIDO' | 'CANCELADO'
+export type TipoDeEstudo =
+  | 'TEORIA'
+  | 'QUESTOES'
+  | 'REVISAO'
+  | 'CADERNO_DE_ERROS'
+  | 'SIMULADO'
+  | 'DISCURSIVA'
+  | 'OUTRA'
+
+export type PadraoDeErroInformado = {
+  descricao: string
+  quantidadeDeOcorrencias: number
+}
+
+export type EvidenciaDeAprendizagem = {
+  identificador?: string
+  resultadoDeQuestoes?: {
+    quantidadeDeQuestoes: number
+    quantidadeDeAcertos: number
+  }
+  quantidadeDeErros?: number
+  nivelDeRecordacao?: number
+  dificuldadePercebida?: number
+  resultadoDaRevisao?: 'PRECISA_REFORCO' | 'PARCIAL' | 'CONSOLIDADA'
+  padroesDeErro?: PadraoDeErroInformado[]
+}
+
+export type ModeloDeEvidencia = {
+  quantidadeDeQuestoes?: number
+  quantidadeDeAcertos?: number
+  nivelDeRecordacao?: number
+  dificuldadePercebida?: number
+  padroesDeErro: PadraoDeErroInformado[]
+}
+
+export function paraEvidencia(
+  modelo: ModeloDeEvidencia,
+): EvidenciaDeAprendizagem | undefined {
+  const possuiResultado =
+    modelo.quantidadeDeQuestoes != null ||
+    modelo.quantidadeDeAcertos != null ||
+    modelo.nivelDeRecordacao != null ||
+    modelo.dificuldadePercebida != null
+  if (!possuiResultado) return undefined
+  return {
+    resultadoDeQuestoes:
+      modelo.quantidadeDeQuestoes == null && modelo.quantidadeDeAcertos == null
+        ? undefined
+        : {
+            quantidadeDeQuestoes: modelo.quantidadeDeQuestoes!,
+            quantidadeDeAcertos: modelo.quantidadeDeAcertos!,
+          },
+    nivelDeRecordacao: modelo.nivelDeRecordacao,
+    dificuldadePercebida: modelo.dificuldadePercebida,
+    padroesDeErro: modelo.padroesDeErro.filter((padrao) =>
+      padrao.descricao.trim(),
+    ),
+  }
+}
 
 export type MaterialDeEstudo = {
   identificador: string
@@ -42,6 +101,7 @@ export type RegistroDeEstudo = {
   identificadorDoMaterial?: string
   tituloDoMaterial?: string
   identificadorDoRegistroDeOrigem?: string
+  tipoDeEstudo: TipoDeEstudo
   dataHora: string
   duracaoEmMinutos: number
   observacao?: string
@@ -49,6 +109,7 @@ export type RegistroDeEstudo = {
   criadoEm: string
   atualizadoEm: string
   versao: number
+  evidencia?: EvidenciaDeAprendizagem
 }
 
 export type DadosDeRegistroDeEstudo = {
@@ -57,6 +118,38 @@ export type DadosDeRegistroDeEstudo = {
   dataHora: string
   duracaoEmMinutos: number
   observacao?: string
+  tipoDeEstudo?: TipoDeEstudo
+  evidencia?: EvidenciaDeAprendizagem
+}
+
+export type DiagnosticoDeTopico = {
+  identificadorDoTopico: string
+  nomeDoTopico: string
+  identificadorDaMateria: string
+  nomeDaMateria: string
+  exigidoNoConcursoAtivo: boolean
+  quantidadeDeEvidencias: number
+  totaisHistoricos: TotaisDeQuestoes
+  totaisDosUltimosTrintaDias: TotaisDeQuestoes
+  percentualRecenteDeAcertos?: number
+  ultimaRecordacao?: number
+  mediaRecenteDeRecordacao?: number
+  ultimaDificuldade?: number
+  mediaRecenteDeDificuldade?: number
+  resultadoDaUltimaRevisao?: 'PRECISA_REFORCO' | 'PARCIAL' | 'CONSOLIDADA'
+  ultimaEvidenciaEm?: string
+  padroesDeErroRepetidos: Array<{
+    identificador: string
+    descricao: string
+    quantidadeDeEvidencias: number
+    quantidadeDeOcorrencias: number
+  }>
+}
+
+export type TotaisDeQuestoes = {
+  questoes: number
+  acertos: number
+  erros: number
 }
 
 export function listarMateriaisDeEstudo(
@@ -219,5 +312,34 @@ export function cancelarEstudo(identificador: string) {
   return requisitar<RegistroDeEstudo>(
     `/v1/estudos/${identificador}/cancelamento`,
     { method: 'POST' },
+  )
+}
+
+export function sugerirPadroesDeErro(
+  identificadorDoTopico: string,
+  pesquisa = '',
+  sinal?: AbortSignal,
+) {
+  const parametros = new URLSearchParams({ identificadorDoTopico, pesquisa })
+  return requisitar<string[]>(`/v1/evidencias/padroes-de-erro?${parametros}`, {
+    signal: sinal,
+  })
+}
+
+export function consultarDiagnosticoDeTopicos(
+  dataDeReferencia: string,
+  identificadorDaMateria?: string,
+  somenteExigidosNoConcursoAtivo = false,
+  sinal?: AbortSignal,
+) {
+  const parametros = new URLSearchParams({
+    dataDeReferencia,
+    somenteExigidosNoConcursoAtivo: String(somenteExigidosNoConcursoAtivo),
+  })
+  if (identificadorDaMateria)
+    parametros.set('identificadorDaMateria', identificadorDaMateria)
+  return requisitar<DiagnosticoDeTopico[]>(
+    `/v1/evidencias/diagnostico-de-topicos?${parametros}`,
+    { signal: sinal },
   )
 }

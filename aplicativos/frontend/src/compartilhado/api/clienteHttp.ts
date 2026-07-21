@@ -39,6 +39,7 @@ export async function requisitar<T>(
       caminho !== '/v1/autenticacao/login' &&
       typeof window !== 'undefined'
     ) {
+      tokenCsrf = undefined
       window.dispatchEvent(new CustomEvent('sessao-expirada'))
     }
     const erro = (await resposta.json().catch(() => null)) as {
