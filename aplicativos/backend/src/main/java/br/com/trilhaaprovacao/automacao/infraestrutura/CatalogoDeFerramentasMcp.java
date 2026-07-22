@@ -3,6 +3,7 @@ package br.com.trilhaaprovacao.automacao.infraestrutura;
 import br.com.trilhaaprovacao.automacao.aplicacao.ResultadoDaConsultaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAuditoriaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeConsultasMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
@@ -32,12 +33,15 @@ public class CatalogoDeFerramentasMcp {
             new TypeReference<>() { };
 
     private final ServicoDeConsultasMcp consultas;
+    private final ServicoDePreparacoesMcp preparacoes;
     private final ServicoDeAuditoriaMcp auditoria;
     private final ObjectMapper mapeador;
 
     public CatalogoDeFerramentasMcp(ServicoDeConsultasMcp consultas,
+            ServicoDePreparacoesMcp preparacoes,
             ServicoDeAuditoriaMcp auditoria, ObjectMapper mapeador) {
         this.consultas = consultas;
+        this.preparacoes = preparacoes;
         this.auditoria = auditoria;
         this.mapeador = mapeador;
     }
@@ -121,19 +125,70 @@ public class CatalogoDeFerramentasMcp {
                                         contexto.identidade().identificadorDoUsuario(),
                                         uuidObrigatorio(argumentos,
                                                 "identificadorDaOperacao"),
-                                        contexto.identificadorDaCorrelacao())));
+                                        contexto.identificadorDaCorrelacao())),
+                preparacao("preparar_registro_de_estudo",
+                        "Prepara um registro de estudo sem alterar os estudos.",
+                        esquemaDoRegistroDeEstudo(), "REGISTRO_DE_ESTUDO"),
+                preparacao("preparar_conclusao_do_bloco",
+                        "Prepara a conclusao de um bloco sem encerra-lo.",
+                        esquemaDaFinalizacaoDoBloco(), "CONCLUSAO_DO_BLOCO"),
+                preparacao("preparar_interrupcao_do_bloco",
+                        "Prepara a interrupcao de um bloco sem encerra-lo.",
+                        esquemaDaFinalizacaoDoBloco(), "INTERRUPCAO_DO_BLOCO"),
+                preparacao("preparar_correcao_do_estudo",
+                        "Prepara uma correcao preservando o estudo anterior.",
+                        esquemaDaCorrecaoDoEstudo(), "CORRECAO_DO_ESTUDO"),
+                preparacao("preparar_geracao_do_plano",
+                        "Calcula e prepara a geracao deterministica sem aplicar.",
+                        esquemaDaPreparacaoDaGeracao(), "GERACAO_DO_PLANO"),
+                preparacao("preparar_replanejamento",
+                        "Calcula e prepara o replanejamento sem aplicar.",
+                        esquemaDaPreparacaoDoReplanejamento(), "REPLANEJAMENTO"),
+                preparacao("preparar_alteracao_de_disponibilidade",
+                        "Prepara a substituicao da disponibilidade semanal.",
+                        esquemaDaAlteracaoDeDisponibilidade(),
+                        "ALTERACAO_DE_DISPONIBILIDADE"),
+                preparacao("preparar_alteracao_de_prioridades",
+                        "Prepara a substituicao das prioridades das materias.",
+                        esquemaDaAlteracaoDePrioridades(),
+                        "ALTERACAO_DE_PRIORIDADES"));
+    }
+
+    private McpStatelessServerFeatures.SyncToolSpecification preparacao(
+            String nome, String descricao, Map<String, Object> esquema,
+            String tipo) {
+        return ferramentaDePreparacao(nome, descricao, esquema,
+                esquemaDosDadosDaPreparacao(), "operacoes:preparar",
+                (contexto, argumentos) -> preparacoes.preparar(
+                        tipo, contexto, argumentos));
     }
 
     private McpStatelessServerFeatures.SyncToolSpecification ferramenta(
             String nome, String descricao, Map<String, Object> esquema,
             Map<String, Object> esquemaDosDados, String escopo,
             Executor executor) {
+        return especificacao(nome, descricao, esquema, esquemaDosDados,
+                escopo, executor, true);
+    }
+
+    private McpStatelessServerFeatures.SyncToolSpecification
+            ferramentaDePreparacao(String nome, String descricao,
+            Map<String, Object> esquema, Map<String, Object> esquemaDosDados,
+            String escopo, Executor executor) {
+        return especificacao(nome, descricao, esquema, esquemaDosDados,
+                escopo, executor, false);
+    }
+
+    private McpStatelessServerFeatures.SyncToolSpecification especificacao(
+            String nome, String descricao, Map<String, Object> esquema,
+            Map<String, Object> esquemaDosDados, String escopo,
+            Executor executor, boolean somenteLeitura) {
         McpSchema.Tool ferramenta = McpSchema.Tool.builder(nome, esquema)
                 .title(nome.replace('_', ' '))
                 .description(descricao)
                 .outputSchema(esquemaDaSaida(esquemaDosDados))
                 .annotations(McpSchema.ToolAnnotations.builder()
-                        .readOnlyHint(true).destructiveHint(false)
+                        .readOnlyHint(somenteLeitura).destructiveHint(false)
                         .idempotentHint(true).openWorldHint(false).build())
                 .build();
         BiFunction<McpTransportContext, McpSchema.CallToolRequest,
@@ -295,6 +350,114 @@ public class CatalogoDeFerramentasMcp {
     private Map<String, Object> inteiro(int minimo, int maximo) {
         return Map.of("type", "integer", "minimum", minimo,
                 "maximum", maximo);
+    }
+
+    private Map<String, Object> esquemaDoRegistroDeEstudo() {
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDoTopico", uuid()),
+                Map.entry("identificadorDoMaterial", uuid()),
+                Map.entry("dataHora", dataHora()),
+                Map.entry("duracaoEmMinutos", inteiro(1, 1_440)),
+                Map.entry("observacao", texto(2_000)),
+                Map.entry("tipoDeEstudo", tipoDeAtividade()),
+                Map.entry("evidencia", esquemaDaEvidencia())),
+                List.of("identificadorDoTopico", "dataHora",
+                        "duracaoEmMinutos", "tipoDeEstudo"));
+    }
+
+    private Map<String, Object> esquemaDaFinalizacaoDoBloco() {
+        return objeto(Map.of(
+                "identificadorDoBloco", uuid(),
+                "duracaoExecutadaEmMinutos", inteiro(1, 1_440),
+                "observacao", texto(2_000),
+                "identificadorDoTopico", uuid(),
+                "evidencia", esquemaDaEvidencia()),
+                List.of("identificadorDoBloco",
+                        "duracaoExecutadaEmMinutos"));
+    }
+
+    private Map<String, Object> esquemaDaCorrecaoDoEstudo() {
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDoEstudo", uuid()),
+                Map.entry("identificadorDoTopico", uuid()),
+                Map.entry("identificadorDoMaterial", uuid()),
+                Map.entry("dataHora", dataHora()),
+                Map.entry("duracaoEmMinutos", inteiro(1, 1_440)),
+                Map.entry("observacao", texto(2_000)),
+                Map.entry("tipoDeEstudo", tipoDeAtividade()),
+                Map.entry("evidencia", esquemaDaEvidencia())),
+                List.of("identificadorDoEstudo", "identificadorDoTopico",
+                        "dataHora", "duracaoEmMinutos", "tipoDeEstudo"));
+    }
+
+    private Map<String, Object> esquemaDaPreparacaoDaGeracao() {
+        return objeto(Map.of(
+                "identificadorDoPlano", uuid(),
+                "dataDeReferencia", data(),
+                "duracaoDoBlocoPrincipalEmMinutos", inteiro(25, 1_440),
+                "substituirBlocosGerados", booleano()),
+                List.of("identificadorDoPlano", "dataDeReferencia",
+                        "duracaoDoBlocoPrincipalEmMinutos",
+                        "substituirBlocosGerados"));
+    }
+
+    private Map<String, Object> esquemaDaPreparacaoDoReplanejamento() {
+        return objeto(Map.of(
+                "identificadorDoPlano", uuid(),
+                "dataDeReferencia", data(),
+                "identificadoresDasPendenciasIgnoradas",
+                lista(uuid(), 10_000),
+                "identificadoresDasConfirmacoesDoLimite",
+                lista(uuid(), 10_000)),
+                List.of("identificadorDoPlano", "dataDeReferencia"));
+    }
+
+    private Map<String, Object> esquemaDaAlteracaoDeDisponibilidade() {
+        Map<String, Object> item = objeto(Map.of(
+                "data", data(), "minutosDisponiveis", inteiro(0, 1_440)),
+                List.of("data", "minutosDisponiveis"));
+        return objeto(Map.of("identificadorDoPlano", uuid(),
+                "disponibilidades", lista(item, 7)),
+                List.of("identificadorDoPlano", "disponibilidades"));
+    }
+
+    private Map<String, Object> esquemaDaAlteracaoDePrioridades() {
+        Map<String, Object> item = objeto(Map.of(
+                "identificadorDaMateria", uuid(),
+                "prioridade", enumeracao("ALTA", "NORMAL", "BAIXA",
+                        "NAO_INCLUIR")),
+                List.of("identificadorDaMateria", "prioridade"));
+        return objeto(Map.of("identificadorDoPlano", uuid(),
+                "prioridades", lista(item, 10_000)),
+                List.of("identificadorDoPlano", "prioridades"));
+    }
+
+    private Map<String, Object> esquemaDaEvidencia() {
+        Map<String, Object> padrao = objeto(Map.of(
+                "descricao", texto(500),
+                "quantidadeDeOcorrencias", inteiro(1, 1_000_000)),
+                List.of("descricao", "quantidadeDeOcorrencias"));
+        return objeto(Map.of(
+                "quantidadeDeQuestoes", inteiro(0, 1_000_000),
+                "quantidadeDeAcertos", inteiro(0, 1_000_000),
+                "nivelDeRecordacao", inteiro(1, 5),
+                "dificuldadePercebida", inteiro(1, 5),
+                "padroesDeErro", lista(padrao, 100)), List.of());
+    }
+
+    private Map<String, Object> esquemaDosDadosDaPreparacao() {
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDaOperacao", uuid()),
+                Map.entry("tipo", texto(80)),
+                Map.entry("estado", constante("AGUARDANDO_CONFIRMACAO")),
+                Map.entry("resumo", texto(500)),
+                Map.entry("proposta", Map.of("type", "object")),
+                Map.entry("codigoDeConfirmacao", texto(8)),
+                Map.entry("fraseDeConfirmacao", texto(30)),
+                Map.entry("expiraEm", dataHora())),
+                List.of("identificadorDaOperacao", "tipo", "estado",
+                        "resumo", "proposta", "codigoDeConfirmacao",
+                        "fraseDeConfirmacao", "expiraEm"));
     }
 
     private Map<String, Object> esquemaDaSaida(

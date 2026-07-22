@@ -73,6 +73,8 @@ O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas o
   confiaveis;
 - `modelos/openclaw.json`: configuracao base validada pelo schema oficial;
 - `plugin-trilha/`: comando `/conectar` sem acesso a segredos;
+- operacoes preparadas pelo MCP sao aplicadas somente pelo comando confiavel
+  `/confirmar CODIGO`, depois de nova verificacao de versoes no backend;
 - `modelos/workspace/`: instrucoes copiadas para cada agente;
 - `scripts/inicializar-estado.sh`: cria o estado externo com permissoes restritas;
 - `scripts/provisionar-vinculo.sh`: cria agente, rota, workspace e bundle MCP isolados;

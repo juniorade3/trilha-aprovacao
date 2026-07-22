@@ -150,7 +150,15 @@ ferramentas_mcp_em_json() {
     "obter_historico_recente",
     "obter_estrutura_do_concurso",
     "explicar_bloco_de_estudo",
-    "consultar_operacao_assistida"
+    "consultar_operacao_assistida",
+    "preparar_registro_de_estudo",
+    "preparar_conclusao_do_bloco",
+    "preparar_interrupcao_do_bloco",
+    "preparar_correcao_do_estudo",
+    "preparar_geracao_do_plano",
+    "preparar_replanejamento",
+    "preparar_alteracao_de_disponibilidade",
+    "preparar_alteracao_de_prioridades"
   ]'
 }
 

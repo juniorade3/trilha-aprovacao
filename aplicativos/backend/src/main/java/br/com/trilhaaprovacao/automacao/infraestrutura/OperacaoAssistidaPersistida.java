@@ -35,6 +35,25 @@ public class OperacaoAssistidaPersistida {
     @Column(name = "hash_da_requisicao", nullable = false, length = 128)
     private String hashDaRequisicao;
     @Column(name = "expira_em", nullable = false) private OffsetDateTime expiraEm;
+    @Column(name = "codigo_de_confirmacao_hash", length = 128)
+    private String codigoDeConfirmacaoHash;
+    @Column(name = "codigo_de_confirmacao_prefixo", length = 24)
+    private String codigoDeConfirmacaoPrefixo;
+    @Column(name = "nonce_da_confirmacao_hash", length = 128)
+    private String nonceDaConfirmacaoHash;
+    @Column(name = "confirmacao_expira_em")
+    private OffsetDateTime confirmacaoExpiraEm;
+    @Column(name = "metodo_da_confirmacao", length = 20)
+    private String metodoDaConfirmacao;
+    @Column(name = "bot_da_confirmacao") private Long botDaConfirmacao;
+    @Column(name = "identificador_externo_da_confirmacao")
+    private Long identificadorExternoDaConfirmacao;
+    @Column(name = "identificador_do_chat_da_confirmacao")
+    private Long identificadorDoChatDaConfirmacao;
+    @Column(name = "identificador_da_sessao_da_confirmacao", length = 160)
+    private String identificadorDaSessaoDaConfirmacao;
+    @Column(name = "identificador_do_update_da_confirmacao", length = 160)
+    private String identificadorDoUpdateDaConfirmacao;
     @Column(name = "confirmada_em") private OffsetDateTime confirmadaEm;
     @Column(name = "aplicada_em") private OffsetDateTime aplicadaEm;
     @Column(name = "cancelada_em") private OffsetDateTime canceladaEm;
@@ -72,6 +91,27 @@ public class OperacaoAssistidaPersistida {
         falha = operacao.falha();
         resultado = operacao.resultado();
         atualizadoEm = operacao.atualizadoEm();
+    }
+
+    public void definirConfirmacao(String codigoHash, String prefixo,
+            String nonceHash, OffsetDateTime expiraEm) {
+        codigoDeConfirmacaoHash = codigoHash;
+        codigoDeConfirmacaoPrefixo = prefixo;
+        nonceDaConfirmacaoHash = nonceHash;
+        confirmacaoExpiraEm = expiraEm;
+    }
+
+    public String codigoDeConfirmacaoHash() { return codigoDeConfirmacaoHash; }
+    public OffsetDateTime confirmacaoExpiraEm() { return confirmacaoExpiraEm; }
+
+    public void registrarContextoDaConfirmacao(String metodo, long bot,
+            long externo, long chat, String sessao, String update) {
+        metodoDaConfirmacao = metodo;
+        botDaConfirmacao = bot;
+        identificadorExternoDaConfirmacao = externo;
+        identificadorDoChatDaConfirmacao = chat;
+        identificadorDaSessaoDaConfirmacao = sessao;
+        identificadorDoUpdateDaConfirmacao = update;
     }
 
     public OperacaoAssistida paraDominio() {

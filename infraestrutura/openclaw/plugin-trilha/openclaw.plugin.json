@@ -10,6 +10,10 @@
     {
       "name": "conectar",
       "kind": "runtime-slash"
+    },
+    {
+      "name": "confirmar",
+      "kind": "runtime-slash"
     }
   ],
   "configSchema": {

@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.automacao.infraestrutura;
 
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Collection;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +20,10 @@ public interface RepositorioDeOperacoesAssistidas
     Optional<OperacaoAssistidaPersistida>
             findByIdentificadorDoUsuarioAndChaveDeIdempotencia(
                     UUID usuario, String chaveDeIdempotencia);
+    Optional<OperacaoAssistidaPersistida>
+            findFirstByIdentificadorDoVinculoAndCodigoDeConfirmacaoHashAndEstadoInOrderByCriadoEmDesc(
+                    UUID vinculo, String codigoHash,
+                    Collection<br.com.trilhaaprovacao.automacao.dominio.EstadoDaOperacaoAssistida> estados);
 
     @Query(value = """
             select 1

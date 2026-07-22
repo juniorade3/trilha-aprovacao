@@ -41,6 +41,9 @@ public class ServicoDeOperacoesAssistidas {
     private final ServicoDeSegredosDaAutomacao segredos;
     private final ObjectMapper mapeador;
 
+    public record OperacaoPreparada(
+            OperacaoAssistida operacao, String codigoDeConfirmacao) { }
+
     public ServicoDeOperacoesAssistidas(
             RepositorioDeOperacoesAssistidas operacoes,
             RepositorioDeVinculosDeCanal vinculos,
@@ -109,6 +112,33 @@ public class ServicoDeOperacoesAssistidas {
                 new OperacaoAssistidaPersistida(operacao)).paraDominio();
         auditar(salva, "OPERACAO_PREPARADA", hashDaRequisicao, "SUCESSO", agora);
         return salva;
+    }
+
+    @Transactional
+    public OperacaoPreparada prepararParaConfirmacao(UUID usuario, UUID vinculo,
+            String tipo, String resumo, String propostaCanonica,
+            String versoesConsultadas, String chaveDeIdempotencia) {
+        OperacaoAssistida operacao = preparar(usuario, vinculo, tipo, resumo,
+                propostaCanonica, versoesConsultadas, chaveDeIdempotencia);
+        String codigo = segredos.derivarCodigoDeConfirmacao(
+                operacao.assinatura());
+        if (operacao.estado() == EstadoDaOperacaoAssistida.PREPARADA) {
+            OffsetDateTime agora = agora();
+            operacao.aguardarConfirmacao(agora);
+            OperacaoAssistidaPersistida persistida = operacoes
+                    .encontrarParaAtualizacao(operacao.identificador(), usuario)
+                    .orElseThrow();
+            persistida.atualizarDe(operacao);
+            persistida.definirConfirmacao(segredos.hash(codigo),
+                    codigo.substring(0, 2),
+                    segredos.hash("nonce:" + operacao.assinatura()),
+                    operacao.expiraEm());
+            operacoes.saveAndFlush(persistida);
+            auditar(operacao, "CONFIRMACAO_SOLICITADA",
+                    segredos.hash(operacao.identificador().toString()),
+                    "SUCESSO", agora);
+        }
+        return new OperacaoPreparada(operacao, codigo);
     }
 
     @Transactional(readOnly = true)

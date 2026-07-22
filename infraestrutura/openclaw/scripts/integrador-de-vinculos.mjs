@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
   statSync,
@@ -35,6 +36,10 @@ const CHAVES_DA_REQUISICAO = [
 const LIMITE_DO_CORPO = 4_096;
 const LIMITE_DA_RESPOSTA_DO_BACKEND = 65_536;
 const CAMINHO_DA_TROCA = "/api/v1/integracoes-confiaveis/telegram/vinculos";
+const CAMINHO_DA_CONFIRMACAO =
+  "/api/v1/integracoes-confiaveis/telegram/operacoes/confirmacao";
+const CAMINHO_LOCAL_DA_CONFIRMACAO = "/v1/operacoes/telegram/confirmacao";
+const FORMATO_DO_CODIGO_DE_CONFIRMACAO = /^[23456789A-HJ-NP-Z]{8}$/;
 
 class ErroDoIntegrador extends Error {
   constructor(codigo, estadoHttp) {
@@ -230,6 +235,84 @@ function validarRequisicao(valor, configuracao) {
     identificadorDoTelegram: valor.identificadorDoTelegram,
     identificadorDoChat: valor.identificadorDoChat,
   });
+}
+
+function validarConfirmacao(valor, configuracao) {
+  const chaves = ["canal", "codigo", "identificadorDaContaDoBot",
+    "identificadorDoChat", "identificadorDoTelegram", "identificadorDoUpdate",
+    "metodo", "versaoDoContrato"].sort();
+  if (!valor || typeof valor !== "object" || Array.isArray(valor)
+      || JSON.stringify(Object.keys(valor).sort()) !== JSON.stringify(chaves)
+      || valor.versaoDoContrato !== "1" || valor.canal !== "TELEGRAM"
+      || valor.metodo !== "TEXTO"
+      || valor.identificadorDaContaDoBot !== configuracao.identificadorDaContaDoBot
+      || typeof valor.codigo !== "string"
+      || !FORMATO_DO_CODIGO_DE_CONFIRMACAO.test(valor.codigo)
+      || typeof valor.identificadorDoUpdate !== "string"
+      || valor.identificadorDoUpdate.length < 1
+      || valor.identificadorDoUpdate.length > 160) {
+    throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
+  }
+  for (const identificador of [valor.identificadorDoTelegram,
+    valor.identificadorDoChat]) {
+    if (typeof identificador !== "string"
+        || !FORMATO_DO_IDENTIFICADOR_NUMERICO.test(identificador)
+        || !Number.isSafeInteger(Number(identificador))) {
+      throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
+    }
+  }
+  if (valor.identificadorDoTelegram !== valor.identificadorDoChat) {
+    throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
+  }
+  return Object.freeze({ ...valor });
+}
+
+function localizarProvisionamento(requisicao, configuracao) {
+  const diretorio = path.join(configuracao.diretorioDeEstado, "provisionamentos");
+  for (const nome of readdirSync(diretorio)) {
+    if (!nome.endsWith(".json")) continue;
+    const arquivo = path.join(diretorio, nome);
+    const estado = lstatSync(arquivo);
+    if (!estado.isFile() || estado.isSymbolicLink()
+        || (estado.mode & 0o777) !== 0o600) continue;
+    const item = JSON.parse(readFileSync(arquivo, "utf8"));
+    if (item.estado === "ATIVO"
+        && item.identificadorDoBot === configuracao.identificadorDoBot
+        && item.identificadorDoTelegram === requisicao.identificadorDoTelegram
+        && item.identificadorDoChat === requisicao.identificadorDoChat
+        && typeof item.identificadorDaSessao === "string") return item;
+  }
+  throw new ErroDoIntegrador("VINCULO_NAO_ENCONTRADO", 404);
+}
+
+async function confirmarOperacao(requisicao, configuracao, buscar) {
+  const provisionamento = localizarProvisionamento(requisicao, configuracao);
+  const corpo = JSON.stringify({
+    codigo: requisicao.codigo,
+    metodo: requisicao.metodo,
+    identificadorDoBot: Number(configuracao.identificadorDoBot),
+    identificadorDoTelegram: Number(requisicao.identificadorDoTelegram),
+    identificadorDoChat: Number(requisicao.identificadorDoChat),
+    identificadorDaSessao: provisionamento.identificadorDaSessao,
+    identificadorDoUpdate: requisicao.identificadorDoUpdate,
+  });
+  const idempotencia = `confirmacao-${createHash("sha256")
+    .update(`${requisicao.identificadorDoTelegram}:${requisicao.identificadorDoUpdate}`)
+    .digest("hex")}`;
+  let retorno;
+  try {
+    retorno = await chamarBackend({ caminho: CAMINHO_DA_CONFIRMACAO, corpo,
+      idempotencia, configuracao, buscar });
+  } catch {
+    throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
+  }
+  if (retorno.status >= 200 && retorno.status < 300) {
+    return { estado: 200, codigo: "OPERACAO_APLICADA" };
+  }
+  if ([404, 409, 410, 422].includes(retorno.status)) {
+    throw new ErroDoIntegrador("CONFIRMACAO_RECUSADA", 409);
+  }
+  throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
 }
 
 function hashDaOperacao(requisicao, configuracao) {
@@ -535,7 +618,9 @@ export function criarServidorDoIntegrador({
       responder(resposta, 200, "ATIVO");
       return;
     }
-    if (pedido.method !== "POST" || pedido.url !== "/v1/vinculos/telegram") {
+    const rotaDeVinculo = pedido.url === "/v1/vinculos/telegram";
+    const rotaDeConfirmacao = pedido.url === CAMINHO_LOCAL_DA_CONFIRMACAO;
+    if (pedido.method !== "POST" || (!rotaDeVinculo && !rotaDeConfirmacao)) {
       responder(resposta, 404, "ROTA_NAO_ENCONTRADA");
       return;
     }
@@ -552,8 +637,12 @@ export function criarServidorDoIntegrador({
       } catch {
         throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
       }
-      const requisicao = validarRequisicao(valor, configuracao);
-      const resultado = await processar(requisicao);
+      const requisicao = rotaDeVinculo
+        ? validarRequisicao(valor, configuracao)
+        : validarConfirmacao(valor, configuracao);
+      const resultado = rotaDeVinculo
+        ? await processar(requisicao)
+        : await confirmarOperacao(requisicao, configuracao, buscar);
       responder(resposta, resultado.estado, resultado.codigo);
     } catch (erro) {
       const conhecido = erro instanceof ErroDoIntegrador

@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ServicoDeVinculosDoTelegram {
     private static final String ESCOPOS_INICIAIS =
             "planejamento:ler prioridades:ler concursos:ler estudos:ler "
-                    + "operacoes:ler";
+                    + "operacoes:ler operacoes:preparar";
 
     private final RepositorioDeVinculosDeCanal vinculos;
     private final RepositorioDeCredenciaisDeIntegracao credenciais;

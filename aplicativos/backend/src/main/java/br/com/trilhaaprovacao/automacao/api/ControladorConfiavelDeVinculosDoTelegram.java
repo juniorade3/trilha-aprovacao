@@ -1,6 +1,7 @@
 package br.com.trilhaaprovacao.automacao.api;
 
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAplicacaoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaDeErro;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 @Hidden
 @RestController
@@ -25,10 +27,16 @@ import org.springframework.web.bind.annotation.RestController;
         havingValue = "true")
 public class ControladorConfiavelDeVinculosDoTelegram {
     private final ServicoDeVinculosDoTelegram servico;
+    private final ServicoDeAplicacaoDeOperacoesAssistidas aplicacao;
+    private final ObjectMapper mapeador;
 
     public ControladorConfiavelDeVinculosDoTelegram(
-            ServicoDeVinculosDoTelegram servico) {
+            ServicoDeVinculosDoTelegram servico,
+            ServicoDeAplicacaoDeOperacoesAssistidas aplicacao,
+            ObjectMapper mapeador) {
         this.servico = servico;
+        this.aplicacao = aplicacao;
+        this.mapeador = mapeador;
     }
 
     @PostMapping("/vinculos")
@@ -66,5 +74,33 @@ public class ControladorConfiavelDeVinculosDoTelegram {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(RespostaDeVinculoDoTelegram.de(vinculo));
+    }
+
+    @PostMapping("/operacoes/{identificador}/confirmacao")
+    public ResponseEntity<RespostaDeOperacaoAssistida> confirmarEAplicar(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
+        var operacao = aplicacao.confirmarEAplicar(identificador,
+                requisicao.codigo(), requisicao.metodo(),
+                requisicao.identificadorDoBot(),
+                requisicao.identificadorDoTelegram(),
+                requisicao.identificadorDoChat(),
+                requisicao.identificadorDaSessao(),
+                requisicao.identificadorDoUpdate());
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(RespostaDeOperacaoAssistida.de(operacao, mapeador));
+    }
+
+    @PostMapping("/operacoes/confirmacao")
+    public ResponseEntity<RespostaDeOperacaoAssistida> confirmarEAplicar(
+            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
+        var operacao = aplicacao.confirmarEAplicar(requisicao.codigo(),
+                requisicao.metodo(), requisicao.identificadorDoBot(),
+                requisicao.identificadorDoTelegram(),
+                requisicao.identificadorDoChat(),
+                requisicao.identificadorDaSessao(),
+                requisicao.identificadorDoUpdate());
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(RespostaDeOperacaoAssistida.de(operacao, mapeador));
     }
 }

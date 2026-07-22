@@ -15,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.trilhaaprovacao.automacao.aplicacao.CodigoDeVinculoExpirado;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAplicacaoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ValidadorDeAssinaturaDoGateway;
@@ -28,6 +30,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -92,6 +95,8 @@ class AutomacaoIntegracaoTest {
     @Autowired JdbcTemplate banco;
     @Autowired ServicoDeVinculosDoTelegram vinculos;
     @Autowired ServicoDeOperacoesAssistidas operacoes;
+    @Autowired ServicoDePreparacoesMcp preparacoes;
+    @Autowired ServicoDeAplicacaoDeOperacoesAssistidas aplicacao;
     @Autowired ServicoDeSegredosDaAutomacao segredos;
 
     @BeforeEach
@@ -242,12 +247,13 @@ class AutomacaoIntegracaoTest {
                 .andExpect(jsonPath("$.vinculo.provisionado").value(false))
                 .andExpect(jsonPath("$.token", not(nullValue())))
                 .andExpect(jsonPath("$.prefixo", not(nullValue())))
-                .andExpect(jsonPath("$.escopos", hasSize(5)))
+                .andExpect(jsonPath("$.escopos", hasSize(6)))
                 .andExpect(jsonPath("$.escopos[0]").value("planejamento:ler"))
                 .andExpect(jsonPath("$.escopos[1]").value("prioridades:ler"))
                 .andExpect(jsonPath("$.escopos[2]").value("concursos:ler"))
                 .andExpect(jsonPath("$.escopos[3]").value("estudos:ler"))
                 .andExpect(jsonPath("$.escopos[4]").value("operacoes:ler"))
+                .andExpect(jsonPath("$.escopos[5]").value("operacoes:preparar"))
                 .andReturn().getResponse().getContentAsString();
         String token = json.readTree(resposta).get("token").asText();
         assertThat(token).startsWith("mcp_");
@@ -557,6 +563,75 @@ class AutomacaoIntegracaoTest {
                 .isInstanceOf(RecursoNaoEncontrado.class)
                 .satisfies(excecao -> assertThat(((RecursoNaoEncontrado) excecao).codigo())
                         .isEqualTo("OPERACAO_ASSISTIDA_NAO_ENCONTRADA"));
+
+        var preparada = operacoes.prepararParaConfirmacao(usuario, null,
+                "REGISTRO_DE_ESTUDO", "Registrar estudo", "{\"minutos\":30}",
+                "{\"topico\":1}", "confirmacao-idempotente");
+        var repeticao = operacoes.prepararParaConfirmacao(usuario, null,
+                "REGISTRO_DE_ESTUDO", "Registrar estudo", "{\"minutos\":30}",
+                "{\"topico\":1}", "confirmacao-idempotente");
+        assertThat(preparada.codigoDeConfirmacao()).hasSize(8)
+                .isEqualTo(repeticao.codigoDeConfirmacao());
+        assertThat(operacoes.obter(usuario,
+                preparada.operacao().identificador()).estado().name())
+                .isEqualTo("AGUARDANDO_CONFIRMACAO");
+        assertThat(banco.queryForObject("""
+                SELECT codigo_de_confirmacao_hash
+                  FROM operacoes_assistidas WHERE identificador = ?
+                """, String.class, preparada.operacao().identificador()))
+                .hasSize(64).isNotEqualTo(preparada.codigoDeConfirmacao());
+    }
+
+    @Test
+    void deveConfirmarEAplicarRegistroSemDuplicar() throws Exception {
+        criarContaEEntrar("aplicacao@example.com");
+        UUID usuario = identificarUsuario("aplicacao@example.com");
+        var codigo = vinculos.gerarCodigo(usuario);
+        var troca = vinculos.trocarCodigo(codigo.codigo(), IDENTIFICADOR_DO_BOT,
+                998877L, 998877L);
+        UUID vinculo = troca.vinculo().identificador();
+        vinculos.registrarProvisionamento(vinculo, IDENTIFICADOR_DO_BOT,
+                998877L, 998877L, "agente-aplicacao", "sessao-aplicacao");
+        UUID materia = UUID.randomUUID();
+        UUID topico = UUID.randomUUID();
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO materias (identificador, usuario_id, nome,
+                  nome_normalizado, arquivada, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Direito', 'direito', false, ?, ?, 0)
+                """, materia, usuario, agora, agora);
+        banco.update("""
+                INSERT INTO topicos_da_materia (identificador, materia_id, nome,
+                  nome_normalizado, ordem, arquivado, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Atos', 'atos', 1, false, ?, ?, 0)
+                """, topico, materia, agora, agora);
+        Map<String, Object> proposta = Map.of(
+                "identificadorDoTopico", topico.toString(),
+                "dataHora", agora.toString(), "duracaoEmMinutos", 30,
+                "tipoDeEstudo", "TEORIA");
+        String propostaJson = json.writeValueAsString(proposta);
+        String versoes = json.writeValueAsString(preparacoes.versoesAtuais(
+                "REGISTRO_DE_ESTUDO", usuario, proposta));
+        var preparada = operacoes.prepararParaConfirmacao(usuario, vinculo,
+                "REGISTRO_DE_ESTUDO", "Registrar estudo de 30 minutos.",
+                propostaJson, versoes, "aplicar-registro");
+
+        var aplicada = aplicacao.confirmarEAplicar(
+                preparada.codigoDeConfirmacao(), "TEXTO",
+                IDENTIFICADOR_DO_BOT, 998877L, 998877L,
+                "sessao-aplicacao", "update-aplicacao-1");
+        assertThat(aplicada.estado().name()).isEqualTo("APLICADA");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM registros_de_estudo WHERE topico_id = ?
+                """, Integer.class, topico)).isEqualTo(1);
+        assertThat(aplicacao.confirmarEAplicar(
+                preparada.codigoDeConfirmacao(), "TEXTO",
+                IDENTIFICADOR_DO_BOT, 998877L, 998877L,
+                "sessao-aplicacao", "update-aplicacao-1").estado().name())
+                .isEqualTo("APLICADA");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM registros_de_estudo WHERE topico_id = ?
+                """, Integer.class, topico)).isEqualTo(1);
     }
 
     @Test

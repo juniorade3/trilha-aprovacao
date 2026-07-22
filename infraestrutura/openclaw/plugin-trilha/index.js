@@ -1,9 +1,11 @@
 const URL_PADRAO_DO_INTEGRADOR = "http://integrador:8090";
 const CAMINHO_DO_VINCULO = "/v1/vinculos/telegram";
+const CAMINHO_DA_CONFIRMACAO = "/v1/operacoes/telegram/confirmacao";
 const TEMPO_LIMITE_PADRAO_EM_MS = 5_000;
 const CODIGO_DE_VINCULO_VALIDO = /^[23456789A-HJ-NP-Z]{10}$/;
 const IDENTIFICADOR_DO_TELEGRAM_VALIDO = /^[1-9][0-9]{0,19}$/;
 const IDENTIFICADOR_DA_CONTA_VALIDO = /^[A-Za-z0-9._:-]{1,100}$/;
+const CODIGO_DE_CONFIRMACAO_VALIDO = /^[23456789A-HJ-NP-Z]{8}$/;
 
 const MENSAGENS = Object.freeze({
   uso: "Use /conectar seguido do codigo de 10 caracteres exibido na Trilha.",
@@ -15,6 +17,10 @@ const MENSAGENS = Object.freeze({
   conflito: "Nao foi possivel usar esse codigo porque ele ja foi consumido ou este Telegram ja esta vinculado.",
   limite: "Foram feitas muitas tentativas. Aguarde um pouco antes de tentar novamente.",
   indisponivel: "Nao foi possivel confirmar o resultado do vinculo agora. Tente novamente em alguns instantes.",
+  usoConfirmacao: "Use /confirmar seguido do codigo exibido na previa.",
+  confirmacaoInvalida: "O codigo de confirmacao nao possui o formato esperado.",
+  confirmacaoAplicada: "Operacao confirmada e aplicada na Trilha.",
+  confirmacaoRecusada: "A operacao expirou, mudou ou o codigo nao confere. Solicite uma nova previa.",
 });
 
 function lerConfiguracao(pluginConfig) {
@@ -39,7 +45,44 @@ function lerConfiguracao(pluginConfig) {
   }
   return {
     url: new URL(CAMINHO_DO_VINCULO, url).toString(),
+    urlDaConfirmacao: new URL(CAMINHO_DA_CONFIRMACAO, url).toString(),
     tempoLimiteEmMs,
+  };
+}
+
+function criarManipuladorDeConfirmacao({ buscar, configuracao }) {
+  return async (contexto) => {
+    const origem = contextoPrivadoDoTelegram(contexto);
+    if (!origem.valido) return { text: origem.mensagem };
+    const codigo = typeof contexto.args === "string"
+      ? contexto.args.trim().toUpperCase() : "";
+    if (!codigo) return { text: MENSAGENS.usoConfirmacao };
+    if (!CODIGO_DE_CONFIRMACAO_VALIDO.test(codigo)) {
+      return { text: MENSAGENS.confirmacaoInvalida };
+    }
+    const conta = typeof contexto.accountId === "string"
+        && IDENTIFICADOR_DA_CONTA_VALIDO.test(contexto.accountId.trim())
+      ? contexto.accountId.trim() : "default";
+    const update = String(contexto.messageId ?? contexto.updateId
+      ?? `${origem.identificador}:${contexto.commandBody ?? codigo}`);
+    try {
+      const resposta = await buscar(configuracao.urlDaConfirmacao, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({
+          versaoDoContrato: "1", canal: "TELEGRAM", codigo,
+          metodo: "TEXTO", identificadorDoTelegram: origem.identificador,
+          identificadorDoChat: origem.identificador,
+          identificadorDaContaDoBot: conta, identificadorDoUpdate: update,
+        }),
+        redirect: "error",
+      });
+      await descartarCorpo(resposta);
+      return { text: resposta.status >= 200 && resposta.status < 300
+        ? MENSAGENS.confirmacaoAplicada : MENSAGENS.confirmacaoRecusada };
+    } catch {
+      return { text: MENSAGENS.indisponivel };
+    }
   };
 }
 
@@ -158,6 +201,12 @@ export function criarPluginDaTrilha(dependencias = {}) {
         acceptsArgs: true,
         requireAuth: false,
         handler: criarManipulador({ buscar, configuracao }),
+      });
+      api.registerCommand({
+        name: "confirmar",
+        description: "Confirmar e aplicar uma previa da Trilha.",
+        channels: ["telegram"], acceptsArgs: true, requireAuth: true,
+        handler: criarManipuladorDeConfirmacao({ buscar, configuracao }),
       });
     },
   };

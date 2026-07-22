@@ -58,4 +58,9 @@ public interface RepositorioDeVinculosDeCanal
     boolean existsByCanalAndIdentificadorDoBotAndIdentificadorExternoAndEstado(
             CanalDeIntegracao canal, long bot, long identificadorExterno,
             EstadoDoVinculoDeCanal estado);
+
+    Optional<VinculoDeCanalPersistido>
+            findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatAndEstado(
+                    CanalDeIntegracao canal, long bot, long identificadorExterno,
+                    long identificadorDoChat, EstadoDoVinculoDeCanal estado);
 }

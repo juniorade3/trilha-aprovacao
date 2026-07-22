@@ -47,7 +47,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class McpIntegracaoTest {
     private static final String TODOS_OS_ESCOPOS = String.join(" ",
             "planejamento:ler", "prioridades:ler", "concursos:ler",
-            "estudos:ler", "operacoes:ler");
+            "estudos:ler", "operacoes:ler", "operacoes:preparar");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRESQL =
@@ -99,7 +99,15 @@ class McpIntegracaoTest {
                             "obter_historico_recente",
                             "obter_estrutura_do_concurso",
                             "explicar_bloco_de_estudo",
-                            "consultar_operacao_assistida");
+                            "consultar_operacao_assistida",
+                            "preparar_registro_de_estudo",
+                            "preparar_conclusao_do_bloco",
+                            "preparar_interrupcao_do_bloco",
+                            "preparar_correcao_do_estudo",
+                            "preparar_geracao_do_plano",
+                            "preparar_replanejamento",
+                            "preparar_alteracao_de_disponibilidade",
+                            "preparar_alteracao_de_prioridades");
             assertThat(ferramentas).allSatisfy(ferramenta -> {
                 assertThat(ferramenta.inputSchema())
                         .containsEntry("type", "object")
@@ -114,7 +122,8 @@ class McpIntegracaoTest {
                 assertThat(esquemaDosDados(ferramenta))
                         .containsEntry("type", "object")
                         .containsEntry("additionalProperties", false);
-                assertThat(ferramenta.annotations().readOnlyHint()).isTrue();
+                assertThat(ferramenta.annotations().readOnlyHint())
+                        .isEqualTo(!ferramenta.name().startsWith("preparar_"));
                 assertThat(ferramenta.annotations().destructiveHint()).isFalse();
                 assertThat(ferramenta.annotations().idempotentHint()).isTrue();
                 assertThat(ferramenta.annotations().openWorldHint()).isFalse();

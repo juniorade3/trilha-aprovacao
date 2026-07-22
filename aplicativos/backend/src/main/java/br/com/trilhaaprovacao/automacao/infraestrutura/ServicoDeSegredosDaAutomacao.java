@@ -36,6 +36,16 @@ public class ServicoDeSegredosDaAutomacao {
         return codigo.toString();
     }
 
+    public String derivarCodigoDeConfirmacao(String material) {
+        byte[] bytes = hmac("confirmacao:" + material);
+        StringBuilder codigo = new StringBuilder(8);
+        for (int indice = 0; indice < 8; indice++) {
+            codigo.append(ALFABETO_DO_CODIGO[
+                    Byte.toUnsignedInt(bytes[indice]) % ALFABETO_DO_CODIGO.length]);
+        }
+        return codigo.toString();
+    }
+
     public String gerarToken() {
         byte[] bytes = new byte[32];
         aleatorio.nextBytes(bytes);
