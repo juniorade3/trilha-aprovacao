@@ -45,8 +45,9 @@ temporario="$(mktemp "${diretorio_de_estado}/temporarios/revogacao.XXXXXX")"
 metadados_temporarios="$(mktemp "${diretorio_de_estado}/temporarios/metadados.XXXXXX")"
 trap 'rm -f -- "${temporario}" "${metadados_temporarios}"' EXIT
 
-jq --arg agente "${agente}" --arg telegram "${telegram}" \
-  '.agents.list = [.agents.list[]? | select(.id != $agente)]
+jq --arg agente "${agente}" --arg telegram "${telegram}" --arg plugin "${plugin}" \
+  '.plugins.allow = [.plugins.allow[]? | select(. != $plugin)]
+   | .agents.list = [.agents.list[]? | select(.id != $agente)]
    | .bindings = [.bindings[]? | select(.agentId != $agente)]
    | .channels.telegram.allowFrom = [.channels.telegram.allowFrom[]? | select(tostring != $telegram)]' \
   "${arquivo_da_configuracao}" > "${temporario}"

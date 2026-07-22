@@ -235,6 +235,7 @@ Tambem confirme:
 - `docker inspect` nao mostra segredos em variaveis de ambiente;
 - nao ha `ports`, `privileged`, Docker socket ou mounts adicionais;
 - cada agente tem `agentDir`, workspace, binding e plugin proprios;
+- cada plugin MCP ativo aparece em `plugins.allow` e e removido na revogacao;
 - `openclaw.json` mantem `mcp.servers` vazio;
 - o servico `gateway` nao monta `/run/secrets/credenciais-mcp` e o broker nao monta o estado;
 - somente o `gateway` monta `OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX`, como arquivo

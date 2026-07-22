@@ -92,8 +92,10 @@ jq -e --arg agente "${agente_um}" '.agents.list | length == 1 and .[0].id == $ag
   "${configuracao}" >/dev/null
 jq -e '(.bindings | length == 1) and .channels.telegram.allowFrom == ["800000001"]' \
   "${configuracao}" >/dev/null
-jq -e \
-  '.plugins.allow == ["codex", "trilha-aprovacao"] and
+jq -e --arg plugin "${plugin_um}" \
+  '(.plugins.allow | index($plugin)) != null and
+   (.plugins.allow | index("codex")) != null and
+   (.plugins.allow | index("trilha-aprovacao")) != null and
    .plugins.entries.codex.enabled == true and
    .plugins.entries["trilha-aprovacao"].enabled == true and .mcp.servers == {} and
    .models.providers.openai.agentRuntime.id == "codex" and
@@ -104,9 +106,12 @@ jq -e \
    (.agents.list[0].tools.deny | index("group:fs")) != null' \
   "${configuracao}" >/dev/null
 jq -e --arg vinculo "${vinculo_um}" \
-  '.mcpServers.trilha.url == ("http://broker-credenciais:18890/mcp/" + $vinculo) and
+  '.mcpServers.trilha.command == "node" and
+   .mcpServers.trilha.args == ["./proxy-mcp-http-stdio.mjs", ("http://broker-credenciais:18890/mcp/" + $vinculo)] and
+   (.mcpServers.trilha | has("url") | not) and
    (.mcpServers.trilha | has("headers") | not) and
    (.mcpServers.trilha.toolFilter.include | length == 24)' "${arquivo_mcp_um}" >/dev/null
+[[ -x "${estado}/workspaces/${agente_um}/.openclaw/extensions/${plugin_um}/proxy-mcp-http-stdio.mjs" ]]
 jq -e --arg token "${valor_token_um}" --arg agente "${agente_um}" \
   --arg sessao "sessao:${vinculo_um}" \
   '.tokenMcp == $token and .identificadorDoAgente == $agente and
@@ -207,6 +212,9 @@ jq -e '.estado == "ATIVO"' "${estado}/provisionamentos/${vinculo_dois}.json" >/d
 [[ "$(stat -c '%a' "${arquivo_credencial_dois}")" == "600" ]]
 jq -e --arg token "${valor_token_dois}" '.tokenMcp == $token' "${arquivo_credencial_dois}" >/dev/null
 [[ -f "${arquivo_mcp_dois}" ]]
+jq -e --arg pluginNovo "${plugin_dois}" --arg pluginAntigo "${plugin_um}" \
+  '(.plugins.allow | index($pluginNovo)) != null and
+   (.plugins.allow | index($pluginAntigo)) == null' "${configuracao}" >/dev/null
 [[ -d "${estado}/revogados/${vinculo_um}/workspace" ]]
 ! grep -R -q -- "${valor_token_um}" "${estado}" "${credenciais}"
 ! grep -R -q -- "${valor_token_dois}" "${estado}"

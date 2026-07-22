@@ -41,8 +41,10 @@ Recibos de idempotencia guardam somente hash, estado e UUID.
 
 O `mcp.servers` global permanece vazio. Cada workspace recebe um plugin Codex
 minimo em `.openclaw/extensions`, descoberto somente pelo runtime daquele
-agente. O plugin contem apenas a URL interna e opaca do vinculo; nao contem
-token, cabecalho de autenticacao nem caminho de segredo.
+agente e ativado explicitamente em `plugins.allow`. Um proxy stdio local
+encaminha o protocolo para a URL interna e opaca do vinculo, contornando a
+incompatibilidade do Codex com `cwd` em MCP HTTP nessa versao do OpenClaw. O
+plugin nao contem token, cabecalho de autenticacao nem caminho de segredo.
 
 O broker, em outro processo e sem montar o estado do agente, resolve um arquivo externo `0600` por vinculo e injeta `Authorization`, `X-Identificador-Do-Agente` e `X-Identificador-Da-Sessao`. O backend valida os tres contra o vinculo ativo; nenhum deles e argumento controlado pelo modelo. O broker aceita somente `POST /mcp/{vinculo}`, limita o corpo, nao segue redirecionamentos e nunca repassa cabecalhos de identidade enviados pelo cliente.
 

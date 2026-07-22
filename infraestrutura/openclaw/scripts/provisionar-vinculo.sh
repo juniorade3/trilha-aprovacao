@@ -160,6 +160,8 @@ workspace_temporario="${diretorio_temporario}/workspace"
 agente_temporario="${diretorio_temporario}/agente"
 plugin_temporario="${workspace_temporario}/.openclaw/extensions/${nome_do_plugin}"
 install -d -m 700 -- "${workspace_temporario}" "${agente_temporario}" "${plugin_temporario}/.codex-plugin"
+install -m 500 -- "${diretorio_do_modulo}/scripts/proxy-mcp-http-stdio.mjs" \
+  "${plugin_temporario}/proxy-mcp-http-stdio.mjs"
 
 for arquivo in AGENTS.md SOUL.md IDENTITY.md TOOLS.md USER.md; do
   install -m 600 -- "${diretorio_do_modulo}/modelos/workspace/${arquivo}" "${workspace_temporario}/${arquivo}"
@@ -174,11 +176,8 @@ jq -n --arg nome "${nome_do_plugin}" '{
 ferramentas="$(ferramentas_mcp_em_json)"
 jq -n --arg vinculo "${identificador_do_vinculo}" --argjson ferramentas "${ferramentas}" \
   '{mcpServers: {trilha: {
-    url: ("http://broker-credenciais:18890/mcp/" + $vinculo),
-    transport: "streamable-http",
-    connectionTimeoutMs: 5000,
-    requestTimeoutMs: 30000,
-    supportsParallelToolCalls: false,
+    command: "node",
+    args: ["./proxy-mcp-http-stdio.mjs", ("http://broker-credenciais:18890/mcp/" + $vinculo)],
     toolFilter: {include: $ferramentas}
   }}}' > "${plugin_temporario}/.mcp.json"
 chmod 600 -- "${plugin_temporario}/.codex-plugin/plugin.json" "${plugin_temporario}/.mcp.json"
@@ -193,10 +192,12 @@ chmod 600 -- "${credencial_temporaria}"
 configuracao_temporaria="${diretorio_temporario}/openclaw.json"
 jq --arg agente "${identificador_do_agente}" --arg telegram "${identificador_do_telegram}" \
   --arg vinculo "${identificador_do_vinculo}" --arg sessao "${identificador_da_sessao}" \
+  --arg plugin "${nome_do_plugin}" --arg pluginAntigo "${plugin_substituido}" \
   --arg workspace "${caminho_do_workspace_no_container}" --arg diretorioAgente "${caminho_do_agente_no_container}" \
   --arg modelo "${modelo}" \
   --arg agenteAntigo "${agente_substituido}" --arg telegramAntigo "${telegram_substituido}" \
-  '.agents.list = [.agents.list[]? | select(.id != $agenteAntigo)]
+  '.plugins.allow = (([.plugins.allow[]? | select(. != $pluginAntigo)] + [$plugin]) | unique)
+   | .agents.list = [.agents.list[]? | select(.id != $agenteAntigo)]
    | .bindings = [.bindings[]? | select(.agentId != $agenteAntigo)]
    | .channels.telegram.allowFrom = [.channels.telegram.allowFrom[]? | select(tostring != $telegramAntigo)]
    | .agents.list += [{
