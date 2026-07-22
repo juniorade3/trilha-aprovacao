@@ -52,6 +52,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private final ServicoDePlanejamento planejamento;
     private final ServicoDeGeracaoDeterministica geracao;
     private final ServicoDeReplanejamento replanejamento;
+    private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ObjectMapper mapeador;
 
     public ServicoDeAplicacaoDeOperacoesAssistidas(
@@ -63,7 +64,9 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             ServicoDeMateriaisEEstudos estudos,
             ServicoDePlanejamento planejamento,
             ServicoDeGeracaoDeterministica geracao,
-            ServicoDeReplanejamento replanejamento, ObjectMapper mapeador) {
+            ServicoDeReplanejamento replanejamento,
+            ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
+            ObjectMapper mapeador) {
         this.operacoes = operacoes;
         this.vinculos = vinculos;
         this.servicoDeOperacoes = servicoDeOperacoes;
@@ -73,6 +76,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         this.planejamento = planejamento;
         this.geracao = geracao;
         this.replanejamento = replanejamento;
+        this.cadastroDeConcursos = cadastroDeConcursos;
         this.mapeador = mapeador;
     }
 
@@ -223,6 +227,9 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                                     PrioridadeDaMateriaNoPlano.valueOf(
                                             texto(item, "prioridade"))))
                             .toList());
+            case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
+                    "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
+                    cadastroDeConcursos.aplicar(usuario, proposta);
             default -> throw new IllegalArgumentException("Operacao desconhecida.");
         };
         return Map.of("tipo", operacao.tipo(), "dados",

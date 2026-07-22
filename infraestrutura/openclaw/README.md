@@ -50,7 +50,7 @@ O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas o
 - somente DMs numericas explicitamente permitidas; grupos desabilitados;
 - um binding `per-channel-peer` por Telegram;
 - runtime OpenAI nativo do OpenClaw, fixado por `agentRuntime.id: "openclaw"`;
-- somente oito ferramentas `trilha__*`, filtradas tambem no servidor MCP;
+- somente ferramentas `trilha__*` explicitamente permitidas, filtradas tambem no servidor MCP;
 - configuracao por chat, comandos administrativos, exec approvals e cron desabilitados;
 - container sem capacidades Linux, sem privilegios, sem Docker socket e com raiz somente leitura;
 - Gateway em loopback e nenhuma porta publicada;

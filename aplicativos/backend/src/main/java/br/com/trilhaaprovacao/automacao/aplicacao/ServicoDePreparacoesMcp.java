@@ -31,16 +31,20 @@ public class ServicoDePreparacoesMcp {
     private final ServicoDeOperacoesAssistidas operacoes;
     private final ServicoDeGeracaoDeterministica geracao;
     private final ServicoDeReplanejamento replanejamento;
+    private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final JdbcTemplate banco;
     private final ObjectMapper mapeador;
 
     public ServicoDePreparacoesMcp(ServicoDeOperacoesAssistidas operacoes,
             ServicoDeGeracaoDeterministica geracao,
-            ServicoDeReplanejamento replanejamento, JdbcTemplate banco,
+            ServicoDeReplanejamento replanejamento,
+            ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
+            JdbcTemplate banco,
             ObjectMapper mapeador) {
         this.operacoes = operacoes;
         this.geracao = geracao;
         this.replanejamento = replanejamento;
+        this.cadastroDeConcursos = cadastroDeConcursos;
         this.banco = banco;
         this.mapeador = mapeador;
     }
@@ -66,6 +70,9 @@ public class ServicoDePreparacoesMcp {
             case "ALTERACAO_DE_DISPONIBILIDADE", "ALTERACAO_DE_PRIORIDADES" ->
                     versoesDoPlano(usuario, uuid(argumentos,
                             "identificadorDoPlano"));
+            case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
+                    "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
+                    cadastroDeConcursos.versoesAtuais(usuario);
             default -> throw new IllegalArgumentException(
                     "Tipo de preparacao desconhecido.");
         };
@@ -115,6 +122,9 @@ public class ServicoDePreparacoesMcp {
             case "ALTERACAO_DE_DISPONIBILIDADE", "ALTERACAO_DE_PRIORIDADES" ->
                     versoesDoPlano(usuario, uuid(proposta,
                             "identificadorDoPlano"));
+            case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
+                    "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
+                    cadastroDeConcursos.versoesAtuais(usuario);
             default -> throw new IllegalArgumentException(
                     "Tipo de preparacao desconhecido.");
         };

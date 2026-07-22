@@ -22,4 +22,9 @@ public record MapeamentoDeItemDoEdital(
         return new MapeamentoDeItemDoEdital(
                 UUID.randomUUID(), item, topico, true, OffsetDateTime.now());
     }
+
+    public static MapeamentoDeItemDoEdital criarSugerido(UUID item, UUID topico) {
+        return new MapeamentoDeItemDoEdital(
+                UUID.randomUUID(), item, topico, false, OffsetDateTime.now());
+    }
 }

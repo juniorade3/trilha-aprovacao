@@ -2,6 +2,7 @@ package br.com.trilhaaprovacao.automacao.infraestrutura;
 
 import br.com.trilhaaprovacao.automacao.aplicacao.ResultadoDaConsultaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAuditoriaMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeCadastroAssistidoDeConcursos;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeConsultasMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
@@ -34,14 +35,17 @@ public class CatalogoDeFerramentasMcp {
 
     private final ServicoDeConsultasMcp consultas;
     private final ServicoDePreparacoesMcp preparacoes;
+    private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ServicoDeAuditoriaMcp auditoria;
     private final ObjectMapper mapeador;
 
     public CatalogoDeFerramentasMcp(ServicoDeConsultasMcp consultas,
             ServicoDePreparacoesMcp preparacoes,
+            ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
             ServicoDeAuditoriaMcp auditoria, ObjectMapper mapeador) {
         this.consultas = consultas;
         this.preparacoes = preparacoes;
+        this.cadastroDeConcursos = cadastroDeConcursos;
         this.auditoria = auditoria;
         this.mapeador = mapeador;
     }
@@ -151,7 +155,36 @@ public class CatalogoDeFerramentasMcp {
                 preparacao("preparar_alteracao_de_prioridades",
                         "Prepara a substituicao das prioridades das materias.",
                         esquemaDaAlteracaoDePrioridades(),
-                        "ALTERACAO_DE_PRIORIDADES"));
+                        "ALTERACAO_DE_PRIORIDADES"),
+                cadastro("preparar_cadastro_do_concurso",
+                        "Prepara o cadastro integral de um concurso em rascunho.",
+                        "CADASTRO_DO_CONCURSO"),
+                cadastro("preparar_catalogo_de_conteudos",
+                        "Prepara catalogo, estrutura oficial e concurso em um lote.",
+                        "CATALOGO_DE_CONTEUDOS"),
+                cadastro("preparar_conteudo_programatico",
+                        "Prepara itens oficiais sem alterar dados antes da confirmacao.",
+                        "CONTEUDO_PROGRAMATICO"),
+                cadastro("preparar_mapeamentos_do_edital",
+                        "Prepara sugestoes de mapeamento que permanecem pendentes.",
+                        "MAPEAMENTOS_DO_EDITAL"),
+                ferramenta("validar_contexto_do_concurso",
+                        "Valida e classifica um cadastro extraido sem persistir dados.",
+                        esquemaDoCadastroAssistido(),
+                        esquemaDosDadosDoCadastroAssistido(),
+                        "concursos:ler",
+                        (contexto, argumentos) -> cadastroDeConcursos.validar(
+                                contexto, argumentos)));
+    }
+
+    private McpStatelessServerFeatures.SyncToolSpecification cadastro(
+            String nome, String descricao, String tipo) {
+        return ferramentaDePreparacao(nome, descricao,
+                esquemaDoCadastroAssistido(),
+                esquemaDosDadosDoCadastroAssistido(),
+                "operacoes:preparar",
+                (contexto, argumentos) -> cadastroDeConcursos.preparar(
+                        tipo, contexto, argumentos));
     }
 
     private McpStatelessServerFeatures.SyncToolSpecification preparacao(
@@ -430,6 +463,90 @@ public class CatalogoDeFerramentasMcp {
         return objeto(Map.of("identificadorDoPlano", uuid(),
                 "prioridades", lista(item, 10_000)),
                 List.of("identificadorDoPlano", "prioridades"));
+    }
+
+    private Map<String, Object> esquemaDoCadastroAssistido() {
+        Map<String, Object> origem = objeto(Map.of(
+                "fonte", texto(500), "pagina", inteiro(1, 100_000),
+                "secao", texto(300), "trechoDeApoio", texto(1_000),
+                "incerto", booleano()), List.of("fonte", "incerto"));
+        Map<String, Object> concurso = objeto(Map.ofEntries(
+                Map.entry("nome", texto(300)),
+                Map.entry("descricao", texto(2_000)),
+                Map.entry("orgao", texto(300)),
+                Map.entry("banca", texto(300)),
+                Map.entry("dataPrevista", data()),
+                Map.entry("origem", origem)), List.of("nome", "origem"));
+        Map<String, Object> edital = objeto(Map.ofEntries(
+                Map.entry("titulo", texto(300)),
+                Map.entry("numero", texto(100)),
+                Map.entry("ano", inteiro(1900, 2200)),
+                Map.entry("descricao", texto(2_000)),
+                Map.entry("dataDePublicacao", data()),
+                Map.entry("enderecoDoDocumento", texto(2_000)),
+                Map.entry("origem", origem)), List.of("titulo", "origem"));
+        Map<String, Object> cargo = objeto(Map.ofEntries(
+                Map.entry("nome", texto(300)),
+                Map.entry("area", texto(300)),
+                Map.entry("especialidade", texto(300)),
+                Map.entry("nivelDeEscolaridade", enumeracao("FUNDAMENTAL",
+                        "MEDIO", "TECNICO", "SUPERIOR", "NAO_INFORMADO")),
+                Map.entry("origem", origem)), List.of("nome", "origem"));
+        Map<String, Object> prova = objeto(Map.ofEntries(
+                Map.entry("nome", texto(300)),
+                Map.entry("tipo", enumeracao("OBJETIVA", "DISCURSIVA",
+                        "PRATICA", "TITULOS", "OUTRA")),
+                Map.entry("carater", enumeracao("ELIMINATORIO",
+                        "CLASSIFICATORIO", "ELIMINATORIO_E_CLASSIFICATORIO",
+                        "NAO_INFORMADO")),
+                Map.entry("dataHora", dataHora()),
+                Map.entry("duracaoEmMinutos", inteiro(1, 100_000)),
+                Map.entry("quantidadeDeQuestoes", inteiro(0, 1_000_000)),
+                Map.entry("pontuacaoMaxima", numero(0, 1_000_000)),
+                Map.entry("pontuacaoMinima", numero(0, 1_000_000)),
+                Map.entry("nomeDoGrupo", texto(300)),
+                Map.entry("origem", origem)), List.of());
+        Map<String, Object> topico = objeto(Map.of(
+                "nome", texto(300), "descricao", texto(2_000),
+                "ordem", inteiro(0, 100_000), "origem", origem),
+                List.of("nome", "origem"));
+        Map<String, Object> item = objeto(Map.of(
+                "descricao", texto(5_000), "ordem", inteiro(0, 100_000),
+                "topicoSugerido", texto(300), "origem", origem),
+                List.of("descricao", "origem"));
+        Map<String, Object> materia = objeto(Map.ofEntries(
+                Map.entry("nome", texto(300)),
+                Map.entry("descricao", texto(2_000)),
+                Map.entry("cor", texto(20)),
+                Map.entry("peso", numero(0, 1_000_000)),
+                Map.entry("quantidadeDeQuestoes", inteiro(0, 1_000_000)),
+                Map.entry("pontuacaoMaxima", numero(0, 1_000_000)),
+                Map.entry("topicos", lista(topico, 10_000)),
+                Map.entry("itensDoEdital", lista(item, 10_000)),
+                Map.entry("origem", origem)), List.of("nome", "origem"));
+        return objeto(Map.of("concurso", concurso, "edital", edital,
+                "cargo", cargo, "prova", prova,
+                "materias", lista(materia, 10_000)),
+                List.of("concurso", "edital", "cargo", "materias"));
+    }
+
+    private Map<String, Object> esquemaDosDadosDoCadastroAssistido() {
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDaOperacao", uuid()),
+                Map.entry("tipo", texto(100)),
+                Map.entry("estado", texto(100)),
+                Map.entry("nadaFoiAlterado", booleano()),
+                Map.entry("codigoDeConfirmacao", texto(8)),
+                Map.entry("fraseDeConfirmacao", texto(30)),
+                Map.entry("expiraEm", dataHora()),
+                Map.entry("materias", inteiroNaoNegativo()),
+                Map.entry("itensDoEdital", inteiroNaoNegativo()),
+                Map.entry("mapeamentosSugeridosPendentes", inteiroNaoNegativo()),
+                Map.entry("classificacoes", lista(Map.of("type", "object"),
+                        100_000)),
+                Map.entry("conflitos", lista(Map.of("type", "object"),
+                        100_000)),
+                Map.entry("aviso", texto(1_000))), List.of());
     }
 
     private Map<String, Object> esquemaDaEvidencia() {
