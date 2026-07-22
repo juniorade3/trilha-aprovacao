@@ -32,6 +32,7 @@ public class ServicoDePreparacoesMcp {
     private final ServicoDeGeracaoDeterministica geracao;
     private final ServicoDeReplanejamento replanejamento;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
+    private final ServicoDeOperacoesCriticasMcp operacoesCriticas;
     private final JdbcTemplate banco;
     private final ObjectMapper mapeador;
 
@@ -39,12 +40,14 @@ public class ServicoDePreparacoesMcp {
             ServicoDeGeracaoDeterministica geracao,
             ServicoDeReplanejamento replanejamento,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
+            ServicoDeOperacoesCriticasMcp operacoesCriticas,
             JdbcTemplate banco,
             ObjectMapper mapeador) {
         this.operacoes = operacoes;
         this.geracao = geracao;
         this.replanejamento = replanejamento;
         this.cadastroDeConcursos = cadastroDeConcursos;
+        this.operacoesCriticas = operacoesCriticas;
         this.banco = banco;
         this.mapeador = mapeador;
     }
@@ -73,6 +76,10 @@ public class ServicoDePreparacoesMcp {
             case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
                     "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
                     cadastroDeConcursos.versoesAtuais(usuario);
+            case "ATIVACAO_DO_CONCURSO", "ARQUIVAMENTO_DO_CONCURSO",
+                    "CANCELAMENTO_DO_CONCURSO" ->
+                    operacoesCriticas.versoesAtuais(usuario,
+                            uuid(argumentos, "identificadorDoConcurso"));
             default -> throw new IllegalArgumentException(
                     "Tipo de preparacao desconhecido.");
         };
@@ -125,6 +132,10 @@ public class ServicoDePreparacoesMcp {
             case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
                     "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
                     cadastroDeConcursos.versoesAtuais(usuario);
+            case "ATIVACAO_DO_CONCURSO", "ARQUIVAMENTO_DO_CONCURSO",
+                    "CANCELAMENTO_DO_CONCURSO" ->
+                    operacoesCriticas.versoesAtuais(usuario,
+                            uuid(proposta, "identificadorDoConcurso"));
             default -> throw new IllegalArgumentException(
                     "Tipo de preparacao desconhecido.");
         };

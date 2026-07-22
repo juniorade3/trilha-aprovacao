@@ -10,6 +10,7 @@ import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeEventosDeAud
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeVinculosDeCanal;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
+import br.com.trilhaaprovacao.automacao.infraestrutura.MetricasDaAutomacao;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
@@ -40,6 +41,7 @@ public class ServicoDeOperacoesAssistidas {
     private final RepositorioDeEventosDeAuditoriaDaAutomacao auditoria;
     private final ServicoDeSegredosDaAutomacao segredos;
     private final ObjectMapper mapeador;
+    private final MetricasDaAutomacao metricas;
 
     public record OperacaoPreparada(
             OperacaoAssistida operacao, String codigoDeConfirmacao) { }
@@ -49,12 +51,13 @@ public class ServicoDeOperacoesAssistidas {
             RepositorioDeVinculosDeCanal vinculos,
             RepositorioDeEventosDeAuditoriaDaAutomacao auditoria,
             ServicoDeSegredosDaAutomacao segredos,
-            ObjectMapper mapeador) {
+            ObjectMapper mapeador, MetricasDaAutomacao metricas) {
         this.operacoes = operacoes;
         this.vinculos = vinculos;
         this.auditoria = auditoria;
         this.segredos = segredos;
         this.mapeador = mapeador;
+        this.metricas = metricas;
     }
 
     @Transactional
@@ -110,6 +113,7 @@ public class ServicoDeOperacoesAssistidas {
         }
         OperacaoAssistida salva = operacoes.saveAndFlush(
                 new OperacaoAssistidaPersistida(operacao)).paraDominio();
+        metricas.registrarPreparacao();
         auditar(salva, "OPERACAO_PREPARADA", hashDaRequisicao, "SUCESSO", agora);
         return salva;
     }
@@ -118,6 +122,24 @@ public class ServicoDeOperacoesAssistidas {
     public OperacaoPreparada prepararParaConfirmacao(UUID usuario, UUID vinculo,
             String tipo, String resumo, String propostaCanonica,
             String versoesConsultadas, String chaveDeIdempotencia) {
+        return prepararParaConfirmacao(usuario, vinculo, tipo, resumo,
+                propostaCanonica, versoesConsultadas, chaveDeIdempotencia,
+                "COMUM");
+    }
+
+    @Transactional
+    public OperacaoPreparada prepararParaConfirmacaoReforcada(UUID usuario,
+            UUID vinculo, String tipo, String resumo, String propostaCanonica,
+            String versoesConsultadas, String chaveDeIdempotencia) {
+        return prepararParaConfirmacao(usuario, vinculo, tipo, resumo,
+                propostaCanonica, versoesConsultadas, chaveDeIdempotencia,
+                "REFORCADA");
+    }
+
+    private OperacaoPreparada prepararParaConfirmacao(UUID usuario,
+            UUID vinculo, String tipo, String resumo, String propostaCanonica,
+            String versoesConsultadas, String chaveDeIdempotencia,
+            String nivel) {
         OperacaoAssistida operacao = preparar(usuario, vinculo, tipo, resumo,
                 propostaCanonica, versoesConsultadas, chaveDeIdempotencia);
         String codigo = segredos.derivarCodigoDeConfirmacao(
@@ -132,7 +154,7 @@ public class ServicoDeOperacoesAssistidas {
             persistida.definirConfirmacao(segredos.hash(codigo),
                     codigo.substring(0, 2),
                     segredos.hash("nonce:" + operacao.assinatura()),
-                    operacao.expiraEm());
+                    operacao.expiraEm(), nivel, 0);
             operacoes.saveAndFlush(persistida);
             auditar(operacao, "CONFIRMACAO_SOLICITADA",
                     segredos.hash(operacao.identificador().toString()),

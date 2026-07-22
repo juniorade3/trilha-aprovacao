@@ -77,10 +77,10 @@ public class ControladorConfiavelDeVinculosDoTelegram {
     }
 
     @PostMapping("/operacoes/{identificador}/confirmacao")
-    public ResponseEntity<RespostaDeOperacaoAssistida> confirmarEAplicar(
+    public ResponseEntity<RespostaDaConfirmacaoAssistida> confirmarEAplicar(
             @PathVariable UUID identificador,
             @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
-        var operacao = aplicacao.confirmarEAplicar(identificador,
+        var resultado = aplicacao.confirmarComResultado(identificador,
                 requisicao.codigo(), requisicao.metodo(),
                 requisicao.identificadorDoBot(),
                 requisicao.identificadorDoTelegram(),
@@ -88,19 +88,19 @@ public class ControladorConfiavelDeVinculosDoTelegram {
                 requisicao.identificadorDaSessao(),
                 requisicao.identificadorDoUpdate());
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(RespostaDeOperacaoAssistida.de(operacao, mapeador));
+                .body(RespostaDaConfirmacaoAssistida.de(resultado, mapeador));
     }
 
     @PostMapping("/operacoes/confirmacao")
-    public ResponseEntity<RespostaDeOperacaoAssistida> confirmarEAplicar(
+    public ResponseEntity<RespostaDaConfirmacaoAssistida> confirmarEAplicar(
             @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
-        var operacao = aplicacao.confirmarEAplicar(requisicao.codigo(),
+        var resultado = aplicacao.confirmarComResultado(requisicao.codigo(),
                 requisicao.metodo(), requisicao.identificadorDoBot(),
                 requisicao.identificadorDoTelegram(),
                 requisicao.identificadorDoChat(),
                 requisicao.identificadorDaSessao(),
                 requisicao.identificadorDoUpdate());
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(RespostaDeOperacaoAssistida.de(operacao, mapeador));
+                .body(RespostaDaConfirmacaoAssistida.de(resultado, mapeador));
     }
 }

@@ -89,9 +89,18 @@ O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas o
   integrador, provisionador e broker;
 - `RUNBOOK.md`: implantacao, operacao e resposta a incidentes.
 
-## Limites desta sprint
+## Capacidades consolidadas
 
-O Gateway nao recebe ferramentas de escrita e nao possui adaptador de anexos, voz ou confirmacao. Provisionar o processo OpenClaw nao habilita a feature flag do backend. Consultas conversacionais, atalhos e operacoes assistidas pertencem as sprints seguintes.
+O Gateway consulta dados atuais, prepara operacoes de estudo e planejamento,
+valida cadastro estruturado de concursos e encaminha confirmacoes ao adaptador
+confiavel. Ativacao, arquivamento e cancelamento exigem dois codigos no mesmo
+Telegram e sessao. O modelo nunca recebe ferramenta direta de aplicacao.
+
+Anexos disponibilizados pelo canal sao tratados como conteudo nao confiavel e
+somente podem originar DTO fechado; o agente nao possui navegador ou filesystem.
+Voz e validacao com Telegram real dependem das credenciais locais e fazem parte
+da ativacao operacional. Provisionar o OpenClaw nao altera a feature flag do
+backend automaticamente.
 
 Execute a porta local com:
 

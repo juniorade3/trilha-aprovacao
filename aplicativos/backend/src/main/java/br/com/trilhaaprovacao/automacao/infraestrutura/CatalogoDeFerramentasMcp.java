@@ -5,6 +5,7 @@ import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAuditoriaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeCadastroAssistidoDeConcursos;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeConsultasMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesCriticasMcp;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
@@ -36,16 +37,19 @@ public class CatalogoDeFerramentasMcp {
     private final ServicoDeConsultasMcp consultas;
     private final ServicoDePreparacoesMcp preparacoes;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
+    private final ServicoDeOperacoesCriticasMcp operacoesCriticas;
     private final ServicoDeAuditoriaMcp auditoria;
     private final ObjectMapper mapeador;
 
     public CatalogoDeFerramentasMcp(ServicoDeConsultasMcp consultas,
             ServicoDePreparacoesMcp preparacoes,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
+            ServicoDeOperacoesCriticasMcp operacoesCriticas,
             ServicoDeAuditoriaMcp auditoria, ObjectMapper mapeador) {
         this.consultas = consultas;
         this.preparacoes = preparacoes;
         this.cadastroDeConcursos = cadastroDeConcursos;
+        this.operacoesCriticas = operacoesCriticas;
         this.auditoria = auditoria;
         this.mapeador = mapeador;
     }
@@ -174,7 +178,26 @@ public class CatalogoDeFerramentasMcp {
                         esquemaDosDadosDoCadastroAssistido(),
                         "concursos:ler",
                         (contexto, argumentos) -> cadastroDeConcursos.validar(
-                                contexto, argumentos)));
+                                contexto, argumentos)),
+                critica("preparar_ativacao_do_concurso",
+                        "Prepara ativacao com confirmacao reforcada.",
+                        "ATIVACAO_DO_CONCURSO"),
+                critica("preparar_arquivamento_do_concurso",
+                        "Prepara arquivamento com confirmacao reforcada.",
+                        "ARQUIVAMENTO_DO_CONCURSO"),
+                critica("preparar_cancelamento_do_concurso",
+                        "Prepara cancelamento com confirmacao reforcada.",
+                        "CANCELAMENTO_DO_CONCURSO"));
+    }
+
+    private McpStatelessServerFeatures.SyncToolSpecification critica(
+            String nome, String descricao, String tipo) {
+        return ferramentaDePreparacao(nome, descricao,
+                objeto(Map.of("identificadorDoConcurso", uuid()),
+                        List.of("identificadorDoConcurso")),
+                esquemaDosDadosDaOperacaoCritica(), "operacoes:preparar",
+                (contexto, argumentos) -> operacoesCriticas.preparar(
+                        tipo, contexto, argumentos));
     }
 
     private McpStatelessServerFeatures.SyncToolSpecification cadastro(
@@ -547,6 +570,22 @@ public class CatalogoDeFerramentasMcp {
                 Map.entry("conflitos", lista(Map.of("type", "object"),
                         100_000)),
                 Map.entry("aviso", texto(1_000))), List.of());
+    }
+
+    private Map<String, Object> esquemaDosDadosDaOperacaoCritica() {
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDaOperacao", uuid()),
+                Map.entry("tipo", texto(100)),
+                Map.entry("estado", texto(100)),
+                Map.entry("nivelDeConfirmacao", constante("REFORCADA")),
+                Map.entry("impacto", texto(1_000)),
+                Map.entry("codigoDeConfirmacao", texto(8)),
+                Map.entry("fraseDeConfirmacao", texto(30)),
+                Map.entry("aviso", texto(1_000)),
+                Map.entry("expiraEm", dataHora())),
+                List.of("identificadorDaOperacao", "estado",
+                        "nivelDeConfirmacao", "codigoDeConfirmacao",
+                        "fraseDeConfirmacao"));
     }
 
     private Map<String, Object> esquemaDaEvidencia() {

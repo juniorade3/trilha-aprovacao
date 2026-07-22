@@ -123,6 +123,18 @@ public class ServicoDaEstruturaDeConcursos {
     }
 
     @Transactional
+    public Concurso cancelarConcurso(UUID usuario, UUID identificador) {
+        ConcursoPersistido persistido = concursoPersistido(usuario, identificador);
+        Concurso atual = persistido.paraDominio();
+        Concurso cancelado = regra("CONCURSO_INVALIDO", () -> atual.alterar(
+                atual.nome(), atual.descricao(), atual.orgao(), atual.banca(),
+                SituacaoDoConcurso.CANCELADO, atual.dataPrevistaPrincipal())
+                .definirAtivacao(false));
+        persistido.atualizarDe(cancelado);
+        return persistido.paraDominio();
+    }
+
+    @Transactional
     public Concurso definirArquivamentoDoConcurso(
             UUID usuario, UUID identificador, boolean arquivado) {
         ConcursoPersistido persistido = concursoPersistido(usuario, identificador);

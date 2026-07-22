@@ -52,6 +52,9 @@ Nao use symlinks, nao coloque esses caminhos dentro do checkout e nao versione c
 
 ## 2. Validar e iniciar
 
+Antes de iniciar, substitua `PREENCHA_COM_SUA_OPENAI_API_KEY` no arquivo local
+de segredos. Nunca use esse marcador em um ambiente ativo.
+
 ```bash
 infraestrutura/openclaw/scripts/validar.sh
 

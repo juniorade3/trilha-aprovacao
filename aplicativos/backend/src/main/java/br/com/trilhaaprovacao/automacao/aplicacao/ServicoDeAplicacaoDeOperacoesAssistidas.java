@@ -8,11 +8,13 @@ import br.com.trilhaaprovacao.automacao.infraestrutura.OperacaoAssistidaPersisti
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeVinculosDeCanal;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
+import br.com.trilhaaprovacao.automacao.infraestrutura.MetricasDaAutomacao;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
 import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;
 import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
+import br.com.trilhaaprovacao.concursos.aplicacao.ServicoDaEstruturaDeConcursos;
 import br.com.trilhaaprovacao.evidencias.aplicacao.DadosDaEvidencia;
 import br.com.trilhaaprovacao.evidencias.dominio.DadosDoPadraoDeErro;
 import br.com.trilhaaprovacao.planejamento.aplicacao.DisponibilidadeInformada;
@@ -53,7 +55,14 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private final ServicoDeGeracaoDeterministica geracao;
     private final ServicoDeReplanejamento replanejamento;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
+    private final ServicoDaEstruturaDeConcursos estruturaDeConcursos;
     private final ObjectMapper mapeador;
+    private final MetricasDaAutomacao metricas;
+
+    public record ResultadoDaConfirmacao(
+            OperacaoAssistida operacao, String proximoCodigo) {
+        public boolean exigeNovaConfirmacao() { return proximoCodigo != null; }
+    }
 
     public ServicoDeAplicacaoDeOperacoesAssistidas(
             RepositorioDeOperacoesAssistidas operacoes,
@@ -66,7 +75,8 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             ServicoDeGeracaoDeterministica geracao,
             ServicoDeReplanejamento replanejamento,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
-            ObjectMapper mapeador) {
+            ServicoDaEstruturaDeConcursos estruturaDeConcursos,
+            ObjectMapper mapeador, MetricasDaAutomacao metricas) {
         this.operacoes = operacoes;
         this.vinculos = vinculos;
         this.servicoDeOperacoes = servicoDeOperacoes;
@@ -77,12 +87,22 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         this.geracao = geracao;
         this.replanejamento = replanejamento;
         this.cadastroDeConcursos = cadastroDeConcursos;
+        this.estruturaDeConcursos = estruturaDeConcursos;
         this.mapeador = mapeador;
+        this.metricas = metricas;
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public OperacaoAssistida confirmarEAplicar(String codigo, String metodo,
             long bot, long telegram, long chat, String sessao, String update) {
+        return confirmarComResultado(codigo, metodo, bot, telegram, chat,
+                sessao, update).operacao();
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public ResultadoDaConfirmacao confirmarComResultado(String codigo,
+            String metodo, long bot, long telegram, long chat, String sessao,
+            String update) {
         String normalizado = codigo == null ? "" : codigo.trim().toUpperCase();
         var vinculo = vinculos
                 .findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatAndEstado(
@@ -99,12 +119,20 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                 .orElseThrow(() -> new RecursoNaoEncontrado(
                         "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
                         "Operacao assistida nao encontrada."));
-        return confirmarEAplicar(operacao.paraDominio().identificador(),
+        return confirmarComResultado(operacao.paraDominio().identificador(),
                 normalizado, metodo, bot, telegram, chat, sessao, update);
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public OperacaoAssistida confirmarEAplicar(UUID identificador,
+            String codigo, String metodo, long bot, long telegram, long chat,
+            String sessao, String update) {
+        return confirmarComResultado(identificador, codigo, metodo, bot,
+                telegram, chat, sessao, update).operacao();
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public ResultadoDaConfirmacao confirmarComResultado(UUID identificador,
             String codigo, String metodo, long bot, long telegram, long chat,
             String sessao, String update) {
         if (codigo == null || !CODIGO.matcher(codigo.trim().toUpperCase()).matches()
@@ -138,7 +166,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                     "Operacao assistida nao encontrada.");
         }
         if (operacao.estado() == EstadoDaOperacaoAssistida.APLICADA) {
-            return operacao;
+            return new ResultadoDaConfirmacao(operacao, null);
         }
         OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
         String informado = codigo.trim().toUpperCase();
@@ -154,6 +182,20 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                 operacao.identificadorDoUsuario(), proposta);
         servicoDeOperacoes.validarAtualidade(operacao.identificadorDoUsuario(),
                 operacao.identificador(), operacao.assinatura(), json(atuais));
+        if ("REFORCADA".equals(persistida.nivelDeConfirmacao())
+                && persistida.etapaDaConfirmacao() == 0) {
+            String segundoCodigo = segredos.derivarCodigoDeConfirmacao(
+                    "segunda-etapa:" + operacao.assinatura());
+            persistida.registrarContextoDaConfirmacao(metodo, bot, telegram,
+                    chat, sessao, update);
+            persistida.definirConfirmacao(segredos.hash(segundoCodigo),
+                    segundoCodigo.substring(0, 2),
+                    segredos.hash("segunda-etapa:nonce:" + operacao.assinatura()),
+                    operacao.expiraEm(), "REFORCADA", 1);
+            operacoes.saveAndFlush(persistida);
+            metricas.registrarPrimeiraConfirmacaoReforcada();
+            return new ResultadoDaConfirmacao(operacao, segundoCodigo);
+        }
         operacao.confirmar(operacao.assinatura(), agora);
         persistida.atualizarDe(operacao);
         persistida.registrarContextoDaConfirmacao(metodo, bot, telegram, chat,
@@ -161,8 +203,10 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         operacoes.saveAndFlush(persistida);
         Map<String, Object> resultado = aplicar(operacao, proposta);
         operacao.aplicar(json(resultado), OffsetDateTime.now(ZoneOffset.UTC));
+        metricas.registrarAplicacao();
         persistida.atualizarDe(operacao);
-        return operacoes.saveAndFlush(persistida).paraDominio();
+        return new ResultadoDaConfirmacao(
+                operacoes.saveAndFlush(persistida).paraDominio(), null);
     }
 
     private Map<String, Object> aplicar(OperacaoAssistida operacao,
@@ -230,6 +274,15 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             case "CADASTRO_DO_CONCURSO", "CATALOGO_DE_CONTEUDOS",
                     "CONTEUDO_PROGRAMATICO", "MAPEAMENTOS_DO_EDITAL" ->
                     cadastroDeConcursos.aplicar(usuario, proposta);
+            case "ATIVACAO_DO_CONCURSO" ->
+                    estruturaDeConcursos.ativarConcurso(usuario,
+                            uuid(proposta, "identificadorDoConcurso"));
+            case "ARQUIVAMENTO_DO_CONCURSO" ->
+                    estruturaDeConcursos.definirArquivamentoDoConcurso(usuario,
+                            uuid(proposta, "identificadorDoConcurso"), true);
+            case "CANCELAMENTO_DO_CONCURSO" ->
+                    estruturaDeConcursos.cancelarConcurso(usuario,
+                            uuid(proposta, "identificadorDoConcurso"));
             default -> throw new IllegalArgumentException("Operacao desconhecida.");
         };
         return Map.of("tipo", operacao.tipo(), "dados",
