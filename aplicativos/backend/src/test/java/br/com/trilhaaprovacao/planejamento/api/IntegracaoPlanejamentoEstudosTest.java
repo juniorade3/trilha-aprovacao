@@ -93,16 +93,16 @@ class IntegracaoPlanejamentoEstudosTest {
                         .content(configuracaoDaPrevia()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dias[0].blocosPreservados.length()").value(1))
-                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(4))
+                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(3))
                 .andExpect(jsonPath("$.dias[0].capacidade.minutosDisponiveis").value(180))
                 .andExpect(jsonPath("$.dias[0].capacidade.minutosPreservados").value(60))
                 .andExpect(jsonPath("$.dias[0].capacidade.minutosSugeridos").value(120))
                 .andExpect(jsonPath("$.dias[0].capacidade.minutosLivres").value(0));
         api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
                         .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content(configuracaoDaAplicacao(false)))
+                        .content(configuracaoDaAplicacao(sessao, plano, false)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosCriados").value(4))
+                .andExpect(jsonPath("$.resumo.quantidadeDeBlocosCriados").value(3))
                 .andExpect(jsonPath("$.resumo.quantidadeDeBlocosPreservados").value(1));
 
         String ajustado = banco.queryForObject("""
@@ -149,7 +149,7 @@ class IntegracaoPlanejamentoEstudosTest {
 
         api.perform(post("/api/v1/planos-semanais/{id}/geracao-deterministica", plano)
                         .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content(configuracaoDaAplicacao(true)))
+                        .content(configuracaoDaAplicacao(sessao, plano, true)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resumo.quantidadeDeBlocosSubstituidos")
                         .value(geradosPurosAnteriores.size()))
@@ -179,7 +179,7 @@ class IntegracaoPlanejamentoEstudosTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("DIA_PLANEJADO"))
                 .andExpect(jsonPath("$.identificadorDoPlano").value(plano))
-                .andExpect(jsonPath("$.quantidadeDeBlocos").value(5))
+                .andExpect(jsonPath("$.quantidadeDeBlocos").value(4))
                 .andExpect(jsonPath("$.minutosPlanejados").value(180));
 
         iniciar(sessao, ajustado);
@@ -671,6 +671,7 @@ class IntegracaoPlanejamentoEstudosTest {
         UUID usuario = banco.queryForObject(
                 "SELECT identificador FROM usuarios WHERE email = ?", UUID.class, email);
         UUID concurso = UUID.randomUUID();
+        UUID edital = UUID.randomUUID();
         UUID cargo = UUID.randomUUID();
         UUID prova = UUID.randomUUID();
         UUID grupoA = UUID.randomUUID();
@@ -681,6 +682,11 @@ class IntegracaoPlanejamentoEstudosTest {
                 VALUES (?, ?, 'Concurso ativo', 'concurso ativo', 'PLANEJADO', TRUE,
                     now(), now(), 0)
                 """, concurso, usuario);
+        banco.update("""
+                INSERT INTO editais (identificador, concurso_id, titulo, principal,
+                    criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Edital principal', TRUE, now(), now(), 0)
+                """, edital, concurso);
         banco.update("""
                 INSERT INTO cargos_do_concurso (identificador, concurso_id, nome,
                     nome_normalizado, nivel_de_escolaridade, selecionado, ordem,
@@ -701,11 +707,40 @@ class IntegracaoPlanejamentoEstudosTest {
                 """, grupoA, prova, grupoB, prova);
         int ordem = 1;
         for (String materia : materias) {
+            UUID materiaDaProva = UUID.randomUUID();
             banco.update("""
                     INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
                         materia_id, ordem, criado_em, atualizado_em, versao)
                     VALUES (?, ?, ?::uuid, ?, now(), now(), 0)
-                    """, UUID.randomUUID(), grupoA, materia, ordem++);
+                    """, materiaDaProva, grupoA, materia, ordem);
+            List<UUID> existentes = banco.queryForList("""
+                    SELECT identificador FROM topicos_da_materia
+                    WHERE materia_id = ?::uuid AND arquivado = FALSE
+                    ORDER BY ordem, identificador LIMIT 1
+                    """, UUID.class, materia);
+            UUID topico = existentes.isEmpty() ? UUID.randomUUID() : existentes.getFirst();
+            if (existentes.isEmpty()) {
+                banco.update("""
+                        INSERT INTO topicos_da_materia (identificador, materia_id, nome,
+                            nome_normalizado, ordem, arquivado, criado_em, atualizado_em,
+                            versao)
+                        VALUES (?, ?::uuid, ?, ?, 1, FALSE, now(), now(), 0)
+                        """, topico, materia, "Topico automatico " + ordem,
+                        "topico automatico " + ordem);
+            }
+            UUID item = UUID.randomUUID();
+            banco.update("""
+                    INSERT INTO itens_do_edital (identificador, edital_id,
+                        materia_da_prova_id, descricao_original, ordem,
+                        criado_em, atualizado_em, versao)
+                    VALUES (?, ?, ?, ?, 1, now(), now(), 0)
+                    """, item, edital, materiaDaProva, "Item oficial " + ordem);
+            banco.update("""
+                    INSERT INTO mapeamentos_de_itens_do_edital (identificador,
+                        item_do_edital_id, topico_da_materia_id, confirmado, criado_em)
+                    VALUES (?, ?, ?, TRUE, now())
+                    """, UUID.randomUUID(), item, topico);
+            ordem++;
         }
         banco.update("""
                 INSERT INTO materias_da_prova (identificador, grupo_de_conteudo_id,
@@ -716,17 +751,29 @@ class IntegracaoPlanejamentoEstudosTest {
 
     private String configuracaoDaPrevia() {
         return """
-                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
-                 "duracaoDoBlocoDeRevisaoEmMinutos":20}
-                """;
+                {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50}
+                """.formatted(SEGUNDA);
     }
 
     private String configuracaoDaAplicacao(boolean substituir) {
         return """
-                {"duracaoPadraoDoBlocoPrincipalEmMinutos":50,
-                 "duracaoDoBlocoDeRevisaoEmMinutos":20,
-                 "substituirBlocosGerados":%s}
-                """.formatted(substituir);
+                {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50,
+                 "substituirBlocosGerados":%s,"assinaturaDaPrevia":"invalida"}
+                """.formatted(SEGUNDA, substituir);
+    }
+
+    private String configuracaoDaAplicacao(MockHttpSession sessao, String plano,
+            boolean substituir) throws Exception {
+        String previa = api.perform(post(
+                        "/api/v1/planos-semanais/{id}/geracao-deterministica/previa", plano)
+                        .session(sessao).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(configuracaoDaPrevia()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return """
+                {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50,
+                 "substituirBlocosGerados":%s,"assinaturaDaPrevia":"%s"}
+                """.formatted(SEGUNDA, substituir,
+                        json.readTree(previa).get("assinaturaDaPrevia").asString());
     }
 
     private String disponibilidades(int minutosDaSegunda) {

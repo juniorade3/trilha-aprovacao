@@ -7,6 +7,9 @@ import br.com.trilhaaprovacao.planejamento.dominio.DiaDaPreviaDaGeracao;
 import br.com.trilhaaprovacao.planejamento.dominio.JustificativaDaGeracao;
 import br.com.trilhaaprovacao.planejamento.dominio.PreviaDaGeracaoDaSemana;
 import br.com.trilhaaprovacao.planejamento.dominio.TipoDeAtividade;
+import br.com.trilhaaprovacao.priorizacao.dominio.FaixaDePriorizacao;
+import br.com.trilhaaprovacao.priorizacao.dominio.GrupoDePriorizacao;
+import br.com.trilhaaprovacao.planejamento.aplicacao.ResultadoDaPreviaDaGeracao;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -15,12 +18,15 @@ public record RespostaDaPreviaDaGeracao(
         UUID identificadorDoPlano,
         List<Dia> dias,
         List<Justificativa> avisos,
+        String assinaturaDaPrevia,
         boolean aplicada) {
 
-    public static RespostaDaPreviaDaGeracao de(PreviaDaGeracaoDaSemana previa) {
+    public static RespostaDaPreviaDaGeracao de(ResultadoDaPreviaDaGeracao resultado) {
+        PreviaDaGeracaoDaSemana previa = resultado.previa();
         return new RespostaDaPreviaDaGeracao(previa.identificadorDoPlano(),
                 previa.dias().stream().map(Dia::de).toList(),
-                previa.avisos().stream().map(Justificativa::de).toList(), false);
+                previa.avisos().stream().map(Justificativa::de).toList(),
+                resultado.assinaturaDaPrevia(), false);
     }
 
     public record Dia(
@@ -56,12 +62,17 @@ public record RespostaDaPreviaDaGeracao(
         }
     }
 
-    public record Sugestao(UUID identificadorDaMateria, String nomeDaMateria,
-            String titulo, TipoDeAtividade tipoDeAtividade, int duracaoEmMinutos,
+    public record Sugestao(UUID identificadorDaMateria, UUID identificadorDoTopico,
+            String nomeDaMateria, String nomeDoTopico, String titulo,
+            TipoDeAtividade tipoDeAtividade, GrupoDePriorizacao grupoDaPriorizacao,
+            FaixaDePriorizacao faixaDaPriorizacao, int duracaoEmMinutos,
             List<Justificativa> justificativas) {
         static Sugestao de(BlocoSugerido bloco) {
-            return new Sugestao(bloco.identificadorDaMateria(), bloco.nomeDaMateria(),
-                    bloco.titulo(), bloco.tipoDeAtividade(), bloco.duracaoEmMinutos(),
+            return new Sugestao(bloco.identificadorDaMateria(),
+                    bloco.identificadorDoTopico(), bloco.nomeDaMateria(),
+                    bloco.nomeDoTopico(), bloco.titulo(), bloco.tipoDeAtividade(),
+                    bloco.grupoDaPriorizacao(), bloco.faixaDaPriorizacao(),
+                    bloco.duracaoEmMinutos(),
                     bloco.justificativas().stream().map(Justificativa::de).toList());
         }
     }

@@ -67,6 +67,7 @@ const blocoDaJustificativa = ref<BlocoDeEstudo>()
 const replanejamentoAberto = ref(false)
 const historico = ref<HistoricoSemanal>()
 const botaoDoReplanejamento = ref<HTMLButtonElement>()
+const botaoDaGeracao = ref<HTMLButtonElement>()
 
 const nomesDosDias = [
   'Segunda-feira',
@@ -158,19 +159,21 @@ const pendenciasDaAtivacao = computed(() => {
   return pendencias
 })
 
-const quantidadeDeBlocosGerados = computed(
-  () =>
-    plano.value?.blocos.filter(
-      (bloco) => bloco.origem === 'GERADO_DETERMINISTICAMENTE',
-    ).length ?? 0,
-)
-
 const dataDeReferenciaDoReplanejamento = computed(() => {
   const hoje = paraIso(new Date())
   if (hoje < dataInicial.value) return dataInicial.value
   const domingo = adicionarDias(dataInicial.value, 6)
   return hoje > domingo ? domingo : hoje
 })
+
+const quantidadeDeBlocosGerados = computed(
+  () =>
+    plano.value?.blocos.filter(
+      (bloco) =>
+        bloco.origem === 'GERADO_DETERMINISTICAMENTE' &&
+        bloco.data >= dataDeReferenciaDoReplanejamento.value,
+    ).length ?? 0,
+)
 
 function formatarData(dataIso: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -357,12 +360,22 @@ async function atualizarPlano() {
   )
 }
 
-function concluirAplicacaoDaGeracao(resultado: ResultadoDaAplicacaoDaGeracao) {
+async function concluirAplicacaoDaGeracao(
+  resultado: ResultadoDaAplicacaoDaGeracao,
+) {
   plano.value = resultado.plano
   preencherFormulario(resultado.plano)
   geracaoAberta.value = false
   const resumo = resultado.resumo
   aviso.value = `${resumo.quantidadeDeBlocosCriados} bloco(s) aplicado(s). ${resumo.quantidadeDeBlocosSubstituidos} substituído(s) e ${resumo.quantidadeDeBlocosPreservados} preservado(s).`
+  await nextTick()
+  botaoDaGeracao.value?.focus()
+}
+
+async function fecharGeracao() {
+  geracaoAberta.value = false
+  await nextTick()
+  botaoDaGeracao.value?.focus()
 }
 
 async function concluirReplanejamento(
@@ -772,6 +785,7 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
           class="acoes-do-plano-semanal d-flex gap-2"
         >
           <button
+            ref="botaoDaGeracao"
             class="btn btn-outline-primary"
             type="button"
             @click="geracaoAberta = true"
@@ -1064,10 +1078,11 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
 
     <GavetaDeGeracaoDeterministica
       v-if="geracaoAberta && plano"
-      :key="plano.identificador"
+      :key="`${plano.identificador}-${dataDeReferenciaDoReplanejamento}`"
       :identificador-do-plano="plano.identificador"
+      :data-de-referencia="dataDeReferenciaDoReplanejamento"
       :quantidade-de-blocos-gerados="quantidadeDeBlocosGerados"
-      @fechar="geracaoAberta = false"
+      @fechar="fecharGeracao"
       @aplicado="concluirAplicacaoDaGeracao"
     />
 

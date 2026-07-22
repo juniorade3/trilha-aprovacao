@@ -34,17 +34,28 @@ public final class DistribuidorDeterministicoDeCapacidade {
         public Set<UUID> materias() { return Set.copyOf(materias); }
 
         public boolean comporta(UUID materia, int minutos) {
+            return comporta(materia, minutos, true);
+        }
+
+        public boolean comporta(UUID materia, int minutos,
+                boolean contaParaLimiteDeMaterias) {
             return minutos > 0 && minutos <= minutosLivres()
-                    && (materia == null || materias.contains(materia)
+                    && (!contaParaLimiteDeMaterias || materia == null
+                    || materias.contains(materia)
                     || materias.size() < LIMITE_DE_MATERIAS);
         }
 
         public void alocar(UUID materia, int minutos) {
-            if (!comporta(materia, minutos)) {
+            alocar(materia, minutos, true);
+        }
+
+        public void alocar(UUID materia, int minutos,
+                boolean contaParaLimiteDeMaterias) {
+            if (!comporta(materia, minutos, contaParaLimiteDeMaterias)) {
                 throw new IllegalArgumentException("A alocacao excede a capacidade do dia.");
             }
             minutosOcupados += minutos;
-            if (materia != null) materias.add(materia);
+            if (contaParaLimiteDeMaterias && materia != null) materias.add(materia);
         }
     }
 }

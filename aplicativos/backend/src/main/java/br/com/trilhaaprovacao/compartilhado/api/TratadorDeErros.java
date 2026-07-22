@@ -6,6 +6,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -47,6 +49,25 @@ public class TratadorDeErros {
     ResponseEntity<RespostaDeErro> tratarConcorrencia(HttpServletRequest requisicao) {
         return resposta(HttpStatus.CONFLICT, "DADO_ALTERADO_CONCORRENTEMENTE",
                 "O registro foi alterado por outra operacao. Atualize os dados e tente novamente.", List.of(), requisicao);
+    }
+
+    @ExceptionHandler({CannotSerializeTransactionException.class,
+            PessimisticLockingFailureException.class})
+    ResponseEntity<RespostaDeErro> tratarConcorrenciaTransacional(
+            HttpServletRequest requisicao) {
+        if (requisicao.getRequestURI().endsWith("/geracao-deterministica")) {
+            return resposta(HttpStatus.CONFLICT, "PREVIA_DA_GERACAO_DESATUALIZADA",
+                    "A previa mudou. Recalcule e confirme a nova proposta antes de aplicar.",
+                    List.of(), requisicao);
+        }
+        if (requisicao.getRequestURI().endsWith("/replanejamento")) {
+            return resposta(HttpStatus.CONFLICT, "PREVIA_DE_REPLANEJAMENTO_DESATUALIZADA",
+                    "A previa mudou. Recalcule e confirme a nova proposta antes de aplicar.",
+                    List.of(), requisicao);
+        }
+        return resposta(HttpStatus.CONFLICT, "DADO_ALTERADO_CONCORRENTEMENTE",
+                "Os dados mudaram durante a operacao. Atualize e tente novamente.",
+                List.of(), requisicao);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

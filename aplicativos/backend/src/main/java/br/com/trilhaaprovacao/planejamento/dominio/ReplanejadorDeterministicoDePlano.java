@@ -84,7 +84,10 @@ public final class ReplanejadorDeterministicoDePlano {
             } else {
                 ocupados += bloco.duracaoPrevistaEmMinutos();
             }
-            if (bloco.identificadorDaMateria() != null) materias.add(bloco.identificadorDaMateria());
+            if (bloco.identificadorDaMateria() != null
+                    && bloco.tipoDeAtividade() != TipoDeAtividade.REVISAO) {
+                materias.add(bloco.identificadorDaMateria());
+            }
         }
         return new DistribuidorDeterministicoDeCapacidade.Dia(disponibilidade.data(),
                 disponibilidade.minutosDisponiveis(), ocupados, materias);
@@ -127,9 +130,11 @@ public final class ReplanejadorDeterministicoDePlano {
     private Proposta tentarInteira(Pendencia pendencia,
             Map<LocalDate, DistribuidorDeterministicoDeCapacidade.Dia> dias) {
         for (var dia : dias.values()) {
+            boolean contaComoMateria = contaParaLimiteDeMaterias(pendencia.bloco());
             if (dia.comporta(pendencia.bloco().identificadorDaMateria(),
-                    pendencia.minutosPendentes())) {
-                dia.alocar(pendencia.bloco().identificadorDaMateria(), pendencia.minutosPendentes());
+                    pendencia.minutosPendentes(), contaComoMateria)) {
+                dia.alocar(pendencia.bloco().identificadorDaMateria(),
+                        pendencia.minutosPendentes(), contaComoMateria);
                 boolean confirma = pendencia.bloco().quantidadeDeReagendamentos() == 3;
                 return new Proposta(pendencia, Decisao.ADIAR,
                         List.of(new Fragmento(dia.data(), pendencia.minutosPendentes(), 1)),
@@ -146,9 +151,11 @@ public final class ReplanejadorDeterministicoDePlano {
         }
         List<AlocacaoTemporaria> temporarias = new ArrayList<>();
         int restante = pendencia.minutosPendentes();
+        boolean contaComoMateria = contaParaLimiteDeMaterias(pendencia.bloco());
         for (var dia : dias.values()) {
             if (!dia.comporta(pendencia.bloco().identificadorDaMateria(),
-                    DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA)) continue;
+                    DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA,
+                    contaComoMateria)) continue;
             int minutos = Math.min(restante, dia.minutosLivres());
             int sobra = restante - minutos;
             if (sobra > 0 && sobra < DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA) {
@@ -164,12 +171,17 @@ public final class ReplanejadorDeterministicoDePlano {
         List<Fragmento> fragmentos = new ArrayList<>();
         int sequencia = 1;
         for (AlocacaoTemporaria temporaria : temporarias) {
-            temporaria.dia().alocar(pendencia.bloco().identificadorDaMateria(), temporaria.minutos());
+            temporaria.dia().alocar(pendencia.bloco().identificadorDaMateria(),
+                    temporaria.minutos(), contaComoMateria);
             fragmentos.add(new Fragmento(temporaria.dia().data(), temporaria.minutos(), sequencia++));
         }
         return new Proposta(pendencia, Decisao.DIVIDIR, fragmentos, 0,
                 pendencia.bloco().quantidadeDeReagendamentos() == 3,
                 "Pendencia dividida integralmente em fragmentos de ao menos 25 minutos.");
+    }
+
+    private boolean contaParaLimiteDeMaterias(BlocoDeEstudo bloco) {
+        return bloco.tipoDeAtividade() != TipoDeAtividade.REVISAO;
     }
 
     private record AlocacaoTemporaria(DistribuidorDeterministicoDeCapacidade.Dia dia,

@@ -71,8 +71,15 @@ public record BlocoDeEstudo(
     public static BlocoDeEstudo criarGerado(UUID plano, UUID materia,
             String titulo, TipoDeAtividade tipo, LocalDate data, int duracao,
             int ordem, String justificativaDaGeracao) {
+        return criarGerado(plano, materia, null, titulo, tipo, data, duracao,
+                ordem, justificativaDaGeracao);
+    }
+
+    public static BlocoDeEstudo criarGerado(UUID plano, UUID materia, UUID topico,
+            String titulo, TipoDeAtividade tipo, LocalDate data, int duracao,
+            int ordem, String justificativaDaGeracao) {
         OffsetDateTime agora = OffsetDateTime.now();
-        return new BlocoDeEstudo(UUID.randomUUID(), plano, materia, null,
+        return new BlocoDeEstudo(UUID.randomUUID(), plano, materia, topico,
                 titulo, tipo, data, duracao, ordem, null, null,
                 OrigemDoBlocoDeEstudo.GERADO_DETERMINISTICAMENTE,
                 justificativaDaGeracao, null, EstadoDoBlocoDeEstudo.PLANEJADO,

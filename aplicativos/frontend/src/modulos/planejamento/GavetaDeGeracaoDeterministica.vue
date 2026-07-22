@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
@@ -17,6 +17,7 @@ import {
 
 const propriedades = defineProps<{
   identificadorDoPlano: string
+  dataDeReferencia: string
   quantidadeDeBlocosGerados: number
 }>()
 const emitir = defineEmits<{
@@ -28,15 +29,22 @@ const etapa = ref<'PRIORIDADES' | 'CONFIGURACAO' | 'PREVIA'>('PRIORIDADES')
 const materias = ref<MateriaParaGeracao[]>([])
 const previa = ref<PreviaDaGeracao>()
 const duracaoPrincipal = ref(50)
-const duracaoDaRevisao = ref(20)
 const carregando = ref(true)
 const processando = ref(false)
 const erro = ref('')
+const avisoDePreviaRecalculada = ref('')
 const confirmacaoDeRegeneracaoAberta = ref(false)
-const assinaturaDaPrevia = ref('')
+const assinaturaLocalDaPrevia = ref('')
 const assinaturaDasPrioridadesSalvas = ref('')
+const substituirNaUltimaAplicacao = ref(false)
+const botaoDeAplicacao = ref<HTMLButtonElement>()
+const alertaDeErro = ref<HTMLDivElement>()
 const operacaoParaTentarNovamente = ref<
-  'CARREGAR_MATERIAS' | 'SALVAR_PRIORIDADES' | 'CALCULAR_PREVIA' | 'APLICAR'
+  | 'CARREGAR_MATERIAS'
+  | 'SALVAR_PRIORIDADES'
+  | 'CALCULAR_PREVIA'
+  | 'RECALCULAR_PREVIA_DESATUALIZADA'
+  | 'APLICAR'
 >()
 
 const rotulos: Record<PrioridadeDaMateriaNoPlano, string> = {
@@ -45,6 +53,32 @@ const rotulos: Record<PrioridadeDaMateriaNoPlano, string> = {
   BAIXA: 'Baixa',
   NAO_INCLUIR: 'Não incluir',
 }
+
+const rotulosDosTipos = {
+  TEORIA: 'Teoria',
+  QUESTOES: 'Questões',
+  REVISAO: 'Revisão',
+  CADERNO_DE_ERROS: 'Caderno de erros',
+  SIMULADO: 'Simulado',
+  DISCURSIVA: 'Discursiva',
+  OUTRA: 'Outra',
+} as const
+
+const rotulosDosGrupos = {
+  LACUNA: 'Lacuna',
+  FRAQUEZA: 'Fraqueza',
+  CONSOLIDADO: 'Consolidado',
+} as const
+
+const rotulosDasFaixas = {
+  SEM_ESTUDO: 'Sem estudo',
+  SEM_EVIDENCIA: 'Sem evidência',
+  EVIDENCIA_DESATUALIZADA: 'Evidência desatualizada',
+  DADOS_INSUFICIENTES: 'Dados insuficientes',
+  PRECISA_REFORCO: 'Precisa de reforço',
+  DESEMPENHO_PARCIAL: 'Desempenho parcial',
+  CONSOLIDADO: 'Consolidado',
+} as const
 
 function prioridadesOrdenadas() {
   return materias.value
@@ -65,8 +99,8 @@ function criarAssinaturaDasPrioridades() {
 
 function criarAssinaturaDaPrevia() {
   return JSON.stringify({
+    dataDeReferencia: propriedades.dataDeReferencia,
     duracaoPrincipal: Number(duracaoPrincipal.value),
-    duracaoDaRevisao: Number(duracaoDaRevisao.value),
     prioridades: prioridadesOrdenadas(),
   })
 }
@@ -79,7 +113,7 @@ const prioridadesNaoSalvas = computed(
 const previaDesatualizada = computed(
   () =>
     Boolean(previa.value) &&
-    assinaturaDaPrevia.value !== criarAssinaturaDaPrevia(),
+    assinaturaLocalDaPrevia.value !== criarAssinaturaDaPrevia(),
 )
 
 function limparErro() {
@@ -91,7 +125,11 @@ function registrarErro(
   causa: unknown,
   mensagemPadrao: string,
   operacao:
-    'CARREGAR_MATERIAS' | 'SALVAR_PRIORIDADES' | 'CALCULAR_PREVIA' | 'APLICAR',
+    | 'CARREGAR_MATERIAS'
+    | 'SALVAR_PRIORIDADES'
+    | 'CALCULAR_PREVIA'
+    | 'RECALCULAR_PREVIA_DESATUALIZADA'
+    | 'APLICAR',
 ) {
   erro.value = causa instanceof Error ? causa.message : mensagemPadrao
   operacaoParaTentarNovamente.value = operacao
@@ -140,6 +178,19 @@ async function salvarPrioridades() {
   }
 }
 
+async function solicitarPrevia(mensagemAposCalculo = '') {
+  const duracaoPrincipalSolicitada = Number(duracaoPrincipal.value)
+  const assinaturaSolicitada = criarAssinaturaDaPrevia()
+  previa.value = await gerarPreviaDeterministica(
+    propriedades.identificadorDoPlano,
+    propriedades.dataDeReferencia,
+    duracaoPrincipalSolicitada,
+  )
+  assinaturaLocalDaPrevia.value = assinaturaSolicitada
+  avisoDePreviaRecalculada.value = mensagemAposCalculo
+  etapa.value = 'PREVIA'
+}
+
 async function calcularPrevia() {
   if (prioridadesNaoSalvas.value) {
     erro.value = 'Salve as prioridades antes de calcular uma nova prévia.'
@@ -148,17 +199,9 @@ async function calcularPrevia() {
   }
   processando.value = true
   limparErro()
-  const duracaoPrincipalSolicitada = Number(duracaoPrincipal.value)
-  const duracaoDaRevisaoSolicitada = Number(duracaoDaRevisao.value)
-  const assinaturaSolicitada = criarAssinaturaDaPrevia()
+  avisoDePreviaRecalculada.value = ''
   try {
-    previa.value = await gerarPreviaDeterministica(
-      propriedades.identificadorDoPlano,
-      duracaoPrincipalSolicitada,
-      duracaoDaRevisaoSolicitada,
-    )
-    assinaturaDaPrevia.value = assinaturaSolicitada
-    etapa.value = 'PREVIA'
+    await solicitarPrevia()
   } catch (causa) {
     registrarErro(
       causa,
@@ -170,6 +213,41 @@ async function calcularPrevia() {
   }
 }
 
+function invalidarPrevia() {
+  previa.value = undefined
+  assinaturaLocalDaPrevia.value = ''
+  avisoDePreviaRecalculada.value = ''
+  etapa.value = 'CONFIGURACAO'
+}
+
+async function recalcularPreviaDesatualizada() {
+  invalidarPrevia()
+  processando.value = true
+  limparErro()
+  let recalculada = false
+  try {
+    materias.value = await listarMateriasParaGeracao(
+      propriedades.identificadorDoPlano,
+    )
+    assinaturaDasPrioridadesSalvas.value = criarAssinaturaDasPrioridades()
+    await solicitarPrevia(
+      'A prévia mudou porque os dados do planejamento foram atualizados. Revise a nova proposta e confirme novamente para aplicar.',
+    )
+    recalculada = true
+  } catch (causa) {
+    registrarErro(
+      causa,
+      'Não foi possível recalcular a prévia atualizada.',
+      'RECALCULAR_PREVIA_DESATUALIZADA',
+    )
+  } finally {
+    processando.value = false
+    await nextTick()
+    if (recalculada) botaoDeAplicacao.value?.focus()
+    else alertaDeErro.value?.focus()
+  }
+}
+
 async function aplicar(substituirBlocosGerados: boolean) {
   if (!previa.value || previaDesatualizada.value) {
     erro.value = 'Recalcule a prévia antes de aplicar.'
@@ -178,12 +256,14 @@ async function aplicar(substituirBlocosGerados: boolean) {
   }
   processando.value = true
   limparErro()
+  substituirNaUltimaAplicacao.value = substituirBlocosGerados
   try {
     const resultado = await aplicarGeracaoDeterministica(
       propriedades.identificadorDoPlano,
+      propriedades.dataDeReferencia,
       Number(duracaoPrincipal.value),
-      Number(duracaoDaRevisao.value),
       substituirBlocosGerados,
+      previa.value.assinaturaDaPrevia,
     )
     confirmacaoDeRegeneracaoAberta.value = false
     emitir('aplicado', resultado)
@@ -194,6 +274,13 @@ async function aplicar(substituirBlocosGerados: boolean) {
       causa.codigo === 'GERACAO_DETERMINISTICA_JA_APLICADA'
     ) {
       confirmacaoDeRegeneracaoAberta.value = true
+    } else if (
+      causa instanceof ErroDaApi &&
+      causa.status === 409 &&
+      causa.codigo === 'PREVIA_DA_GERACAO_DESATUALIZADA'
+    ) {
+      confirmacaoDeRegeneracaoAberta.value = false
+      await recalcularPreviaDesatualizada()
     } else {
       confirmacaoDeRegeneracaoAberta.value = false
       registrarErro(causa, 'Não foi possível aplicar a geração.', 'APLICAR')
@@ -214,8 +301,11 @@ async function tentarNovamente() {
     case 'CALCULAR_PREVIA':
       await calcularPrevia()
       break
+    case 'RECALCULAR_PREVIA_DESATUALIZADA':
+      await recalcularPreviaDesatualizada()
+      break
     case 'APLICAR':
-      await aplicar(false)
+      await aplicar(substituirNaUltimaAplicacao.value)
       break
     default:
       await carregarMaterias()
@@ -272,7 +362,13 @@ onMounted(carregarMaterias)
       </button>
     </nav>
 
-    <div v-if="erro" class="alert alert-danger" role="alert">
+    <div
+      v-if="erro"
+      ref="alertaDeErro"
+      class="alert alert-danger"
+      role="alert"
+      tabindex="-1"
+    >
       {{ erro }}
       <button
         v-if="operacaoParaTentarNovamente"
@@ -327,7 +423,10 @@ onMounted(carregarMaterias)
       aria-labelledby="titulo-configuracao"
     >
       <h3 id="titulo-configuracao">Configuração dos blocos</h3>
-      <p>O cálculo respeita a disponibilidade e os blocos já existentes.</p>
+      <p>
+        O cálculo respeita a disponibilidade, os blocos já existentes e reserva
+        automaticamente as revisões devidas em blocos de 20 minutos.
+      </p>
       <div class="grade-da-configuracao">
         <label>
           <span>Duração principal</span>
@@ -340,18 +439,6 @@ onMounted(carregarMaterias)
             required
           />
           <small>Entre 25 e 180 minutos.</small>
-        </label>
-        <label>
-          <span>Duração da revisão</span>
-          <input
-            v-model.number="duracaoDaRevisao"
-            class="form-control"
-            type="number"
-            min="0"
-            max="120"
-            required
-          />
-          <small>Use zero para não sugerir revisão.</small>
         </label>
       </div>
       <div class="d-flex gap-2">
@@ -366,7 +453,7 @@ onMounted(carregarMaterias)
           class="btn btn-primary flex-grow-1"
           type="button"
           :disabled="processando"
-          @click="calcularPrevia"
+          @click="calcularPrevia()"
         >
           {{ processando ? 'Calculando…' : 'Calcular prévia' }}
         </button>
@@ -396,8 +483,17 @@ onMounted(carregarMaterias)
         role="status"
         aria-live="polite"
       >
-        <strong>Prévia desatualizada.</strong> Prioridades ou durações mudaram.
-        Recalcule antes de aplicar.
+        <strong>Prévia desatualizada.</strong> Prioridades ou a configuração
+        mudaram. Recalcule antes de aplicar.
+      </div>
+      <div
+        v-if="avisoDePreviaRecalculada"
+        class="alert alert-warning"
+        role="status"
+        aria-live="assertive"
+      >
+        <strong>Prévia recalculada.</strong>
+        {{ avisoDePreviaRecalculada }}
       </div>
       <div
         v-for="aviso in previa.avisos"
@@ -431,20 +527,33 @@ onMounted(carregarMaterias)
             :key="bloco.identificador"
             class="bloco-da-previa preservado"
           >
-            <span>Preservado</span><strong>{{ bloco.titulo }}</strong
-            ><small>{{ bloco.duracaoEmMinutos }} min</small>
+            <span
+              >Preservado · {{ rotulosDosTipos[bloco.tipoDeAtividade] }}</span
+            ><strong>{{ bloco.titulo }}</strong
+            ><small class="duracao-do-bloco"
+              >{{ bloco.duracaoEmMinutos }} min</small
+            >
           </div>
           <div
             v-for="(bloco, indice) in dia.blocosSugeridos"
             :key="`${dia.data}-${indice}`"
             class="bloco-da-previa sugerido"
           >
-            <span>{{
-              bloco.tipoDeAtividade === 'REVISAO' ? 'Revisão' : 'Sugestão'
-            }}</span>
-            <strong>{{ bloco.titulo }}</strong
-            ><small>{{ bloco.duracaoEmMinutos }} min</small>
-            <ul>
+            <span>{{ rotulosDosTipos[bloco.tipoDeAtividade] }}</span>
+            <strong>{{ bloco.nomeDoTopico || bloco.titulo }}</strong
+            ><small class="duracao-do-bloco"
+              >{{ bloco.duracaoEmMinutos }} min</small
+            >
+            <div class="contexto-do-bloco">
+              <span v-if="bloco.nomeDaMateria">{{ bloco.nomeDaMateria }}</span>
+              <span v-if="bloco.grupoDaPriorizacao" class="badge text-bg-light">
+                {{ rotulosDosGrupos[bloco.grupoDaPriorizacao] }}
+              </span>
+              <span v-if="bloco.faixaDaPriorizacao" class="badge text-bg-light">
+                {{ rotulosDasFaixas[bloco.faixaDaPriorizacao] }}
+              </span>
+            </div>
+            <ul class="justificativas-do-bloco">
               <li v-for="motivo in bloco.justificativas" :key="motivo.codigo">
                 {{ motivo.mensagem }}
               </li>
@@ -465,6 +574,7 @@ onMounted(carregarMaterias)
           O servidor recalculará esta proposta antes de salvar os blocos.
         </p>
         <button
+          ref="botaoDeAplicacao"
           class="btn btn-primary"
           type="button"
           :disabled="processando || previaDesatualizada"
@@ -489,13 +599,14 @@ onMounted(carregarMaterias)
     sobre-gaveta
     :descricao="
       propriedades.quantidadeDeBlocosGerados > 0
-        ? `${propriedades.quantidadeDeBlocosGerados} bloco(s) gerado(s) serão substituídos.`
-        : 'O servidor encontrou uma geração anterior. Os blocos puramente gerados serão substituídos.'
+        ? `${propriedades.quantidadeDeBlocosGerados} bloco(s) gerado(s) a partir da data de referência serão substituídos.`
+        : 'O servidor encontrou uma geração anterior. Os blocos puramente gerados a partir da data de referência serão substituídos.'
     "
     @fechar="confirmacaoDeRegeneracaoAberta = false"
   >
     <p class="mb-0">
-      Blocos manuais e blocos gerados que você já ajustou serão preservados.
+      Blocos anteriores à data de referência, blocos manuais e blocos gerados
+      que você já ajustou serão preservados.
     </p>
     <template #rodape>
       <button
@@ -558,7 +669,7 @@ onMounted(carregarMaterias)
 }
 .grade-da-configuracao {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 28rem);
   gap: 1rem;
   margin: 1.5rem 0;
 }
@@ -619,8 +730,19 @@ onMounted(carregarMaterias)
   text-transform: uppercase;
   font-weight: 700;
 }
-.bloco-da-previa ul {
+.contexto-do-bloco,
+.justificativas-do-bloco {
   grid-column: 2 / -1;
+}
+.contexto-do-bloco {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  color: #60716c;
+  font-size: 0.8rem;
+}
+.justificativas-do-bloco {
   margin: 0;
   padding-left: 1rem;
   color: #60716c;
@@ -659,7 +781,8 @@ onMounted(carregarMaterias)
   .bloco-da-previa > span {
     grid-column: 1 / -1;
   }
-  .bloco-da-previa ul {
+  .contexto-do-bloco,
+  .justificativas-do-bloco {
     grid-column: 1 / -1;
   }
   .acoes-da-aplicacao-da-geracao {

@@ -59,9 +59,15 @@ e o tipo `REVISAO`.
 A interface devera cobrir carregamento, lista vazia, sessao expirada e erro de
 rede com repeticao recuperavel, alem de navegacao por teclado e foco.
 
+## Integracao com a geracao semanal
+
+A Sprint 03 de priorizacao passou a consumir esta agenda na geracao semanal.
+As revisoes devidas sao blocos especificos de 20 minutos, reservados antes dos
+blocos principais, sem antecipacao ou divisao e sem estado persistido duplicado.
+As regras completas estao em
+`SELECAO-AUTOMATICA-E-INTEGRACAO-SEMANAL.md`.
+
 ## Limites desta entrega
 
-Esta etapa nao adia, dispensa nem suspende revisoes manualmente. Ela tambem nao
-persiste uma copia da agenda e nao altera a geracao deterministica ou a selecao
-automatica de topicos. A integracao da agenda com a geracao semanal pertence a
-Sprint 03 de priorizacao.
+A agenda nao adia, dispensa nem suspende revisoes manualmente e continua sem
+persistir uma copia de seu estado calculado.

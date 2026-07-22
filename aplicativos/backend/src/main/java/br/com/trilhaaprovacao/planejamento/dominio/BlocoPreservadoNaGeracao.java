@@ -7,6 +7,7 @@ import java.util.UUID;
 public record BlocoPreservadoNaGeracao(
         UUID identificador,
         UUID identificadorDaMateria,
+        UUID identificadorDoTopico,
         String nomeDaMateria,
         String titulo,
         TipoDeAtividade tipoDeAtividade,
@@ -21,6 +22,9 @@ public record BlocoPreservadoNaGeracao(
         Objects.requireNonNull(data);
         if (duracaoEmMinutos < 1 || ordem < 1) {
             throw new IllegalArgumentException("Bloco preservado invalido.");
+        }
+        if (identificadorDoTopico != null && identificadorDaMateria == null) {
+            throw new IllegalArgumentException("Topico preservado exige uma materia.");
         }
     }
 }
