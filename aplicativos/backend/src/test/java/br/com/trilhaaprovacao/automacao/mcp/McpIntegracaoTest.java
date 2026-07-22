@@ -112,7 +112,10 @@ class McpIntegracaoTest {
                             "preparar_catalogo_de_conteudos",
                             "preparar_conteudo_programatico",
                             "preparar_mapeamentos_do_edital",
-                            "validar_contexto_do_concurso");
+                            "validar_contexto_do_concurso",
+                            "preparar_ativacao_do_concurso",
+                            "preparar_arquivamento_do_concurso",
+                            "preparar_cancelamento_do_concurso");
             assertThat(ferramentas).allSatisfy(ferramenta -> {
                 assertThat(ferramenta.inputSchema())
                         .containsEntry("type", "object")

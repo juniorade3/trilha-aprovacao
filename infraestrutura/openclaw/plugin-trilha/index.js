@@ -20,6 +20,7 @@ const MENSAGENS = Object.freeze({
   usoConfirmacao: "Use /confirmar seguido do codigo exibido na previa.",
   confirmacaoInvalida: "O codigo de confirmacao nao possui o formato esperado.",
   confirmacaoAplicada: "Operacao confirmada e aplicada na Trilha.",
+  confirmacaoReforcada: "Primeira confirmacao aceita. Confirme novamente com: ",
   confirmacaoRecusada: "A operacao expirou, mudou ou o codigo nao confere. Solicite uma nova previa.",
 });
 
@@ -77,7 +78,13 @@ function criarManipuladorDeConfirmacao({ buscar, configuracao }) {
         }),
         redirect: "error",
       });
-      await descartarCorpo(resposta);
+      let dados = null;
+      try { dados = await resposta.json(); } catch { dados = null; }
+      if (resposta.status >= 200 && resposta.status < 300
+          && dados?.codigo === "NOVA_CONFIRMACAO_EXIGIDA"
+          && typeof dados.proximaFrase === "string") {
+        return { text: MENSAGENS.confirmacaoReforcada + dados.proximaFrase };
+      }
       return { text: resposta.status >= 200 && resposta.status < 300
         ? MENSAGENS.confirmacaoAplicada : MENSAGENS.confirmacaoRecusada };
     } catch {

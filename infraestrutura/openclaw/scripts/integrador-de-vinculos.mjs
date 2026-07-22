@@ -307,6 +307,17 @@ async function confirmarOperacao(requisicao, configuracao, buscar) {
     throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
   }
   if (retorno.status >= 200 && retorno.status < 300) {
+    try {
+      const dados = JSON.parse(retorno.bytes.toString("utf8"));
+      if (dados?.exigeNovaConfirmacao === true
+          && typeof dados.proximaFrase === "string"
+          && /^CONFIRMAR [23456789A-HJ-NP-Z]{8}$/.test(dados.proximaFrase)) {
+        return { estado: 200, codigo: "NOVA_CONFIRMACAO_EXIGIDA",
+          proximaFrase: dados.proximaFrase };
+      }
+    } catch {
+      throw new ErroDoIntegrador("RESPOSTA_DO_BACKEND_INVALIDA", 503);
+    }
     return { estado: 200, codigo: "OPERACAO_APLICADA" };
   }
   if ([404, 409, 410, 422].includes(retorno.status)) {
@@ -558,13 +569,14 @@ function criarLimitador(configuracao) {
   };
 }
 
-function responder(resposta, estado, codigo) {
+function responder(resposta, estado, codigo, proximaFrase = undefined) {
   resposta.writeHead(estado, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
   });
-  resposta.end(JSON.stringify({ codigo }));
+  resposta.end(JSON.stringify({ codigo, ...(proximaFrase
+    ? { proximaFrase } : {}) }));
 }
 
 export function criarServidorDoIntegrador({
@@ -643,7 +655,8 @@ export function criarServidorDoIntegrador({
       const resultado = rotaDeVinculo
         ? await processar(requisicao)
         : await confirmarOperacao(requisicao, configuracao, buscar);
-      responder(resposta, resultado.estado, resultado.codigo);
+      responder(resposta, resultado.estado, resultado.codigo,
+        resultado.proximaFrase);
     } catch (erro) {
       const conhecido = erro instanceof ErroDoIntegrador
         ? erro : new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);

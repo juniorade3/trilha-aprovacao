@@ -18,10 +18,13 @@ import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAplicacaoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesCriticasMcp;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ValidadorDeAssinaturaDoGateway;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
+import br.com.trilhaaprovacao.concursos.aplicacao.ServicoDaEstruturaDeConcursos;
+import br.com.trilhaaprovacao.concursos.dominio.SituacaoDoConcurso;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -98,6 +101,8 @@ class AutomacaoIntegracaoTest {
     @Autowired ServicoDePreparacoesMcp preparacoes;
     @Autowired ServicoDeAplicacaoDeOperacoesAssistidas aplicacao;
     @Autowired ServicoDeSegredosDaAutomacao segredos;
+    @Autowired ServicoDeOperacoesCriticasMcp operacoesCriticas;
+    @Autowired ServicoDaEstruturaDeConcursos estruturaDeConcursos;
 
     @BeforeEach
     void limparBanco() {
@@ -185,6 +190,43 @@ class AutomacaoIntegracaoTest {
                 WHERE identificador = ?
                 """, evento)).isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("append-only");
+    }
+
+    @Test
+    void deveExigirDuasConfirmacoesParaAtivarConcurso() throws Exception {
+        MockHttpSession sessaoWeb = criarContaEEntrar(
+                "confirmacao.reforcada@example.com");
+        UUID usuario = identificarUsuario("confirmacao.reforcada@example.com");
+        VinculoCriado vinculo = vincular(sessaoWeb, 676767L, 676767L);
+        var concurso = estruturaDeConcursos.criarConcurso(usuario,
+                "Concurso reforcado", null, null, null,
+                SituacaoDoConcurso.PLANEJADO, null);
+        Map<String, Object> proposta = Map.of(
+                "identificadorDoConcurso", concurso.identificador().toString(),
+                "impacto", "Ativar concurso");
+        String versoes = json.writeValueAsString(operacoesCriticas.versoesAtuais(
+                usuario, concurso.identificador()));
+        var preparada = operacoes.prepararParaConfirmacaoReforcada(usuario,
+                vinculo.identificadorDoVinculo(), "ATIVACAO_DO_CONCURSO",
+                "Ativar concurso", json.writeValueAsString(proposta), versoes,
+                "teste-confirmacao-reforcada");
+
+        var primeira = aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(),
+                preparada.codigoDeConfirmacao(), "TEXTO", IDENTIFICADOR_DO_BOT,
+                676767L, 676767L, vinculo.identificadorDaSessao(), "update-1");
+        assertThat(primeira.exigeNovaConfirmacao()).isTrue();
+        assertThat(estruturaDeConcursos.obterConcurso(usuario,
+                concurso.identificador()).ativo()).isFalse();
+
+        var segunda = aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(), primeira.proximoCodigo(),
+                "TEXTO", IDENTIFICADOR_DO_BOT, 676767L, 676767L,
+                vinculo.identificadorDaSessao(), "update-2");
+        assertThat(segunda.exigeNovaConfirmacao()).isFalse();
+        assertThat(segunda.operacao().estado().name()).isEqualTo("APLICADA");
+        assertThat(estruturaDeConcursos.obterConcurso(usuario,
+                concurso.identificador()).ativo()).isTrue();
     }
 
     @Test

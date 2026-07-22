@@ -34,6 +34,10 @@ public class OperacaoAssistidaPersistida {
     private String chaveDeIdempotencia;
     @Column(name = "hash_da_requisicao", nullable = false, length = 128)
     private String hashDaRequisicao;
+    @Column(name = "nivel_de_confirmacao", nullable = false, length = 20)
+    private String nivelDeConfirmacao = "COMUM";
+    @Column(name = "etapa_da_confirmacao", nullable = false)
+    private int etapaDaConfirmacao;
     @Column(name = "expira_em", nullable = false) private OffsetDateTime expiraEm;
     @Column(name = "codigo_de_confirmacao_hash", length = 128)
     private String codigoDeConfirmacaoHash;
@@ -95,14 +99,25 @@ public class OperacaoAssistidaPersistida {
 
     public void definirConfirmacao(String codigoHash, String prefixo,
             String nonceHash, OffsetDateTime expiraEm) {
+        definirConfirmacao(codigoHash, prefixo, nonceHash, expiraEm,
+                nivelDeConfirmacao, etapaDaConfirmacao);
+    }
+
+    public void definirConfirmacao(String codigoHash, String prefixo,
+            String nonceHash, OffsetDateTime expiraEm, String nivel,
+            int etapa) {
         codigoDeConfirmacaoHash = codigoHash;
         codigoDeConfirmacaoPrefixo = prefixo;
         nonceDaConfirmacaoHash = nonceHash;
         confirmacaoExpiraEm = expiraEm;
+        nivelDeConfirmacao = nivel;
+        etapaDaConfirmacao = etapa;
     }
 
     public String codigoDeConfirmacaoHash() { return codigoDeConfirmacaoHash; }
     public OffsetDateTime confirmacaoExpiraEm() { return confirmacaoExpiraEm; }
+    public String nivelDeConfirmacao() { return nivelDeConfirmacao; }
+    public int etapaDaConfirmacao() { return etapaDaConfirmacao; }
 
     public void registrarContextoDaConfirmacao(String metodo, long bot,
             long externo, long chat, String sessao, String update) {
