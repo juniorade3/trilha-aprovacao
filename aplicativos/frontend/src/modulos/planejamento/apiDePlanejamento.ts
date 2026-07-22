@@ -1,5 +1,9 @@
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 import type { EvidenciaDeAprendizagem } from '@/modulos/estudos/apiDeEstudos'
+import type {
+  FaixaDaPriorizacao,
+  GrupoDaPriorizacao,
+} from './apiDePriorizacaoDeTopicos'
 
 export type EstadoDoPlanoSemanal =
   'RASCUNHO' | 'ATIVO' | 'ENCERRADO' | 'CANCELADO'
@@ -172,8 +176,8 @@ export interface JustificativaDaGeracao {
 
 export interface BlocoPreservadoNaPrevia {
   identificador: string
-  identificadorDaMateria?: string
-  nomeDaMateria?: string
+  identificadorDaMateria?: string | null
+  nomeDaMateria?: string | null
   titulo: string
   tipoDeAtividade: TipoDeAtividade
   duracaoEmMinutos: number
@@ -181,8 +185,12 @@ export interface BlocoPreservadoNaPrevia {
 }
 
 export interface BlocoSugeridoNaPrevia {
-  identificadorDaMateria?: string
-  nomeDaMateria?: string
+  identificadorDaMateria?: string | null
+  nomeDaMateria?: string | null
+  identificadorDoTopico?: string | null
+  nomeDoTopico?: string | null
+  grupoDaPriorizacao?: GrupoDaPriorizacao | null
+  faixaDaPriorizacao?: FaixaDaPriorizacao | null
   titulo: string
   tipoDeAtividade: TipoDeAtividade
   duracaoEmMinutos: number
@@ -204,6 +212,7 @@ export interface DiaDaPreviaDaGeracao {
 
 export interface PreviaDaGeracao {
   identificadorDoPlano: string
+  assinaturaDaPrevia: string
   dias: DiaDaPreviaDaGeracao[]
   avisos: JustificativaDaGeracao[]
   aplicada: false
@@ -452,16 +461,16 @@ export async function substituirPrioridadesDeMaterias(
 
 export function gerarPreviaDeterministica(
   identificadorDoPlano: string,
-  duracaoPadraoDoBlocoPrincipalEmMinutos: number,
-  duracaoDoBlocoDeRevisaoEmMinutos: number,
+  dataDeReferencia: string,
+  duracaoDoBlocoPrincipalEmMinutos: number,
 ): Promise<PreviaDaGeracao> {
   return requisitar<PreviaDaGeracao>(
     `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica/previa`,
     {
       method: 'POST',
       body: JSON.stringify({
-        duracaoPadraoDoBlocoPrincipalEmMinutos,
-        duracaoDoBlocoDeRevisaoEmMinutos,
+        dataDeReferencia,
+        duracaoDoBlocoPrincipalEmMinutos,
       }),
     },
   )
@@ -469,18 +478,20 @@ export function gerarPreviaDeterministica(
 
 export function aplicarGeracaoDeterministica(
   identificadorDoPlano: string,
-  duracaoPadraoDoBlocoPrincipalEmMinutos: number,
-  duracaoDoBlocoDeRevisaoEmMinutos: number,
+  dataDeReferencia: string,
+  duracaoDoBlocoPrincipalEmMinutos: number,
   substituirBlocosGerados: boolean,
+  assinaturaDaPrevia: string,
 ): Promise<ResultadoDaAplicacaoDaGeracao> {
   return requisitar<ResultadoDaAplicacaoDaGeracao>(
     `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica`,
     {
       method: 'POST',
       body: JSON.stringify({
-        duracaoPadraoDoBlocoPrincipalEmMinutos,
-        duracaoDoBlocoDeRevisaoEmMinutos,
+        dataDeReferencia,
+        duracaoDoBlocoPrincipalEmMinutos,
         substituirBlocosGerados,
+        assinaturaDaPrevia,
       }),
     },
   )

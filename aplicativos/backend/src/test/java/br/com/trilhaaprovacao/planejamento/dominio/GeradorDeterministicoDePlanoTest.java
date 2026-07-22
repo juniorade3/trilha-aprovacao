@@ -2,6 +2,8 @@ package br.com.trilhaaprovacao.planejamento.dominio;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.trilhaaprovacao.priorizacao.dominio.FaixaDePriorizacao;
+import br.com.trilhaaprovacao.priorizacao.dominio.GrupoDePriorizacao;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,195 +11,98 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+/** Regressao das regras de carga, pesos, alternancia e capacidade do gerador original. */
 class GeradorDeterministicoDePlanoTest {
-    private static final UUID PLANO = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID PLANO = uuid(1);
     private static final LocalDate SEGUNDA = LocalDate.of(2026, 7, 20);
     private final GeradorDeterministicoDePlano gerador = new GeradorDeterministicoDePlano();
 
     @Test
-    void deveSerDeterministicoMesmoComEntradasEmOrdensDiferentes() {
-        List<CandidatoDeMateriaParaGeracao> candidatos = candidatos();
-        List<EntradaDoDiaParaGeracao> dias = dias(170);
-        List<CandidatoDeMateriaParaGeracao> candidatosInvertidos = new ArrayList<>(candidatos);
-        List<EntradaDoDiaParaGeracao> diasInvertidos = new ArrayList<>(dias);
-        Collections.reverse(candidatosInvertidos);
-        Collections.reverse(diasInvertidos);
+    void deveManterResultadoParaPermutacoesDeMateriasTopicosEDias() {
+        List<CandidatoDeMateriaParaGeracao> materias = materias();
+        List<CandidatoDeTopicoParaGeracao> topicos = topicos(materias);
+        List<EntradaDoDiaParaGeracao> dias = dias(150);
+        var esperada = gerar(materias, topicos, dias, 50);
 
-        var primeira = gerador.gerar(PLANO, candidatos, dias,
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-        var segunda = gerador.gerar(PLANO, candidatosInvertidos, diasInvertidos,
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-
-        assertThat(segunda).isEqualTo(primeira);
-        assertThat(primeira.dias().getFirst().blocosSugeridos()).hasSize(4);
-        assertThat(primeira.dias().getFirst().blocosSugeridos().getFirst()
-                .tipoDeAtividade()).isEqualTo(TipoDeAtividade.REVISAO);
-        assertThat(primeira.dias().getFirst().blocosSugeridos())
-                .filteredOn(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO)
-                .hasSize(1);
-        assertThat(primeira.dias().getFirst().blocosSugeridos().stream()
-                .filter(item -> item.identificadorDaMateria() != null)
-                .map(BlocoSugerido::identificadorDaMateria))
+        assertThat(gerar(inverter(materias), inverter(topicos), inverter(dias), 50))
+                .isEqualTo(esperada);
+        assertThat(esperada.dias().getFirst().blocosSugeridos())
                 .hasSize(3)
+                .extracting(BlocoSugerido::identificadorDaMateria)
                 .doesNotHaveDuplicates();
-        assertThat(primeira.dias().getFirst().capacidade())
-                .satisfies(capacidade -> {
-                    assertThat(capacidade.minutosDisponiveis()).isEqualTo(170);
-                    assertThat(capacidade.minutosPreservados()).isZero();
-                    assertThat(capacidade.minutosSugeridos()).isEqualTo(170);
-                    assertThat(capacidade.minutosLivres()).isZero();
-                });
     }
 
     @Test
-    void deveManterResultadoParaQuatroPermutacoesFixasDeCandidatos() {
-        List<CandidatoDeMateriaParaGeracao> originais = candidatos();
-        List<List<CandidatoDeMateriaParaGeracao>> permutacoes = List.of(
-                originais,
-                List.of(originais.get(1), originais.get(0),
-                        originais.get(3), originais.get(2)),
-                List.of(originais.get(2), originais.get(3),
-                        originais.get(0), originais.get(1)),
-                List.of(originais.get(3), originais.get(1),
-                        originais.get(2), originais.get(0)));
-        var esperada = gerador.gerar(PLANO, originais, dias(170),
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-
-        assertThat(permutacoes).allSatisfy(permutacao ->
-                assertThat(gerador.gerar(PLANO, permutacao, dias(170),
-                        new ConfiguracaoDaGeracaoDeterministica(50, 20)))
-                        .isEqualTo(esperada));
-    }
-
-    @Test
-    void deveManterResultadoComBlocosPreservadosEmOrdensDeEntradaDiferentes() {
-        var primeiro = preservado(candidatos().get(0).identificadorDaMateria(),
-                TipoDeAtividade.QUESTOES, 25, 2);
-        var segundo = preservado(candidatos().get(1).identificadorDaMateria(),
-                TipoDeAtividade.TEORIA, 25, 1);
-        List<EntradaDoDiaParaGeracao> entradasA = dias(170);
-        List<EntradaDoDiaParaGeracao> entradasB = dias(170);
+    void deveManterResultadoComPreservadosEmOrdensDeEntradaDiferentes() {
+        List<CandidatoDeMateriaParaGeracao> materias = materias();
+        var primeiro = preservado(101, materias.get(0), TipoDeAtividade.QUESTOES, 25, 2);
+        var segundo = preservado(102, materias.get(1), TipoDeAtividade.TEORIA, 25, 1);
+        List<EntradaDoDiaParaGeracao> entradasA = dias(150);
+        List<EntradaDoDiaParaGeracao> entradasB = dias(150);
         entradasA.set(0, new EntradaDoDiaParaGeracao(
-                SEGUNDA, 170, List.of(primeiro, segundo)));
+                SEGUNDA, 150, List.of(primeiro, segundo)));
         entradasB.set(0, new EntradaDoDiaParaGeracao(
-                SEGUNDA, 170, List.of(segundo, primeiro)));
+                SEGUNDA, 150, List.of(segundo, primeiro)));
 
-        var previaA = gerador.gerar(PLANO, candidatos(), entradasA,
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-        var previaB = gerador.gerar(PLANO, candidatos(), entradasB,
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-
-        assertThat(previaB).isEqualTo(previaA);
+        assertThat(gerar(materias, topicos(materias), entradasB, 50))
+                .isEqualTo(gerar(materias, topicos(materias), entradasA, 50));
     }
 
     @Test
-    void deveOcuparCentoESetentaMinutosComRevisaoETresMaterias() {
-        var dia = gerador.gerar(PLANO, candidatos(), dias(170),
-                        new ConfiguracaoDaGeracaoDeterministica(50, 20))
+    void devePreservarTresMateriasPrincipaisDeCinquentaMinutos() {
+        var dia = gerar(materias(), topicos(materias()), dias(150), 50)
                 .dias().getFirst();
 
-        assertThat(dia.blocosSugeridos())
-                .filteredOn(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO)
-                .singleElement()
-                .extracting(BlocoSugerido::duracaoEmMinutos)
-                .isEqualTo(20);
-        assertThat(dia.blocosSugeridos())
-                .filteredOn(item -> item.identificadorDaMateria() != null)
-                .hasSize(3)
-                .allSatisfy(item -> assertThat(item.duracaoEmMinutos()).isEqualTo(50));
-        assertThat(dia.capacidade().minutosSugeridos()).isEqualTo(170);
+        assertThat(dia.blocosSugeridos()).hasSize(3)
+                .allSatisfy(item -> {
+                    assertThat(item.tipoDeAtividade()).isNotEqualTo(TipoDeAtividade.REVISAO);
+                    assertThat(item.duracaoEmMinutos()).isEqualTo(50);
+                });
+        assertThat(dia.capacidade().minutosSugeridos()).isEqualTo(150);
         assertThat(dia.capacidade().minutosLivres()).isZero();
     }
 
     @Test
-    void deveOcuparSetentaMinutosComRevisaoEDoisBlocosMinimos() {
-        var dia = gerador.gerar(PLANO, candidatos(), dias(70),
-                        new ConfiguracaoDaGeracaoDeterministica(50, 20))
+    void deveDistribuirSetentaMinutosEmDoisBlocosSemViolarDuracaoMinima() {
+        var dia = gerar(materias(), topicos(materias()), dias(70), 50)
                 .dias().getFirst();
 
-        assertThat(dia.blocosSugeridos())
-                .filteredOn(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO)
-                .singleElement()
-                .extracting(BlocoSugerido::duracaoEmMinutos)
-                .isEqualTo(20);
-        assertThat(dia.blocosSugeridos())
-                .filteredOn(item -> item.identificadorDaMateria() != null)
-                .hasSize(2)
-                .allSatisfy(item -> assertThat(item.duracaoEmMinutos()).isEqualTo(25));
+        assertThat(dia.blocosSugeridos()).hasSize(2)
+                .allSatisfy(item -> assertThat(item.duracaoEmMinutos()).isEqualTo(35));
         assertThat(dia.capacidade().minutosSugeridos()).isEqualTo(70);
         assertThat(dia.avisos()).extracting(JustificativaDaGeracao::codigo)
                 .contains("DISPONIBILIDADE_INSUFICIENTE");
     }
 
     @Test
-    void deveManterUmaUnicaRevisaoQuandoJaExisteRevisaoPreservada() {
-        var revisao = preservado(null, TipoDeAtividade.REVISAO, 20, 1);
-        List<EntradaDoDiaParaGeracao> entradas = dias(170);
-        entradas.set(0, new EntradaDoDiaParaGeracao(SEGUNDA, 170, List.of(revisao)));
+    void deveRespeitarPesosAlternanciaExclusaoELimiteDeMaterias() {
+        List<CandidatoDeMateriaParaGeracao> materias = new ArrayList<>(materias());
+        materias.set(0, comPrioridade(materias.get(0), PrioridadeDaMateriaNoPlano.ALTA));
+        materias.set(2, comPrioridade(
+                materias.get(2), PrioridadeDaMateriaNoPlano.NAO_INCLUIR));
 
-        var dia = gerador.gerar(PLANO, candidatos(), entradas,
-                        new ConfiguracaoDaGeracaoDeterministica(50, 20))
-                .dias().getFirst();
+        var previa = gerar(materias, topicos(materias), dias(70), 50);
 
-        long revisoesPreservadas = dia.blocosPreservados().stream()
-                .filter(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO).count();
-        long revisoesSugeridas = dia.blocosSugeridos().stream()
-                .filter(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO).count();
-        assertThat(revisoesPreservadas + revisoesSugeridas).isEqualTo(1);
-        assertThat(dia.avisos()).extracting(JustificativaDaGeracao::codigo)
-                .contains("REVISAO_JA_EXISTENTE");
-    }
-
-    @Test
-    void deveRespeitarPesosAlternanciaExclusaoELimites() {
-        List<CandidatoDeMateriaParaGeracao> candidatos = new ArrayList<>(candidatos());
-        candidatos.set(0, comPrioridade(candidatos.get(0), PrioridadeDaMateriaNoPlano.ALTA));
-        candidatos.set(2, comPrioridade(candidatos.get(2), PrioridadeDaMateriaNoPlano.NAO_INCLUIR));
-
-        var previa = gerador.gerar(PLANO, candidatos, dias(70),
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-
-        assertThat(previa.dias().getFirst().blocosSugeridos()).hasSize(3);
-        assertThat(previa.dias().getFirst().blocosSugeridos().get(1)
-                .identificadorDaMateria()).isEqualTo(candidatos.get(0).identificadorDaMateria());
-        assertThat(previa.dias().get(1).blocosSugeridos().get(1)
-                .identificadorDaMateria()).isNotEqualTo(candidatos.get(0).identificadorDaMateria());
-        assertThat(previa.dias()).allSatisfy(dia ->
-                assertThat(dia.capacidade().minutosPreservados()
-                        + dia.capacidade().minutosSugeridos())
-                        .isLessThanOrEqualTo(dia.capacidade().minutosDisponiveis()));
-    }
-
-    @Test
-    void devePreservarRevisaoEContarMateriaManualNaMetaECarga() {
-        UUID materiaManual = candidatos().getFirst().identificadorDaMateria();
-        var revisao = preservado(null, TipoDeAtividade.REVISAO, 20, 1);
-        var manual = preservado(materiaManual, TipoDeAtividade.QUESTOES, 50, 2);
-        List<EntradaDoDiaParaGeracao> entradas = dias(170);
-        entradas.set(0, new EntradaDoDiaParaGeracao(SEGUNDA, 170, List.of(revisao, manual)));
-
-        var previa = gerador.gerar(PLANO, candidatos(), entradas,
-                new ConfiguracaoDaGeracaoDeterministica(50, 20));
-        var primeiroDia = previa.dias().getFirst();
-
-        assertThat(primeiroDia.blocosSugeridos()).hasSize(2);
-        assertThat(primeiroDia.blocosSugeridos())
-                .noneMatch(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO);
-        assertThat(primeiroDia.blocosPreservados().stream()
-                .filter(item -> item.tipoDeAtividade() == TipoDeAtividade.REVISAO))
-                .hasSize(1);
-        assertThat(primeiroDia.blocosSugeridos())
-                .noneMatch(item -> materiaManual.equals(item.identificadorDaMateria()));
-        assertThat(primeiroDia.avisos()).extracting(JustificativaDaGeracao::codigo)
-                .contains("REVISAO_JA_EXISTENTE");
+        assertThat(previa.dias().getFirst().blocosSugeridos()).hasSize(2);
+        assertThat(previa.dias().getFirst().blocosSugeridos().getFirst()
+                .identificadorDaMateria()).isEqualTo(materias.getFirst().identificadorDaMateria());
+        assertThat(previa.dias().get(1).blocosSugeridos().getFirst()
+                .identificadorDaMateria()).isNotEqualTo(materias.getFirst()
+                        .identificadorDaMateria());
+        assertThat(previa.dias()).allSatisfy(dia -> {
+            assertThat(dia.blocosSugeridos()).hasSizeLessThanOrEqualTo(3);
+            assertThat(dia.capacidade().minutosPreservados()
+                    + dia.capacidade().minutosSugeridos())
+                    .isLessThanOrEqualTo(dia.capacidade().minutosDisponiveis());
+        });
     }
 
     @Test
     void somaDiariaNuncaDeveExcederDisponibilidade() {
+        List<CandidatoDeMateriaParaGeracao> materias = materias();
         for (int minutos = 0; minutos <= 1440; minutos++) {
+            var previa = gerar(materias, topicos(materias), dias(minutos), 180);
             int disponibilidade = minutos;
-            var previa = gerador.gerar(PLANO, candidatos(), dias(disponibilidade),
-                    new ConfiguracaoDaGeracaoDeterministica(180, 120));
             assertThat(previa.dias()).allSatisfy(dia ->
                     assertThat(dia.capacidade().minutosPreservados()
                             + dia.capacidade().minutosSugeridos())
@@ -205,25 +110,52 @@ class GeradorDeterministicoDePlanoTest {
         }
     }
 
-    private List<CandidatoDeMateriaParaGeracao> candidatos() {
-        return List.of(
-                candidato(11, "Banco de dados", 1),
-                candidato(12, "Engenharia de software", 2),
-                candidato(13, "Redes", 3),
-                candidato(14, "Seguranca", 4));
+    private PreviaDaGeracaoDaSemana gerar(
+            List<CandidatoDeMateriaParaGeracao> materias,
+            List<CandidatoDeTopicoParaGeracao> topicos,
+            List<EntradaDoDiaParaGeracao> dias, int duracao) {
+        return gerador.gerar(PLANO, SEGUNDA, materias, topicos, List.of(), dias,
+                new ConfiguracaoDaGeracaoDeterministica(duracao));
     }
 
-    private CandidatoDeMateriaParaGeracao candidato(int finalDoUuid, String nome, int ordem) {
-        UUID identificador = UUID.fromString(
-                "00000000-0000-0000-0000-%012d".formatted(finalDoUuid));
-        return new CandidatoDeMateriaParaGeracao(identificador, nome,
+    private List<CandidatoDeMateriaParaGeracao> materias() {
+        return List.of(
+                materia(11, "Banco de dados", 1),
+                materia(12, "Engenharia de software", 2),
+                materia(13, "Redes", 3),
+                materia(14, "Seguranca", 4));
+    }
+
+    private CandidatoDeMateriaParaGeracao materia(int id, String nome, int ordem) {
+        return new CandidatoDeMateriaParaGeracao(uuid(id), nome,
                 nome.toLowerCase(), ordem, PrioridadeDaMateriaNoPlano.NORMAL);
     }
 
     private CandidatoDeMateriaParaGeracao comPrioridade(
-            CandidatoDeMateriaParaGeracao candidato, PrioridadeDaMateriaNoPlano prioridade) {
-        return new CandidatoDeMateriaParaGeracao(candidato.identificadorDaMateria(),
-                candidato.nome(), candidato.nomeNormalizado(), candidato.ordemEstavel(), prioridade);
+            CandidatoDeMateriaParaGeracao materia,
+            PrioridadeDaMateriaNoPlano prioridade) {
+        return new CandidatoDeMateriaParaGeracao(materia.identificadorDaMateria(),
+                materia.nome(), materia.nomeNormalizado(), materia.ordemEstavel(), prioridade);
+    }
+
+    private List<CandidatoDeTopicoParaGeracao> topicos(
+            List<CandidatoDeMateriaParaGeracao> materias) {
+        List<CandidatoDeTopicoParaGeracao> resultado = new ArrayList<>();
+        int indice = 0;
+        for (CandidatoDeMateriaParaGeracao materia : materias) {
+            resultado.add(new CandidatoDeTopicoParaGeracao(
+                    materia.identificadorDaMateria(), uuid(200 + indice * 2),
+                    materia.nome(), "Lacuna " + indice, "lacuna " + indice,
+                    indice * 2 + 1, 1, GrupoDePriorizacao.LACUNA,
+                    FaixaDePriorizacao.SEM_ESTUDO, false));
+            resultado.add(new CandidatoDeTopicoParaGeracao(
+                    materia.identificadorDaMateria(), uuid(201 + indice * 2),
+                    materia.nome(), "Fraqueza " + indice, "fraqueza " + indice,
+                    indice * 2 + 2, 1, GrupoDePriorizacao.FRAQUEZA,
+                    FaixaDePriorizacao.PRECISA_REFORCO, true));
+            indice++;
+        }
+        return resultado;
     }
 
     private List<EntradaDoDiaParaGeracao> dias(int minutos) {
@@ -235,13 +167,21 @@ class GeradorDeterministicoDePlanoTest {
         return resultado;
     }
 
-    private BlocoPreservadoNaGeracao preservado(UUID materia,
-            TipoDeAtividade tipo, int minutos, int ordem) {
-        UUID identificador = UUID.fromString(
-                "00000000-0000-0000-0000-%012d".formatted(
-                        100 + ordem * 10 + tipo.ordinal()));
-        return new BlocoPreservadoNaGeracao(identificador, materia,
-                materia == null ? null : "Materia manual", "Bloco existente",
-                tipo, SEGUNDA, minutos, ordem);
+    private BlocoPreservadoNaGeracao preservado(int id,
+            CandidatoDeMateriaParaGeracao materia, TipoDeAtividade tipo,
+            int minutos, int ordem) {
+        return new BlocoPreservadoNaGeracao(uuid(id), materia.identificadorDaMateria(),
+                null, materia.nome(), "Bloco existente", tipo, SEGUNDA,
+                minutos, ordem);
+    }
+
+    private <T> List<T> inverter(List<T> original) {
+        List<T> resultado = new ArrayList<>(original);
+        Collections.reverse(resultado);
+        return resultado;
+    }
+
+    private static UUID uuid(int fim) {
+        return UUID.fromString("00000000-0000-0000-0000-%012d".formatted(fim));
     }
 }

@@ -114,6 +114,10 @@ public class ControladorDePlanosSemanais {
                         implementation = RespostaDeMateriasParaGeracao.class))),
         @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "409", description = "Plano nao esta em rascunho.",
@@ -145,12 +149,16 @@ public class ControladorDePlanosSemanais {
                         implementation = RespostaDaPreviaDaGeracao.class))),
         @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "409", description = "Plano nao esta em rascunho.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "422",
-                description = "Elegibilidade ou configuracao da geracao invalida.",
+                description = "Elegibilidade, topicos ou configuracao da geracao invalida.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
     })
     public RespostaDaPreviaDaGeracao gerarPrevia(
@@ -158,10 +166,10 @@ public class ControladorDePlanosSemanais {
             @Valid @RequestBody RequisicaoDePreviaDaGeracao requisicao,
             Authentication autenticacao) {
         var configuracao = new ConfiguracaoDaGeracaoDeterministica(
-                requisicao.duracaoPadraoDoBlocoPrincipalEmMinutos(),
-                requisicao.duracaoDoBlocoDeRevisaoEmMinutos());
+                requisicao.duracaoDoBlocoPrincipalEmMinutos());
         return RespostaDaPreviaDaGeracao.de(geracao.gerarPrevia(
-                usuarioAtual.obter(autenticacao), identificador, configuracao));
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.dataDeReferencia(), configuracao));
     }
 
     @PostMapping("/{identificador}/geracao-deterministica")
@@ -175,13 +183,18 @@ public class ControladorDePlanosSemanais {
                         implementation = RespostaDaAplicacaoDaGeracao.class))),
         @ApiResponse(responseCode = "400", description = "Requisicao invalida.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "401", description = "Sessao ausente ou expirada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "403", description = "Acesso negado.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "404", description = "Plano semanal nao encontrado.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "409",
-                description = "Plano nao esta em rascunho ou exige confirmacao para regenerar.",
+                description = "Plano nao esta em rascunho, exige confirmacao para regenerar "
+                        + "ou a previa esta desatualizada.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
         @ApiResponse(responseCode = "422",
-                description = "Elegibilidade ou configuracao da geracao invalida.",
+                description = "Elegibilidade, topicos ou configuracao da geracao invalida.",
                 content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
     })
     public RespostaDaAplicacaoDaGeracao aplicarGeracao(
@@ -189,11 +202,11 @@ public class ControladorDePlanosSemanais {
             @Valid @RequestBody RequisicaoDeAplicacaoDaGeracao requisicao,
             Authentication autenticacao) {
         var configuracao = new ConfiguracaoDaGeracaoDeterministica(
-                requisicao.duracaoPadraoDoBlocoPrincipalEmMinutos(),
-                requisicao.duracaoDoBlocoDeRevisaoEmMinutos());
+                requisicao.duracaoDoBlocoPrincipalEmMinutos());
         return RespostaDaAplicacaoDaGeracao.de(geracao.aplicar(
-                usuarioAtual.obter(autenticacao), identificador, configuracao,
-                requisicao.substituirBlocosGerados()));
+                usuarioAtual.obter(autenticacao), identificador,
+                requisicao.dataDeReferencia(), configuracao,
+                requisicao.substituirBlocosGerados(), requisicao.assinaturaDaPrevia()));
     }
 
     @PostMapping("/{identificador}/replanejamento/previa")

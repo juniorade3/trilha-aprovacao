@@ -62,6 +62,13 @@ import PlanejamentoSemanaPagina from './PlanejamentoSemanaPagina.vue'
 const inicio = '2026-07-20'
 const paginasMontadas: ReturnType<typeof mount>[] = []
 
+function dataDeReferenciaEsperada() {
+  const agora = new Date()
+  const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`
+  if (hoje < inicio) return inicio
+  return hoje > '2026-07-26' ? '2026-07-26' : hoje
+}
+
 function planoSemanal(
   minutosDaSegunda = 0,
   blocos: object[] = [],
@@ -153,6 +160,7 @@ async function montarPagina(foco?: string) {
 describe('PlanejamentoSemanaPagina', () => {
   afterEach(() => {
     for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
+    vi.useRealTimers()
   })
 
   beforeEach(() => {
@@ -281,6 +289,10 @@ describe('PlanejamentoSemanaPagina', () => {
     expect(pagina.text()).toContain('Prioridades desta semana')
     expect(roteador.currentRoute.value.query).toEqual({ inicio })
 
+    const fechar = pagina.get('[aria-label="Fechar"]')
+    ;(fechar.element as HTMLButtonElement).focus()
+    expect(document.activeElement).toBe(fechar.element)
+
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await flushPromises()
 
@@ -290,6 +302,68 @@ describe('PlanejamentoSemanaPagina', () => {
     expect(chamadas.aplicarGeracaoDeterministica).not.toHaveBeenCalled()
     expect(pagina.findAll('.lista-de-blocos-do-dia > li')).toHaveLength(1)
     expect(pagina.text()).toContain('Banco de dados')
+  })
+
+  it('confirma somente a substituicao de gerados a partir da referencia', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-22T12:00:00-03:00'))
+    const geradoPassado = {
+      ...blocoDeEstudo('bloco-passado', 'Gerado passado'),
+      data: '2026-07-20',
+      origem: 'GERADO_DETERMINISTICAMENTE',
+    }
+    const geradoFuturo = {
+      ...blocoDeEstudo('bloco-futuro', 'Gerado futuro'),
+      data: '2026-07-23',
+      origem: 'GERADO_DETERMINISTICAMENTE',
+    }
+    chamadas.obterPlanoSemanal.mockResolvedValue(
+      planoSemanal(240, [geradoPassado, geradoFuturo]),
+    )
+    const materia = {
+      identificadorDaMateria: 'materia-1',
+      nome: 'Banco de dados',
+      ordemEstavel: 1,
+      prioridade: 'NORMAL',
+    }
+    chamadas.substituirPrioridadesDeMaterias.mockResolvedValue([materia])
+    chamadas.gerarPreviaDeterministica.mockResolvedValue({
+      identificadorDoPlano: 'plano-1',
+      assinaturaDaPrevia: 'assinatura-meio-da-semana',
+      aplicada: false,
+      avisos: [],
+      dias: [],
+    })
+    const { pagina, roteador } = await montarPagina()
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Gerar semana'))!
+      .trigger('click')
+    await flushPromises()
+    await pagina.get('button.btn-primary.w-100').trigger('click')
+    await flushPromises()
+    await pagina.get('button.btn-primary.flex-grow-1').trigger('click')
+    await flushPromises()
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Aplicar à semana')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain(
+      '1 bloco(s) gerado(s) a partir da data de referência serão substituídos.',
+    )
+    expect(document.body.textContent).toContain(
+      'Blocos anteriores à data de referência',
+    )
+    expect(chamadas.gerarPreviaDeterministica).toHaveBeenCalledWith(
+      'plano-1',
+      '2026-07-22',
+      50,
+    )
+    expect(chamadas.aplicarGeracaoDeterministica).not.toHaveBeenCalled()
+    expect(roteador.currentRoute.value.query).toEqual({ inicio })
   })
 
   it('aplica a geracao e atualiza a semana com origem e justificativa', async () => {
@@ -302,6 +376,7 @@ describe('PlanejamentoSemanaPagina', () => {
     chamadas.substituirPrioridadesDeMaterias.mockResolvedValue([materia])
     chamadas.gerarPreviaDeterministica.mockResolvedValue({
       identificadorDoPlano: 'plano-1',
+      assinaturaDaPrevia: 'assinatura-da-pagina',
       aplicada: false,
       avisos: [],
       dias: Array.from({ length: 7 }, (_, indice) => ({
@@ -319,7 +394,11 @@ describe('PlanejamentoSemanaPagina', () => {
                 {
                   identificadorDaMateria: 'materia-1',
                   nomeDaMateria: 'Banco de dados',
-                  titulo: 'Banco de dados',
+                  identificadorDoTopico: 'topico-1',
+                  nomeDoTopico: 'Normalização de dados',
+                  grupoDaPriorizacao: 'LACUNA',
+                  faixaDaPriorizacao: 'SEM_ESTUDO',
+                  titulo: 'Normalização de dados',
                   tipoDeAtividade: 'TEORIA',
                   duracaoEmMinutos: 50,
                   justificativas: [
@@ -365,6 +444,18 @@ describe('PlanejamentoSemanaPagina', () => {
       .trigger('click')
     await flushPromises()
 
+    expect(chamadas.gerarPreviaDeterministica).toHaveBeenCalledWith(
+      'plano-1',
+      dataDeReferenciaEsperada(),
+      50,
+    )
+    expect(chamadas.aplicarGeracaoDeterministica).toHaveBeenCalledWith(
+      'plano-1',
+      dataDeReferenciaEsperada(),
+      50,
+      false,
+      'assinatura-da-pagina',
+    )
     expect(pagina.text()).toContain('1 bloco(s) aplicado(s)')
     expect(pagina.text()).toContain('Gerado')
     expect(pagina.text()).toContain('Por que este bloco?')
