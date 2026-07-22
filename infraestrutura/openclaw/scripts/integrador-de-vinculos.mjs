@@ -143,7 +143,7 @@ export function carregarConfiguracaoDoAmbiente(ambiente = process.env) {
   if (!FORMATO_DA_CONTA.test(identificadorDaContaDoBot)) {
     falharConfiguracao("IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW invalido.");
   }
-  const modelo = ambiente.MODELO_OPENAI_DO_ASSISTENTE ?? "openai/gpt-5.6";
+  const modelo = ambiente.MODELO_OPENAI_DO_ASSISTENTE ?? "openai/gpt-5.5";
   if (!/^openai\/[A-Za-z0-9._-]+$/.test(modelo)) {
     falharConfiguracao("MODELO_OPENAI_DO_ASSISTENTE invalido.");
   }

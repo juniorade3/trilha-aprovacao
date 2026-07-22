@@ -144,6 +144,15 @@ test("configura os atalhos conversacionais sem transforma-los em comandos privil
   assert.equal(new Set(nomes).size, nomes.length);
   assert.equal(configuracao.commands.text, false);
   assert.equal(configuracao.tools.deny.includes("group:messaging"), true);
+  assert.equal(configuracao.tools.profile, "minimal");
+  assert.equal(configuracao.tools.deny.includes("group:runtime"), true);
+  assert.equal(configuracao.tools.deny.includes("group:fs"), true);
+  assert.equal(configuracao.models.providers.openai.apiKey, undefined);
+  assert.equal(configuracao.models.providers.openai.agentRuntime.id, "codex");
+  assert.equal(configuracao.agents.defaults.model.primary, "openai/gpt-5.5");
+  assert.equal(configuracao.plugins.allow.includes("codex"), true);
+  assert.equal(configuracao.plugins.entries.codex.enabled, true);
+  assert.equal(configuracao.plugins.entries.codex.config.appServer.homeScope, "agent");
 });
 
 test("prompt vincula cada conversa suportada a dados atuais do MCP", async () => {

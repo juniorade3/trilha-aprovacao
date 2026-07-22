@@ -25,8 +25,14 @@
 - teste PostgreSQL adicional confirmou que a primeira etapa nao ativa o
   concurso e que somente o segundo codigo conclui a operacao.
 
-O Gateway real nao foi iniciado porque nao existe `OPENAI_API_KEY` no ambiente.
-O token do Telegram foi guardado apenas no arquivo local de segredos; falta o
-usuario preencher a chave OpenAI, subir backend e OpenClaw e concluir o vinculo
-pela interface web. Voz e validacao visual real permanecem pendentes ate essa
-ativacao operacional.
+O bloqueio anterior por ausencia de `OPENAI_API_KEY` foi removido pela correcao
+que passou a usar `openai/gpt-5.5` pelo runtime Codex nativo do OpenClaw,
+autenticado pelo arquivo do login existente do CLI. Em 22 de julho de 2026,
+`models status --probe --probe-provider openai` aprovou o perfil OAuth e o modelo
+`openai/gpt-5.5`; uma execucao local real do agente respondeu `OK` e informou
+`agentHarnessId=codex`, sem fallback. O relatorio da mesma execucao confirmou que
+o perfil `minimal` removeu `exec`, `process`, leitura, escrita e edicao.
+
+O token do Telegram continua somente no arquivo local de segredos; subir backend
+e OpenClaw, concluir o vinculo pela interface web, testar voz e executar a
+validacao visual real permanecem pendentes ate a ativacao operacional.

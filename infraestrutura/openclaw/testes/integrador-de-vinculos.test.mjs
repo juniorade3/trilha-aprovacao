@@ -190,7 +190,7 @@ async function criarCenario(opcoesDoBackend = {}, opcoesDoAmbiente = {}) {
     URL_MCP_DA_TRILHA: "http://127.0.0.1:8080/mcp",
     IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW: IDENTIFICADOR_DA_CHAVE,
     IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW: "default",
-    MODELO_OPENAI_DO_ASSISTENTE: "openai/gpt-5.6",
+    MODELO_OPENAI_DO_ASSISTENTE: "openai/gpt-5.5",
     TEMPO_LIMITE_DO_BACKEND_EM_MS: "5000",
     TEMPO_LIMITE_DOS_SCRIPTS_EM_MS: "10000",
     ...opcoesDoAmbiente,

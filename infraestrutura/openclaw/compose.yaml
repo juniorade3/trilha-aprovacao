@@ -21,6 +21,7 @@ services:
       OPENCLAW_CONFIG_DIR: /home/node/.openclaw
       OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
       OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspaces
+      CODEX_HOME: /run/secrets/codex-cli
       OPENCLAW_DISABLE_BONJOUR: "1"
       OPENCLAW_NIX_MODE: "1"
       TZ: America/Sao_Paulo
@@ -32,6 +33,10 @@ services:
       - type: bind
         source: ${OPENCLAW_ARQUIVO_SEGREDOS:?defina OPENCLAW_ARQUIVO_SEGREDOS}
         target: /run/secrets/segredos-openclaw.json
+        read_only: true
+      - type: bind
+        source: ${OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX:?defina OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX}
+        target: /run/secrets/codex-cli/auth.json
         read_only: true
       - type: bind
         source: ./plugin-trilha
@@ -149,7 +154,7 @@ services:
       URL_MCP_DA_TRILHA: ${URL_MCP_DA_TRILHA:-http://host.docker.internal:8080/mcp}
       IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW: ${IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW:-gateway-openclaw}
       IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW: ${IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW:-default}
-      MODELO_OPENAI_DO_ASSISTENTE: ${MODELO_OPENAI_DO_ASSISTENTE:-openai/gpt-5.6}
+      MODELO_OPENAI_DO_ASSISTENTE: ${MODELO_OPENAI_DO_ASSISTENTE:-openai/gpt-5.5}
       LIMITE_DE_VINCULOS_POR_TELEGRAM: ${LIMITE_DE_VINCULOS_POR_TELEGRAM:-5}
       JANELA_DE_VINCULOS_POR_TELEGRAM_EM_MS: ${JANELA_DE_VINCULOS_POR_TELEGRAM_EM_MS:-600000}
       LIMITE_GLOBAL_DE_VINCULOS_POR_MINUTO: ${LIMITE_GLOBAL_DE_VINCULOS_POR_MINUTO:-100}

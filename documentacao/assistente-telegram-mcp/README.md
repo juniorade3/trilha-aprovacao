@@ -53,7 +53,7 @@ O fluxo respeitará as seguintes fronteiras:
 | Componente | Responsabilidade | Limite de confiança |
 |---|---|---|
 | Bot do Telegram | Receber mensagens, anexos, callbacks e confirmações | Não decide identidade nem executa regras de negócio |
-| OpenClaw Gateway | Rotear cada remetente ao agente correto e usar o provedor OpenAI nativo | Não acessa banco, repositório, Docker, shell ou segredos gerais da aplicação |
+| OpenClaw Gateway | Rotear cada remetente ao agente correto e executar o runtime Codex nativo, autenticado pelo login existente do CLI | Não acessa banco, repositório, Docker, shell ou segredos gerais da aplicação |
 | Agente conversacional | Entender a intenção, selecionar ferramentas e explicar resultados | Memória não é fonte de verdade e não confirma sua própria escrita |
 | Agente leitor | Extrair estrutura de texto, imagem, PDF ou link | Não possui ferramenta de escrita e trata o documento como conteúdo hostil |
 | Adaptador MCP | Expor contratos tipados e autenticar credenciais de integração | Não contém regra de domínio nem recebe identificador livre de usuário |
@@ -64,7 +64,10 @@ O fluxo respeitará as seguintes fronteiras:
 
 ## Decisões fixadas
 
-- Usar o provedor OpenAI nativo do OpenClaw. O Codex CLI não fará parte do runtime de produção.
+- Usar `openai/gpt-5.5` pelo runtime Codex nativo e fail-closed do OpenClaw,
+  com o plugin Codex. O binario e gerenciado pelo OpenClaw e reutiliza o arquivo
+  do login existente do CLI, montado somente para o Gateway em modo somente
+  leitura; nao existe `OPENAI_API_KEY` nem fallback por chave de API.
 - Usar um Gateway OpenClaw compartilhado para um conjunto privado e previamente aprovado de usuários.
 - Atender somente conversas diretas com o bot; mensagens em grupos do Telegram não executarão ferramentas.
 - Manter um agente, uma sessão e uma credencial MCP isolados por vínculo ativo.
@@ -97,7 +100,9 @@ O fluxo respeitará as seguintes fronteiras:
 ### Fora do escopo
 
 - bot público ou atendimento em grupos do Telegram;
-- Codex CLI, shell, navegador pessoal, filesystem, nodes ou Docker disponíveis ao agente;
+- binario Codex do host, shell, `exec`, navegador pessoal, filesystem, nodes ou
+  Docker disponiveis ao agente; o uso do arquivo de login pelo runtime gerenciado
+  nao concede essas capacidades;
 - acesso direto do OpenClaw ou do MCP ao PostgreSQL;
 - ferramenta genérica para chamar qualquer rota, executar SQL ou editar arquivos;
 - armazenamento de raciocínio interno do modelo, credenciais ou documentos completos nos logs;
