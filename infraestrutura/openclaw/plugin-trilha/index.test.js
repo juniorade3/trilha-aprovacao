@@ -130,3 +130,36 @@ test("manifesto e configuracao sao fechados e compativeis com 2026.7.1", async (
   assert.equal(pacote.openclaw.compat.pluginApi, ">=2026.7.1");
   assert.deepEqual(pacote.openclaw.extensions, ["./index.js"]);
 });
+
+test("configura os atalhos conversacionais sem transforma-los em comandos privilegiados", async () => {
+  const configuracao = JSON.parse(await readFile(
+    new URL("../modelos/openclaw.json", import.meta.url), "utf8"));
+  const nomes = configuracao.channels.telegram.customCommands
+    .map((comando) => comando.command);
+
+  assert.deepEqual(nomes, [
+    "hoje", "revisoes", "prioridades", "progresso", "operacoes",
+    "desconectar", "privacidade",
+  ]);
+  assert.equal(new Set(nomes).size, nomes.length);
+  assert.equal(configuracao.commands.text, false);
+  assert.equal(configuracao.tools.deny.includes("group:messaging"), true);
+});
+
+test("prompt vincula cada conversa suportada a dados atuais do MCP", async () => {
+  const prompt = await readFile(
+    new URL("../modelos/workspace/AGENTS.md", import.meta.url), "utf8");
+  for (const ferramenta of [
+    "trilha__obter_agenda_de_estudos_de_hoje",
+    "trilha__obter_revisoes_devidas",
+    "trilha__obter_prioridades_atuais",
+    "trilha__obter_progresso_do_concurso",
+    "trilha__obter_historico_recente",
+    "trilha__explicar_bloco_de_estudo",
+    "trilha__consultar_operacao_assistida",
+  ]) {
+    assert.match(prompt, new RegExp(ferramenta));
+  }
+  assert.match(prompt, /Sempre consulte a ferramenta indicada/);
+  assert.match(prompt, /Nunca estime esses valores/);
+});

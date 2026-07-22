@@ -73,6 +73,15 @@
       "reactionLevel": "off",
       "historyLimit": 0,
       "dmHistoryLimit": 20
+      ,"customCommands": [
+        { "command": "hoje", "description": "Ver o que estudar hoje" },
+        { "command": "revisoes", "description": "Ver revisoes devidas" },
+        { "command": "prioridades", "description": "Ver prioridades atuais" },
+        { "command": "progresso", "description": "Ver progresso do concurso" },
+        { "command": "operacoes", "description": "Consultar uma operacao assistida" },
+        { "command": "desconectar", "description": "Como desconectar o Telegram" },
+        { "command": "privacidade", "description": "Ver regras de privacidade" }
+      ]
     }
   },
   "commands": {
