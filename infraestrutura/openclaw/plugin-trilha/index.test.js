@@ -4,16 +4,16 @@ import test from "node:test";
 import { criarPluginDaTrilha, MENSAGENS } from "./index.js";
 
 function registrar(buscar, pluginConfig = {}) {
-  let comando;
+  const comandos = [];
   const plugin = criarPluginDaTrilha({ buscar });
   plugin.register({
     pluginConfig,
     registerCommand(registrado) {
-      comando = registrado;
+      comandos.push(registrado);
     },
   });
-  assert.ok(comando);
-  return comando;
+  assert.ok(comandos.length > 0);
+  return comandos.find((comando) => comando.name === "conectar");
 }
 
 function contextoPrivado(sobrescritas = {}) {
@@ -162,4 +162,26 @@ test("prompt vincula cada conversa suportada a dados atuais do MCP", async () =>
   }
   assert.match(prompt, /Sempre consulte a ferramenta indicada/);
   assert.match(prompt, /Nunca estime esses valores/);
+});
+
+test("confirma operacao somente pelo adaptador confiavel", async () => {
+  const comandos = [];
+  let chamada;
+  criarPluginDaTrilha({ buscar: async (url, opcoes) => {
+    chamada = { url, opcoes }; return { status: 200 };
+  }}).register({ pluginConfig: {}, registerCommand: (comando) => comandos.push(comando) });
+  const confirmar = comandos.find((comando) => comando.name === "confirmar");
+  assert.equal(confirmar.requireAuth, true);
+  const resposta = await confirmar.handler(contextoPrivado({
+    args: "2345678A", messageId: "update-10",
+  }));
+  assert.deepEqual(resposta, { text: MENSAGENS.confirmacaoAplicada });
+  assert.equal(chamada.url,
+    "http://integrador:8090/v1/operacoes/telegram/confirmacao");
+  assert.deepEqual(JSON.parse(chamada.opcoes.body), {
+    versaoDoContrato: "1", canal: "TELEGRAM", codigo: "2345678A",
+    metodo: "TEXTO", identificadorDoTelegram: "123456789",
+    identificadorDoChat: "123456789", identificadorDaContaDoBot: "principal",
+    identificadorDoUpdate: "update-10",
+  });
 });

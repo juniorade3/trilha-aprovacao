@@ -31,6 +31,8 @@ const IDENTIFICADOR_DO_VINCULO = "123e4567-e89b-42d3-a456-426614174000";
 const TOKEN_MCP = `mcp_${"A".repeat(43)}`;
 const CAMINHO_DA_TROCA =
   "/api/v1/integracoes-confiaveis/telegram/vinculos";
+const CAMINHO_DA_CONFIRMACAO =
+  "/api/v1/integracoes-confiaveis/telegram/operacoes/confirmacao";
 
 function escutar(servidor) {
   return new Promise((resolver, rejeitar) => {
@@ -88,7 +90,8 @@ function criarBackendFalso({
   estadoDaTroca = 200,
   estadosDoProvisionamento = [200],
 } = {}) {
-  const chamadas = { troca: 0, provisionamento: 0, assinaturasInvalidas: 0 };
+  const chamadas = { troca: 0, provisionamento: 0, confirmacao: 0,
+    assinaturasInvalidas: 0 };
   const servidor = createServer(async (pedido, resposta) => {
     const corpo = await lerCorpo(pedido);
     if (!assinaturaValida(pedido, corpo)) {
@@ -120,6 +123,15 @@ function criarBackendFalso({
         },
         token: TOKEN_MCP,
       });
+      return;
+    }
+    if (pedido.method === "POST" && pedido.url === CAMINHO_DA_CONFIRMACAO) {
+      chamadas.confirmacao += 1;
+      const requisicao = JSON.parse(corpo.toString("utf8"));
+      assert.equal(requisicao.codigo, "2345678A");
+      assert.equal(requisicao.identificadorDaSessao,
+        `sessao:${IDENTIFICADOR_DO_VINCULO}`);
+      responderJson(resposta, 200, { estado: "APLICADA" });
       return;
     }
     const caminhoDeProvisionamento =
@@ -219,6 +231,20 @@ async function vincular(cenario, corpo) {
   return { status: resposta.status, texto: await resposta.text() };
 }
 
+async function confirmar(cenario) {
+  const resposta = await fetch(
+    `${cenario.url}/v1/operacoes/telegram/confirmacao`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ versaoDoContrato: "1", canal: "TELEGRAM",
+        codigo: "2345678A", metodo: "TEXTO",
+        identificadorDoTelegram: IDENTIFICADOR_DO_TELEGRAM,
+        identificadorDoChat: IDENTIFICADOR_DO_TELEGRAM,
+        identificadorDaContaDoBot: "default",
+        identificadorDoUpdate: "update-100" }),
+    });
+  return { status: resposta.status, texto: await resposta.text() };
+}
+
 function lerArquivosRecursivamente(diretorio) {
   const conteudos = [];
   for (const entrada of readdirSync(diretorio, { withFileTypes: true })) {
@@ -275,6 +301,20 @@ test("retoma o registro no backend sem trocar novamente o codigo", async () => {
       path.join(cenario.estado, "openclaw.json"), "utf8"));
     assert.equal(configuracao.agents.list.length, 1);
     assert.equal(readdirSync(cenario.credenciais).length, 1);
+  } finally {
+    await cenario.encerrar();
+  }
+});
+
+test("confirma pelo vinculo provisionado sem expor o segredo do gateway", async () => {
+  const cenario = await criarCenario();
+  try {
+    assert.equal((await vincular(cenario, corpoDoPlugin())).status, 200);
+    const resposta = await confirmar(cenario);
+    assert.equal(resposta.status, 200);
+    assert.deepEqual(JSON.parse(resposta.texto), { codigo: "OPERACAO_APLICADA" });
+    assert.equal(cenario.backend.chamadas.confirmacao, 1);
+    assert.equal(cenario.backend.chamadas.assinaturasInvalidas, 0);
   } finally {
     await cenario.encerrar();
   }
