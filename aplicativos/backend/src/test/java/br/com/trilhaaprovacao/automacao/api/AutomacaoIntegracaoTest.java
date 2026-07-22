@@ -1,0 +1,673 @@
+package br.com.trilhaaprovacao.automacao.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import br.com.trilhaaprovacao.automacao.aplicacao.CodigoDeVinculoExpirado;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
+import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
+import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
+import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+@SpringBootTest(properties = {
+        "debug=false",
+        "trilha.automacao.habilitada=true",
+        "trilha.automacao.identificador-do-bot=123456789",
+        "trilha.automacao.segredo-de-hash=segredo-de-hash-exclusivo-dos-testes",
+        "trilha.automacao.chave-do-gateway=chave-exclusiva-do-gateway-de-teste",
+        "trilha.automacao.validade-do-codigo=PT10M",
+        "trilha.automacao.validade-da-credencial=P90D"
+})
+@AutoConfigureMockMvc
+@Testcontainers
+class AutomacaoIntegracaoTest {
+    private static final long IDENTIFICADOR_DO_BOT = 123456789L;
+    private static final String CHAVE_DO_GATEWAY =
+            "chave-exclusiva-do-gateway-de-teste";
+
+    @Container
+    static final PostgreSQLContainer POSTGRESQL =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
+                    .withDatabaseName("trilha_aprovacao_automacao")
+                    .withUsername("teste")
+                    .withPassword("teste");
+
+    @DynamicPropertySource
+    static void configurarBanco(DynamicPropertyRegistry propriedades) {
+        propriedades.add("spring.datasource.url", POSTGRESQL::getJdbcUrl);
+        propriedades.add("spring.datasource.username", POSTGRESQL::getUsername);
+        propriedades.add("spring.datasource.password", POSTGRESQL::getPassword);
+    }
+
+    @Autowired MockMvc api;
+    @Autowired ObjectMapper json;
+    @Autowired JdbcTemplate banco;
+    @Autowired ServicoDeVinculosDoTelegram vinculos;
+    @Autowired ServicoDeOperacoesAssistidas operacoes;
+    @Autowired ServicoDeSegredosDaAutomacao segredos;
+
+    @BeforeEach
+    void limparBanco() {
+        banco.execute("""
+                TRUNCATE TABLE eventos_de_auditoria_da_automacao,
+                    operacoes_assistidas, credenciais_de_integracao,
+                    vinculos_de_canal, usuarios CASCADE
+                """);
+    }
+
+    @Test
+    void deveAplicarV1AteV16EmPostgresqlVazioComRestricoesEAppendOnly()
+            throws Exception {
+        assertThat(banco.queryForObject("""
+                SELECT max(version::integer)
+                FROM flyway_schema_history
+                WHERE success = TRUE
+                """, Integer.class)).isEqualTo(16);
+        assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE success = TRUE
+                """, Integer.class)).isEqualTo(16);
+        assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN (
+                    'vinculos_de_canal', 'credenciais_de_integracao',
+                    'operacoes_assistidas', 'eventos_de_auditoria_da_automacao')
+                """, Integer.class)).isEqualTo(4);
+        assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND indexname IN (
+                    'uk_vinculos_de_canal_usuario_ativo_ou_pendente',
+                    'uk_vinculos_de_canal_externo_ativo',
+                    'uk_credenciais_de_integracao_ativa_por_vinculo',
+                    'uk_operacoes_assistidas_update_confirmacao',
+                    'idx_eventos_de_auditoria_correlacao')
+                """, Integer.class)).isEqualTo(5);
+        assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.referential_constraints
+                WHERE constraint_schema = 'public'
+                  AND constraint_name IN (
+                    'fk_vinculos_de_canal_usuario',
+                    'fk_credenciais_de_integracao_vinculo',
+                    'fk_operacoes_assistidas_usuario',
+                    'fk_operacoes_assistidas_vinculo_usuario',
+                    'fk_eventos_de_auditoria_usuario',
+                    'fk_eventos_de_auditoria_vinculo_usuario',
+                    'fk_eventos_de_auditoria_operacao_usuario')
+                  AND delete_rule = 'NO ACTION'
+                """, Integer.class)).isEqualTo(7);
+        assertThat(banco.queryForObject("""
+                SELECT count(*)
+                FROM pg_trigger
+                WHERE tgrelid = 'eventos_de_auditoria_da_automacao'::regclass
+                  AND tgname = 'trg_eventos_de_auditoria_append_only'
+                  AND NOT tgisinternal
+                """, Integer.class)).isEqualTo(1);
+
+        MockHttpSession sessao = criarContaEEntrar("auditoria@example.com");
+        gerarCodigo(sessao);
+        UUID evento = banco.queryForObject("""
+                SELECT identificador
+                FROM eventos_de_auditoria_da_automacao
+                LIMIT 1
+                """, UUID.class);
+
+        assertThatThrownBy(() -> banco.update("""
+                UPDATE eventos_de_auditoria_da_automacao
+                SET resultado = 'ALTERADO'
+                WHERE identificador = ?
+                """, evento)).isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("append-only");
+        assertThatThrownBy(() -> banco.update("""
+                DELETE FROM eventos_de_auditoria_da_automacao
+                WHERE identificador = ?
+                """, evento)).isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("append-only");
+    }
+
+    @Test
+    void deveGerarTrocarEConsumirCodigoSemPersistirSegredosPuros()
+            throws Exception {
+        api.perform(post("/api/v1/integracoes/telegram/codigos-de-vinculo")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        MockHttpSession sessao = criarContaEEntrar("vinculo@example.com");
+        api.perform(post("/api/v1/integracoes/telegram/codigos-de-vinculo")
+                        .session(sessao))
+                .andExpect(status().isForbidden());
+
+        CodigoGerado gerado = gerarCodigo(sessao);
+        assertThat(gerado.codigo()).matches("[23456789A-HJ-NP-Z]{10}");
+        assertThat(banco.queryForObject("""
+                SELECT codigo_de_vinculo_hash
+                FROM vinculos_de_canal
+                WHERE identificador = ?
+                """, String.class, gerado.identificadorDoVinculo()))
+                .hasSize(64)
+                .isNotEqualTo(gerado.codigo());
+
+        api.perform(get("/api/v1/integracoes/telegram/vinculo")
+                        .session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("PENDENTE"))
+                .andExpect(jsonPath("$.identificadorExterno").value(nullValue()));
+
+        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", "chave-incorreta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("ACESSO_NEGADO"));
+
+        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(gerado.codigo(), 998877L, 887766L)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo")
+                        .value("VINCULO_DO_TELEGRAM_INVALIDO"));
+        assertThat(banco.queryForObject("""
+                SELECT estado FROM vinculos_de_canal WHERE identificador = ?
+                """, String.class, gerado.identificadorDoVinculo()))
+                .isEqualTo("PENDENTE");
+
+        String resposta = api.perform(post(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.vinculo.estado").value("ATIVO"))
+                .andExpect(jsonPath("$.vinculo.identificadorExterno").value(998877L))
+                .andExpect(jsonPath("$.token", not(nullValue())))
+                .andExpect(jsonPath("$.prefixo", not(nullValue())))
+                .andExpect(jsonPath("$.escopos", hasSize(7)))
+                .andReturn().getResponse().getContentAsString();
+        String token = json.readTree(resposta).get("token").asText();
+        assertThat(token).startsWith("mcp_");
+        assertThat(banco.queryForObject("""
+                SELECT token_hash
+                FROM credenciais_de_integracao
+                WHERE vinculo_id = ?
+                """, String.class, gerado.identificadorDoVinculo()))
+                .hasSize(64)
+                .isNotEqualTo(token);
+
+        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo")
+                        .value("CODIGO_DE_VINCULO_NAO_ENCONTRADO"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM credenciais_de_integracao
+                WHERE vinculo_id = ?
+                """, Integer.class, gerado.identificadorDoVinculo())).isEqualTo(1);
+    }
+
+    @Test
+    void deveExpirarCodigoSemCriarCredencial() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("expiracao@example.com");
+        UUID usuario = identificarUsuario("expiracao@example.com");
+        UUID vinculo = UUID.randomUUID();
+        String codigo = "ABC2345678";
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO vinculos_de_canal (
+                    identificador, usuario_id, canal, bot, estado,
+                    codigo_de_vinculo_hash, codigo_expira_em,
+                    criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'TELEGRAM', ?, 'PENDENTE', ?, ?, ?, ?, 0)
+                """, vinculo, usuario, IDENTIFICADOR_DO_BOT,
+                segredos.hash(codigo), agora.minusMinutes(10),
+                agora.minusMinutes(20), agora.minusMinutes(20));
+
+        assertThatThrownBy(() -> vinculos.trocarCodigo(
+                codigo, IDENTIFICADOR_DO_BOT, 111222L, 111222L))
+                .isInstanceOf(CodigoDeVinculoExpirado.class)
+                .satisfies(excecao -> assertThat(
+                        ((CodigoDeVinculoExpirado) excecao).codigo())
+                        .isEqualTo("CODIGO_DE_VINCULO_EXPIRADO"));
+        assertThat(banco.queryForObject("""
+                SELECT estado FROM vinculos_de_canal WHERE identificador = ?
+                """, String.class, vinculo)).isEqualTo("EXPIRADO");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM credenciais_de_integracao
+                WHERE vinculo_id = ?
+                """, Integer.class, vinculo)).isZero();
+
+        api.perform(get("/api/v1/integracoes/telegram/vinculo").session(sessao))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveRevogarVinculoECredencialSemExcluirHistorico()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("revogacao@example.com");
+        VinculoCriado criado = vincular(sessao, 444555L, 444555L);
+
+        api.perform(delete("/api/v1/integracoes/telegram/vinculo")
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isNoContent());
+        api.perform(get("/api/v1/integracoes/telegram/vinculo").session(sessao))
+                .andExpect(status().isNotFound());
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM credenciais_de_integracao
+                WHERE vinculo_id = ? AND revogado_em IS NULL
+                """, Integer.class, criado.identificadorDoVinculo())).isZero();
+        assertThat(banco.queryForList("""
+                SELECT acao FROM eventos_de_auditoria_da_automacao
+                WHERE vinculo_id = ? ORDER BY ocorrido_em
+                """, String.class, criado.identificadorDoVinculo()))
+                .contains("CODIGO_DE_VINCULO_GERADO", "VINCULO_ATIVADO",
+                        "VINCULO_REVOGADO");
+    }
+
+    @Test
+    void devePrepararRotacaoRevogandoAcessoAnteriorEExigirNovaConexao()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("rotacao@example.com");
+        VinculoCriado anterior = vincular(sessao, 444555L, 444555L);
+
+        String resposta = api.perform(post(
+                        "/api/v1/integracoes/telegram/vinculo/rotacoes")
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location",
+                        "/api/v1/integracoes/telegram/vinculo"))
+                .andExpect(jsonPath("$.codigo", not(nullValue())))
+                .andExpect(jsonPath("$.vinculo.estado").value("PENDENTE"))
+                .andReturn().getResponse().getContentAsString();
+        var rotacao = json.readTree(resposta);
+        String codigo = rotacao.get("codigo").asText();
+        UUID novoVinculo = UUID.fromString(
+                rotacao.get("vinculo").get("identificador").asText());
+
+        assertThat(novoVinculo).isNotEqualTo(anterior.identificadorDoVinculo());
+        assertThat(banco.queryForObject("""
+                SELECT estado FROM vinculos_de_canal WHERE identificador = ?
+                """, String.class, anterior.identificadorDoVinculo()))
+                .isEqualTo("REVOGADO");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM credenciais_de_integracao
+                WHERE vinculo_id = ? AND revogado_em IS NULL
+                """, Integer.class, anterior.identificadorDoVinculo())).isZero();
+
+        String novaResposta = api.perform(post(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(codigo, 444555L, 444555L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vinculo.identificador").value(
+                        novoVinculo.toString()))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(novaResposta).get("token").asText())
+                .isNotEqualTo(anterior.token());
+        assertThat(banco.queryForList("""
+                SELECT fonte FROM eventos_de_auditoria_da_automacao
+                WHERE acao = 'VINCULO_ATIVADO' ORDER BY ocorrido_em
+                """, String.class)).containsOnly("TELEGRAM");
+        assertThat(banco.queryForList("""
+                SELECT acao FROM eventos_de_auditoria_da_automacao
+                WHERE usuario_id = ? ORDER BY ocorrido_em
+                """, String.class, identificarUsuario("rotacao@example.com")))
+                .contains("CREDENCIAL_ANTERIOR_REVOGADA_PARA_ROTACAO",
+                        "ROTACAO_DE_CREDENCIAL_PREPARADA");
+    }
+
+    @Test
+    void deveIsolarVinculosEOperacoesEntreUsuariosAEB() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("pessoa.a.automacao@example.com");
+        MockHttpSession sessaoB = criarContaEEntrar("pessoa.b.automacao@example.com");
+        UUID usuarioA = identificarUsuario("pessoa.a.automacao@example.com");
+        UUID usuarioB = identificarUsuario("pessoa.b.automacao@example.com");
+        VinculoCriado vinculoA = vincular(sessaoA, 101010L, 101010L);
+
+        api.perform(get("/api/v1/integracoes/telegram/vinculo").session(sessaoB))
+                .andExpect(status().isNotFound());
+
+        var operacaoA = prepararOperacao(usuarioA,
+                vinculoA.identificadorDoVinculo(), "chave-a", "{\"minutos\":30}");
+        var operacaoB = prepararOperacao(usuarioB, null,
+                "chave-b", "{\"minutos\":45}");
+
+        api.perform(get("/api/v1/operacoes-assistidas").session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDeItens").value(1))
+                .andExpect(jsonPath("$.itens[0].identificador")
+                        .value(operacaoA.identificador().toString()));
+        api.perform(get("/api/v1/operacoes-assistidas").session(sessaoB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDeItens").value(1))
+                .andExpect(jsonPath("$.itens[0].identificador")
+                        .value(operacaoB.identificador().toString()));
+
+        api.perform(get("/api/v1/operacoes-assistidas/{id}",
+                        operacaoA.identificador()).session(sessaoB))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo")
+                        .value("OPERACAO_ASSISTIDA_NAO_ENCONTRADA"));
+        assertThatThrownBy(() -> operacoes.preparar(usuarioB,
+                vinculoA.identificadorDoVinculo(), "REGISTRAR_ESTUDO", "Resumo",
+                "{}", "{}", "chave-cruzada"))
+                .isInstanceOf(RecursoNaoEncontrado.class)
+                .satisfies(excecao -> assertThat(((RecursoNaoEncontrado) excecao).codigo())
+                        .isEqualTo("VINCULO_DO_TELEGRAM_NAO_ENCONTRADO"));
+    }
+
+    @Test
+    void deveTratarIdempotenciaEAtualidadeDaOperacaoAssistida() throws Exception {
+        criarContaEEntrar("idempotencia@example.com");
+        UUID usuario = identificarUsuario("idempotencia@example.com");
+
+        var primeira = operacoes.preparar(usuario, null, "REGISTRAR_ESTUDO",
+                "Registrar estudo", "{\"minutos\":30}", "{\"plano\":1}",
+                "mesma-chave");
+        var repetida = operacoes.preparar(usuario, null, "REGISTRAR_ESTUDO",
+                "Registrar estudo", "{\"minutos\":30}", "{\"plano\":1}",
+                "mesma-chave");
+
+        assertThat(repetida.identificador()).isEqualTo(primeira.identificador());
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM operacoes_assistidas
+                WHERE usuario_id = ? AND chave_de_idempotencia = 'mesma-chave'
+                """, Integer.class, usuario)).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM eventos_de_auditoria_da_automacao
+                WHERE operacao_assistida_id = ? AND acao = 'OPERACAO_PREPARADA'
+                """, Integer.class, primeira.identificador())).isEqualTo(1);
+
+        assertThatThrownBy(() -> operacoes.preparar(usuario, null,
+                "REGISTRAR_ESTUDO", "Registrar estudo", "{\"minutos\":60}",
+                "{\"plano\":1}", "mesma-chave"))
+                .isInstanceOf(ConflitoDeDominio.class)
+                .satisfies(excecao -> assertThat(((ConflitoDeDominio) excecao).codigo())
+                        .isEqualTo("CHAVE_DE_IDEMPOTENCIA_REUTILIZADA"));
+
+        assertThat(operacoes.validarAtualidade(usuario, primeira.identificador(),
+                primeira.assinatura(), "{\"plano\":1}"))
+                .extracting("identificador")
+                .isEqualTo(primeira.identificador());
+        assertThatThrownBy(() -> operacoes.validarAtualidade(usuario,
+                primeira.identificador(), primeira.assinatura(), "{\"plano\":2}"))
+                .isInstanceOf(ConflitoDeDominio.class)
+                .satisfies(excecao -> assertThat(((ConflitoDeDominio) excecao).codigo())
+                        .isEqualTo("PREVIA_DE_AUTOMACAO_DESATUALIZADA"));
+        assertThatThrownBy(() -> operacoes.obter(
+                UUID.randomUUID(), primeira.identificador()))
+                .isInstanceOf(RecursoNaoEncontrado.class)
+                .satisfies(excecao -> assertThat(((RecursoNaoEncontrado) excecao).codigo())
+                        .isEqualTo("OPERACAO_ASSISTIDA_NAO_ENCONTRADA"));
+    }
+
+    @Test
+    void deveSerializarPreparacoesConcorrentesComMesmaChave() throws Exception {
+        criarContaEEntrar("concorrencia@example.com");
+        UUID usuario = identificarUsuario("concorrencia@example.com");
+        CountDownLatch inicio = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var tarefa = (java.util.concurrent.Callable<UUID>) () -> {
+                inicio.await();
+                return operacoes.preparar(usuario, null, "REGISTRAR_ESTUDO",
+                        "Registrar estudo", "{\"minutos\":30}",
+                        "{\"plano\":1}", "chave-concorrente").identificador();
+            };
+            var primeira = executor.submit(tarefa);
+            var segunda = executor.submit(tarefa);
+            inicio.countDown();
+
+            assertThat(primeira.get()).isEqualTo(segunda.get());
+        }
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM operacoes_assistidas
+                WHERE usuario_id = ?
+                  AND chave_de_idempotencia = 'chave-concorrente'
+                """, Integer.class, usuario)).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM eventos_de_auditoria_da_automacao
+                WHERE usuario_id = ? AND acao = 'OPERACAO_PREPARADA'
+                """, Integer.class, usuario)).isEqualTo(1);
+    }
+
+    @Test
+    void deveRejeitarRestricoesDeUnicidadeEJsonDaV16() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("restricoes@example.com");
+        UUID usuario = identificarUsuario("restricoes@example.com");
+        CodigoGerado primeiro = gerarCodigo(sessao);
+
+        assertThatThrownBy(() -> inserirVinculoPendente(
+                UUID.randomUUID(), usuario, "outro-hash"))
+                .isInstanceOf(DataAccessException.class);
+
+        var operacao = prepararOperacao(usuario, null,
+                "chave-unica", "{\"valor\":1}");
+        assertThatThrownBy(() -> banco.update("""
+                UPDATE operacoes_assistidas
+                SET proposta_canonica = '[]'::jsonb
+                WHERE identificador = ?
+                """, operacao.identificador()))
+                .isInstanceOf(DataAccessException.class);
+
+        banco.update("""
+                UPDATE vinculos_de_canal
+                SET estado = 'REVOGADO', revogado_em = now()
+                WHERE identificador = ?
+                """, primeiro.identificadorDoVinculo());
+        assertThatThrownBy(() -> banco.update("""
+                INSERT INTO vinculos_de_canal (
+                    identificador, usuario_id, canal, bot,
+                    identificador_externo, identificador_do_chat, estado,
+                    codigo_de_vinculo_hash, codigo_expira_em,
+                    codigo_consumido_em, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'TELEGRAM', ?, 123, 456, 'ATIVO', ?,
+                    now() + interval '10 minutes', now(), now(), now(), 0)
+                """, UUID.randomUUID(), usuario, IDENTIFICADOR_DO_BOT,
+                "hash-conversa-em-grupo"))
+                .isInstanceOf(DataAccessException.class);
+        assertThat(banco.queryForObject("""
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'vinculos_de_canal'
+                  AND column_name = 'bot'
+                """, String.class)).isEqualTo("NO");
+    }
+
+    @Test
+    void deveDocumentarContratosWebDaAutomacaoNoOpenApi() throws Exception {
+        String corpo = api.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode documento = json.readTree(corpo);
+
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1integracoes~1telegram~1"
+                                + "codigos-de-vinculo/post"),
+                true, "201", "RespostaDeCodigoDeVinculo",
+                List.of("400", "401", "403", "409", "422"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1integracoes~1telegram~1vinculo/get"),
+                false, "200", "RespostaDeVinculoDoTelegram",
+                List.of("401", "403", "404"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1integracoes~1telegram~1vinculo/delete"),
+                true, "204", null, List.of("400", "401", "403", "404"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1integracoes~1telegram~1vinculo~1rotacoes/post"),
+                true, "201", "RespostaDeCodigoDeVinculo",
+                List.of("400", "401", "403", "404", "422"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1operacoes-assistidas/get"),
+                false, "200", "RespostaPaginada",
+                List.of("400", "401", "403"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1operacoes-assistidas~1{identificador}/get"),
+                false, "200", "RespostaDeOperacaoAssistida",
+                List.of("400", "401", "403", "404"));
+
+        assertThat(documento.at(
+                "/paths/~1api~1v1~1integracoes-confiaveis~1telegram~1vinculos")
+                .isMissingNode()).isTrue();
+        assertThat(documento.path("components").path("schemas").propertyNames())
+                .contains("RespostaDeCodigoDeVinculo",
+                        "RespostaDeVinculoDoTelegram",
+                        "RespostaResumidaDeOperacaoAssistida",
+                        "RespostaDeOperacaoAssistida", "RespostaDeErro");
+    }
+
+    private CodigoGerado gerarCodigo(MockHttpSession sessao) throws Exception {
+        String resposta = api.perform(post(
+                        "/api/v1/integracoes/telegram/codigos-de-vinculo")
+                        .session(sessao).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location",
+                        "/api/v1/integracoes/telegram/vinculo"))
+                .andExpect(jsonPath("$.codigo", not(nullValue())))
+                .andExpect(jsonPath("$.expiraEm", not(nullValue())))
+                .andExpect(jsonPath("$.vinculo.estado").value("PENDENTE"))
+                .andReturn().getResponse().getContentAsString();
+        var raiz = json.readTree(resposta);
+        return new CodigoGerado(raiz.get("codigo").asText(),
+                UUID.fromString(raiz.get("vinculo").get("identificador").asText()));
+    }
+
+    private VinculoCriado vincular(MockHttpSession sessao, long telegram, long chat)
+            throws Exception {
+        CodigoGerado codigo = gerarCodigo(sessao);
+        String resposta = api.perform(post(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
+                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoDaTroca(codigo.codigo(), telegram, chat)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return new VinculoCriado(codigo.identificadorDoVinculo(),
+                json.readTree(resposta).get("token").asText());
+    }
+
+    private br.com.trilhaaprovacao.automacao.dominio.OperacaoAssistida
+            prepararOperacao(UUID usuario, UUID vinculo, String chave,
+                    String proposta) {
+        return operacoes.preparar(usuario, vinculo, "REGISTRAR_ESTUDO",
+                "Registrar estudo", proposta, "{\"plano\":1}", chave);
+    }
+
+    private MockHttpSession criarContaEEntrar(String email) throws Exception {
+        api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Pessoa","email":"%s",
+                                 "senha":"senha-segura-123"}
+                                """.formatted(email)))
+                .andExpect(status().isCreated());
+        return (MockHttpSession) api.perform(post("/api/v1/autenticacao/login")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","senha":"senha-segura-123"}
+                                """.formatted(email)))
+                .andExpect(status().isOk())
+                .andReturn().getRequest().getSession(false);
+    }
+
+    private UUID identificarUsuario(String email) {
+        return banco.queryForObject("""
+                SELECT identificador FROM usuarios WHERE email = ?
+                """, UUID.class, email);
+    }
+
+    private String corpoDaTroca(String codigo, long telegram, long chat) {
+        return """
+                {"codigo":"%s","identificadorDoBot":%d,
+                 "identificadorDoTelegram":%d,"identificadorDoChat":%d}
+                """.formatted(codigo, IDENTIFICADOR_DO_BOT, telegram, chat);
+    }
+
+    private void inserirVinculoPendente(UUID identificador, UUID usuario,
+            String hash) {
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO vinculos_de_canal (
+                    identificador, usuario_id, canal, bot, estado,
+                    codigo_de_vinculo_hash, codigo_expira_em,
+                    criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'TELEGRAM', ?, 'PENDENTE', ?, ?, ?, ?, 0)
+                """, identificador, usuario, IDENTIFICADOR_DO_BOT, hash,
+                agora.plusMinutes(10), agora, agora);
+    }
+
+    private void validarOperacaoOpenApi(JsonNode operacao, boolean exigeCsrf,
+            String sucesso, String fragmentoDoEsquema,
+            List<String> respostasDeErro) {
+        assertThat(operacao.isMissingNode()).isFalse();
+        assertThat(operacao.path("summary").asString()).isNotBlank();
+        assertThat(operacao.path("tags").valueStream().map(JsonNode::asString))
+                .contains("Automação assistida");
+        assertThat(operacao.at("/security/0/sessao").isMissingNode()).isFalse();
+        assertThat(operacao.at("/security/0/csrf").isMissingNode())
+                .isEqualTo(!exigeCsrf);
+
+        JsonNode respostaDeSucesso = operacao.at("/responses/" + sucesso);
+        assertThat(respostaDeSucesso.isMissingNode()).isFalse();
+        if (fragmentoDoEsquema != null) {
+            assertThat(respostaDeSucesso.path("content").valueStream()
+                    .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                    .anyMatch(referencia -> referencia.contains(fragmentoDoEsquema));
+        }
+        respostasDeErro.forEach(codigo -> assertThat(operacao
+                .at("/responses/" + codigo + "/content").valueStream()
+                .map(conteudo -> conteudo.at("/schema/$ref").asString()))
+                .as("resposta HTTP %s da automacao", codigo)
+                .anyMatch(referencia -> referencia.endsWith("/RespostaDeErro")));
+    }
+
+    private record CodigoGerado(String codigo, UUID identificadorDoVinculo) {
+    }
+
+    private record VinculoCriado(UUID identificadorDoVinculo, String token) {
+    }
+}

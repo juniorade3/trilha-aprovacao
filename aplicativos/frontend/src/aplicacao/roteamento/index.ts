@@ -6,6 +6,7 @@ import {
 } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
+import { assistenteTelegramEstaHabilitado } from '@/aplicacao/configuracao/funcionalidades'
 import LayoutDeAutenticacao from '@/aplicacao/layouts/LayoutDeAutenticacao.vue'
 import LayoutPrincipal from '@/aplicacao/layouts/LayoutPrincipal.vue'
 import InicioPagina from '@/modulos/inicio/InicioPagina.vue'
@@ -20,6 +21,7 @@ import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
 import PlanejamentoSemanaPagina from '@/modulos/planejamento/PlanejamentoSemanaPagina.vue'
 import PlanejamentoHojePagina from '@/modulos/planejamento/PlanejamentoHojePagina.vue'
 import PriorizacaoDeTopicosPagina from '@/modulos/planejamento/PriorizacaoDeTopicosPagina.vue'
+import IntegracaoTelegramPagina from '@/modulos/integracoes/IntegracaoTelegramPagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -103,6 +105,13 @@ const roteador = createRouter({
           name: 'materia-detalhe',
           component: MateriasPagina,
           props: true,
+        },
+        {
+          path: 'integracoes/telegram',
+          name: 'integracao-telegram',
+          component: IntegracaoTelegramPagina,
+          beforeEnter: () =>
+            assistenteTelegramEstaHabilitado() ? true : { name: 'dashboard' },
         },
       ],
     },
