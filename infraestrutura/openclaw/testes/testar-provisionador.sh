@@ -99,7 +99,7 @@ jq -e \
 jq -e --arg vinculo "${vinculo_um}" \
   '.mcpServers.trilha.url == ("http://broker-credenciais:18890/mcp/" + $vinculo) and
    (.mcpServers.trilha | has("headers") | not) and
-   (.mcpServers.trilha.toolFilter.include | length == 16)' "${arquivo_mcp_um}" >/dev/null
+   (.mcpServers.trilha.toolFilter.include | length == 21)' "${arquivo_mcp_um}" >/dev/null
 jq -e --arg token "${valor_token_um}" --arg agente "${agente_um}" \
   --arg sessao "sessao:${vinculo_um}" \
   '.tokenMcp == $token and .identificadorDoAgente == $agente and

@@ -158,7 +158,12 @@ ferramentas_mcp_em_json() {
     "preparar_geracao_do_plano",
     "preparar_replanejamento",
     "preparar_alteracao_de_disponibilidade",
-    "preparar_alteracao_de_prioridades"
+    "preparar_alteracao_de_prioridades",
+    "preparar_cadastro_do_concurso",
+    "preparar_catalogo_de_conteudos",
+    "preparar_conteudo_programatico",
+    "preparar_mapeamentos_do_edital",
+    "validar_contexto_do_concurso"
   ]'
 }
 

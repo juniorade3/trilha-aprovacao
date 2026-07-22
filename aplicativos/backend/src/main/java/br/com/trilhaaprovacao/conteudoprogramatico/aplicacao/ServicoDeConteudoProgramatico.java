@@ -130,6 +130,17 @@ public class ServicoDeConteudoProgramatico {
     @Transactional
     public MapeamentoDeItemDoEdital criarMapeamento(
             UUID usuario, UUID item, UUID topico) {
+        return criarMapeamento(usuario, item, topico, true);
+    }
+
+    @Transactional
+    public MapeamentoDeItemDoEdital criarSugestaoDeMapeamento(
+            UUID usuario, UUID item, UUID topico) {
+        return criarMapeamento(usuario, item, topico, false);
+    }
+
+    private MapeamentoDeItemDoEdital criarMapeamento(
+            UUID usuario, UUID item, UUID topico, boolean confirmado) {
         ItemDoEditalPersistido itemEncontrado = itemPersistido(usuario, item);
         ContextoDaMateria contexto = contextoDaMateria(
                 usuario, itemEncontrado.identificadorDaMateriaDaProva(), true);
@@ -152,8 +163,9 @@ public class ServicoDeConteudoProgramatico {
             throw conflito("MAPEAMENTO_DUPLICADO",
                     "O item ja esta mapeado para esse topico.");
         }
-        MapeamentoDeItemDoEdital mapeamento =
-                MapeamentoDeItemDoEdital.criarManual(item, topico);
+        MapeamentoDeItemDoEdital mapeamento = confirmado
+                ? MapeamentoDeItemDoEdital.criarManual(item, topico)
+                : MapeamentoDeItemDoEdital.criarSugerido(item, topico);
         return mapeamentos.save(
                 new MapeamentoDeItemDoEditalPersistido(mapeamento)).paraDominio();
     }
