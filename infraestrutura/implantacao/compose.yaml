@@ -1,0 +1,94 @@
+name: trilha-aprovacao
+
+services:
+  postgresql:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${NOME_BANCO:-trilha_aprovacao}
+      POSTGRES_USER: ${USUARIO_BANCO:-trilha_aprovacao}
+      POSTGRES_PASSWORD_FILE: /run/secrets/SENHA_BANCO
+    secrets:
+      - source: senha-do-banco
+        target: SENHA_BANCO
+    volumes:
+      - dados-postgresql:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - dados-internos
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: infraestrutura/implantacao/Dockerfile.backend
+    image: trilha-aprovacao-backend:local
+    restart: unless-stopped
+    environment:
+      URL_BANCO: jdbc:postgresql://postgresql:5432/${NOME_BANCO:-trilha_aprovacao}
+      USUARIO_BANCO: ${USUARIO_BANCO:-trilha_aprovacao}
+      PORTA_BACKEND: "8080"
+      SPRING_CONFIG_IMPORT: file:/run/configuracao/segredos-backend.yml,configtree:/run/secrets/
+    secrets:
+      - source: senha-do-banco
+        target: SENHA_BANCO
+    volumes:
+      - type: bind
+        source: ${ARQUIVO_SEGREDOS_BACKEND:?defina ARQUIVO_SEGREDOS_BACKEND}
+        target: /run/configuracao/segredos-backend.yml
+        read_only: true
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - dados-internos
+      - aplicacao-interna
+      - trilha-aplicacao
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infraestrutura/implantacao/Dockerfile.frontend
+      args:
+        VITE_ASSISTENTE_TELEGRAM_HABILITADO: ${ASSISTENTE_TELEGRAM_HABILITADO:-true}
+    image: trilha-aprovacao-frontend:local
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${PORTA_FRONTEND:-5173}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/api/v1/autenticacao/csrf || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aplicacao-interna
+
+secrets:
+  senha-do-banco:
+    file: ${ARQUIVO_SENHA_BANCO:?defina ARQUIVO_SENHA_BANCO}
+
+volumes:
+  dados-postgresql:
+
+networks:
+  dados-internos:
+    internal: true
+  aplicacao-interna:
+  trilha-aplicacao:
+    name: trilha-aplicacao
+    external: true

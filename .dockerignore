@@ -1,0 +1,9 @@
+.git
+.env
+.vscode
+**/node_modules
+**/target
+**/dist
+**/coverage
+**/*.log
+udo systemctl restart ollama

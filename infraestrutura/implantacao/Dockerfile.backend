@@ -1,0 +1,26 @@
+FROM maven:3.9.11-eclipse-temurin-21-alpine AS construcao
+
+WORKDIR /codigo
+
+COPY aplicativos/backend/pom.xml ./pom.xml
+RUN mvn --batch-mode --no-transfer-progress dependency:go-offline
+
+COPY aplicativos/backend/src ./src
+RUN mvn --batch-mode --no-transfer-progress -DskipTests package \
+    && find target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' \
+        -exec cp '{}' /aplicacao.jar \; \
+    && test -s /aplicacao.jar
+
+FROM eclipse-temurin:21-jre-alpine
+
+RUN addgroup -S aplicacao \
+    && adduser -S -G aplicacao aplicacao
+
+WORKDIR /aplicacao
+
+COPY --from=construcao /aplicacao.jar ./aplicacao.jar
+
+USER aplicacao
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "/aplicacao/aplicacao.jar"]

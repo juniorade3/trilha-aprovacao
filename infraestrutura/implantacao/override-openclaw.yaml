@@ -1,0 +1,16 @@
+services:
+  broker-credenciais:
+    networks:
+      - trilha-aplicacao
+
+  integrador:
+    environment:
+      URL_DO_BACKEND_DA_TRILHA: http://backend:8080
+      URL_MCP_DA_TRILHA: http://backend:8080/mcp
+    networks:
+      - trilha-aplicacao
+
+networks:
+  trilha-aplicacao:
+    name: trilha-aplicacao
+    external: true
