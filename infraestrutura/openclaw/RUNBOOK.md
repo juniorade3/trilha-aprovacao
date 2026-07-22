@@ -8,6 +8,7 @@ Use um usuario operacional dedicado com UID/GID `1000`, ou ajuste de forma consc
 export OPENCLAW_DIRETORIO_ESTADO="$HOME/.local/share/trilha-openclaw"
 export OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$HOME/.config/trilha-openclaw/credenciais-mcp"
 export OPENCLAW_ARQUIVO_SEGREDOS="$HOME/.config/trilha-openclaw/segredos.json"
+export OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$HOME/.codex/auth.json"
 export OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT="$HOME/.config/trilha-openclaw/identificador-bot"
 export OPENCLAW_ARQUIVO_SEGREDO_GATEWAY="$HOME/.config/trilha-openclaw/segredo-do-gateway"
 
@@ -23,11 +24,28 @@ historico. `segredos.json` deve ter o seguinte formato:
 
 ```json
 {
-  "openai": { "apiKey": "VALOR_REAL" },
   "telegram": { "tokenDoBot": "VALOR_REAL" },
   "gateway": { "token": "VALOR_ALEATORIO_COM_PELO_MENOS_32_BYTES" }
 }
 ```
+
+Nao ha `OPENAI_API_KEY`. O Gateway usa `openai/gpt-5.5` pelo runtime Codex
+nativo e fail-closed do OpenClaw. O binario gerenciado pelo OpenClaw reutiliza a
+autenticacao do login ja realizado no CLI do computador; ele nao executa o
+binario do host. Confirme esse login antes de subir os containers:
+
+```bash
+codex login status
+```
+
+O Compose monta `OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX` em modo somente leitura
+apenas no Gateway e define `CODEX_HOME=/run/secrets/codex-cli`. Cada app-server
+mantem configuracao e sessoes no diretorio isolado do agente; apenas a conta do
+CLI e repassada pelo runtime. O perfil `minimal`, sem `exec` ou `process`, e a
+negacao dos grupos de runtime e filesystem desabilitam o modo de codigo nativo.
+Se a autenticacao estiver ausente,
+expirada ou invalida, a chamada do modelo falha; nao existe fallback por chave
+de API.
 
 `identificador-bot` contem somente o identificador numerico do bot, sem o token.
 `segredo-do-gateway` contem exatamente o mesmo segredo HMAC configurado no
@@ -38,22 +56,29 @@ Verifique antes de iniciar:
 
 ```bash
 chmod 600 "$OPENCLAW_ARQUIVO_SEGREDOS"
+chmod 600 "$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX"
 chmod 600 "$OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT" "$OPENCLAW_ARQUIVO_SEGREDO_GATEWAY"
 test "$(stat -c '%a' "$OPENCLAW_DIRETORIO_ESTADO")" = 700
 test "$(stat -c '%a' "$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP")" = 700
 test "$(stat -c '%a' "$OPENCLAW_ARQUIVO_SEGREDOS")" = 600
+test "$(stat -c '%a' "$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX")" = 600
 test "$(stat -c '%a' "$OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT")" = 600
 test "$(stat -c '%a' "$OPENCLAW_ARQUIVO_SEGREDO_GATEWAY")" = 600
 test ! -L "$OPENCLAW_ARQUIVO_SEGREDOS"
+test ! -L "$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX"
 jq empty "$OPENCLAW_ARQUIVO_SEGREDOS"
+jq empty "$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX"
 ```
 
-Nao use symlinks, nao coloque esses caminhos dentro do checkout e nao versione copias ou backups. Estado e credenciais MCP devem ser diretorios separados; o container do Gateway monta apenas o estado, e apenas o broker monta as credenciais MCP.
+Nao use symlinks, nao coloque esses caminhos dentro do checkout e nao versione
+copias ou backups. Estado e credenciais MCP devem ser diretorios separados; o
+container do Gateway monta o estado e somente o arquivo de autenticacao Codex,
+e apenas o broker monta as credenciais MCP.
 
 ## 2. Validar e iniciar
 
-Antes de iniciar, substitua `PREENCHA_COM_SUA_OPENAI_API_KEY` no arquivo local
-de segredos. Nunca use esse marcador em um ambiente ativo.
+Antes de iniciar, confirme que `codex login status` informa uma sessao valida e
+que o JSON local contem somente os segredos do Telegram e do Gateway.
 
 ```bash
 infraestrutura/openclaw/scripts/validar.sh
@@ -61,6 +86,7 @@ infraestrutura/openclaw/scripts/validar.sh
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml up -d
 ```
 
@@ -70,11 +96,13 @@ O Compose nao publica `18789`. A verificacao ocorre dentro do container:
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml ps
 
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml exec gateway \
   node dist/index.js config validate --json
 ```
@@ -137,6 +165,7 @@ infraestrutura/openclaw/scripts/registrar-provisionamento.sh \
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml restart gateway
 ```
 
@@ -186,12 +215,14 @@ Depois de cada alteracao de versao ou configuracao:
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml exec gateway \
   node dist/index.js security audit --deep
 
 OPENCLAW_DIRETORIO_ESTADO="$OPENCLAW_DIRETORIO_ESTADO" \
 OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
 OPENCLAW_ARQUIVO_SEGREDOS="$OPENCLAW_ARQUIVO_SEGREDOS" \
+OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="$OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX" \
 docker compose -f infraestrutura/openclaw/compose.yaml exec gateway \
   node dist/index.js secrets audit --check
 ```
@@ -206,6 +237,8 @@ Tambem confirme:
 - cada agente tem `agentDir`, workspace, binding e plugin proprios;
 - `openclaw.json` mantem `mcp.servers` vazio;
 - o servico `gateway` nao monta `/run/secrets/credenciais-mcp` e o broker nao monta o estado;
+- somente o `gateway` monta `OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX`, como arquivo
+  regular `0600`, somente leitura, sob `/run/secrets/codex-cli`;
 - `grep -R 'mcp_' "$OPENCLAW_DIRETORIO_ESTADO"` nao encontra token literal;
 - cada JSON em `OPENCLAW_DIRETORIO_CREDENCIAIS_MCP` e arquivo regular `0600`;
 - o backend continua derivando o usuario exclusivamente da credencial MCP.
@@ -219,9 +252,14 @@ Em suspeita de vazamento, nesta ordem:
 3. revogue o token do bot no BotFather se o incidente o incluir;
 4. pare o Compose;
 5. preserve auditoria e metadados, sem copiar tokens;
-6. rotacione OpenAI e token do Gateway quando aplicavel;
+6. revogue a sessao Codex afetada, refaca `codex login` no host e rotacione o
+   token do Gateway quando aplicavel;
 7. reprovisione vinculos somente apos identificar a causa;
 8. execute as validacoes, o security audit e o teste A/B antes de reabilitar.
+
+Depois de refazer o login, reinicie o Gateway para remontar o arquivo atualizado
+e confirme `codex login status` antes do smoke. A autenticacao nunca deve ser
+copiada para o estado do OpenClaw ou para o repositorio.
 
 ## 8. Atualizar o OpenClaw
 

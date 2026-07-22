@@ -39,17 +39,39 @@ provisionadores existentes. Depois do provisionamento local, um retry conclui
 diretamente o registro no backend sem depender de o codigo continuar valido.
 Recibos de idempotencia guardam somente hash, estado e UUID.
 
-O `mcp.servers` global permanece vazio. Cada workspace recebe um bundle Codex minimo em `.openclaw/extensions`, descoberto somente pelo runtime daquele agente. O bundle contem apenas a URL interna e opaca do vinculo; nao contem token, cabecalho de autenticacao nem caminho de segredo.
+O `mcp.servers` global permanece vazio. Cada workspace recebe um plugin Codex
+minimo em `.openclaw/extensions`, descoberto somente pelo runtime daquele
+agente. O plugin contem apenas a URL interna e opaca do vinculo; nao contem
+token, cabecalho de autenticacao nem caminho de segredo.
 
 O broker, em outro processo e sem montar o estado do agente, resolve um arquivo externo `0600` por vinculo e injeta `Authorization`, `X-Identificador-Do-Agente` e `X-Identificador-Da-Sessao`. O backend valida os tres contra o vinculo ativo; nenhum deles e argumento controlado pelo modelo. O broker aceita somente `POST /mcp/{vinculo}`, limita o corpo, nao segue redirecionamentos e nunca repassa cabecalhos de identidade enviados pelo cliente.
 
-O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas o processo compartilhado faria todos os tokens existirem no ambiente do mesmo runtime. A Trilha usa, em vez disso, um broker minimo: somente ele monta `OPENCLAW_DIRETORIO_CREDENCIAIS_MCP`; o Gateway nao monta esse diretorio e nenhum token aparece no workspace, no diretorio do agente ou no `openclaw.json`. O agente nao recebe ferramentas de filesystem, shell, execucao, navegador, nodes, Docker, mensagens externas ou administracao. OpenAI, Telegram e autenticacao do Gateway usam `SecretRef` para outro arquivo externo montado somente no Gateway.
+O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas
+o processo compartilhado faria todos os tokens existirem no ambiente do mesmo
+runtime. A Trilha usa, em vez disso, um broker minimo: somente ele monta
+`OPENCLAW_DIRETORIO_CREDENCIAIS_MCP`; o Gateway nao monta esse diretorio e
+nenhum token aparece no workspace, no diretorio do agente ou no
+`openclaw.json`.
+
+As respostas do modelo usam `openai/gpt-5.5` pelo runtime Codex nativo do
+OpenClaw, em modo fail-closed. O binario do Codex e gerenciado pelo OpenClaw;
+ele apenas reutiliza o login ja feito pelo CLI no computador por meio de
+`OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX=$HOME/.codex/auth.json`. O arquivo e
+montado somente para o Gateway, em modo somente leitura, com
+`CODEX_HOME=/run/secrets/codex-cli`. Nao existe `OPENAI_API_KEY`, fallback para
+chave de API ou copia dessa autenticacao nos workspaces. Telegram e
+autenticacao do Gateway continuam usando `SecretRef` no arquivo externo de
+segredos. O agente nao recebe ferramentas de filesystem, shell, execucao,
+navegador, nodes, Docker, mensagens externas ou administracao.
 
 ## Protecoes aplicadas
 
 - somente DMs numericas explicitamente permitidas; grupos desabilitados;
 - um binding `per-channel-peer` por Telegram;
-- runtime OpenAI nativo do OpenClaw, fixado por `agentRuntime.id: "openclaw"`;
+- runtime Codex nativo do OpenClaw em modo fail-closed, com o modelo
+  `openai/gpt-5.5` e o plugin Codex;
+- perfil de ferramentas `minimal`, sem `exec` ou `process`, e negacao explicita
+  dos grupos de runtime e filesystem, desabilitando o modo de codigo nativo;
 - somente ferramentas `trilha__*` explicitamente permitidas, filtradas tambem no servidor MCP;
 - configuracao por chat, comandos administrativos, exec approvals e cron desabilitados;
 - container sem capacidades Linux, sem privilegios, sem Docker socket e com raiz somente leitura;
@@ -59,7 +81,8 @@ O OpenClaw `v2026.7.1` aceita interpolacao de ambiente nos cabecalhos MCP, mas o
   fechado e sem credencial compartilhada com o plugin;
 - integrador sem porta publicada, isolado do broker por rede, com segredos
   regulares `0600`, corpo limitado, timeout, rate limit e HMAC;
-- arquivo de segredos, estado e diretorio de credenciais MCP obrigatoriamente fora do repositorio e separados entre si;
+- arquivo de segredos, autenticacao Codex, estado e diretorio de credenciais
+  MCP obrigatoriamente fora do repositorio e separados entre si;
 - token MCP de entrada, credencial persistida e segredo HMAC devem ser arquivos regulares, nao links simbolicos, com permissao `0600`;
 - alteracoes de configuracao serializadas com `flock` e escritas por troca atomica;
 - metadados guardam somente SHA-256 do token MCP, nunca seu valor.

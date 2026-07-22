@@ -11,6 +11,7 @@ compor() {
   OPENCLAW_DIRETORIO_ESTADO="${temporario}/estado" \
   OPENCLAW_DIRETORIO_CREDENCIAIS_MCP="${temporario}/credenciais-mcp" \
   OPENCLAW_ARQUIVO_SEGREDOS="${temporario}/segredos.json" \
+  OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX="${temporario}/autenticacao-codex.json" \
   OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT="${temporario}/identificador-bot" \
   OPENCLAW_ARQUIVO_SEGREDO_GATEWAY="${temporario}/segredo-gateway" \
     docker compose -p "${projeto}" -f "${diretorio_do_modulo}/compose.yaml" "$@"
@@ -30,10 +31,12 @@ mkdir -m 700 "${temporario}/estado" "${temporario}/credenciais-mcp"
 mkdir -m 700 "${temporario}/estado/extensions" \
   "${temporario}/estado/extensions/trilha-aprovacao"
 printf '{}\n' > "${temporario}/segredos.json"
+printf '{"auth_mode":"chatgpt","tokens":{}}\n' > "${temporario}/autenticacao-codex.json"
 printf '700000001\n' > "${temporario}/identificador-bot"
 printf 'segredo-de-teste-do-gateway-com-mais-de-trinta-e-dois-bytes\n' \
   > "${temporario}/segredo-gateway"
-chmod 600 "${temporario}/segredos.json" "${temporario}/identificador-bot" \
+chmod 600 "${temporario}/segredos.json" "${temporario}/autenticacao-codex.json" \
+  "${temporario}/identificador-bot" \
   "${temporario}/segredo-gateway"
 
 vinculo="423e4567-e89b-42d3-a456-426614174003"

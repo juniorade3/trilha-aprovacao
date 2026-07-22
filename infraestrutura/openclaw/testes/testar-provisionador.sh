@@ -93,8 +93,15 @@ jq -e --arg agente "${agente_um}" '.agents.list | length == 1 and .[0].id == $ag
 jq -e '(.bindings | length == 1) and .channels.telegram.allowFrom == ["800000001"]' \
   "${configuracao}" >/dev/null
 jq -e \
-  '.plugins.allow == ["trilha-aprovacao"] and
-   .plugins.entries["trilha-aprovacao"].enabled == true and .mcp.servers == {}' \
+  '.plugins.allow == ["codex", "trilha-aprovacao"] and
+   .plugins.entries.codex.enabled == true and
+   .plugins.entries["trilha-aprovacao"].enabled == true and .mcp.servers == {} and
+   .models.providers.openai.agentRuntime.id == "codex" and
+   (.models.providers.openai | has("apiKey") | not) and
+   .agents.defaults.model.primary == "openai/gpt-5.5" and
+   .agents.list[0].model.primary == "openai/gpt-5.5" and
+   (.agents.list[0].tools.deny | index("group:runtime")) != null and
+   (.agents.list[0].tools.deny | index("group:fs")) != null' \
   "${configuracao}" >/dev/null
 jq -e --arg vinculo "${vinculo_um}" \
   '.mcpServers.trilha.url == ("http://broker-credenciais:18890/mcp/" + $vinculo) and
@@ -211,7 +218,9 @@ jq -e --arg token "${valor_token_dois}" '.tokenMcp == $token' "${arquivo_credenc
   --diretorio-estado "${estado}" --diretorio-credenciais-mcp "${credenciais}" \
   --identificador-vinculo "${vinculo_dois}" >/dev/null
 jq -e '.agents.list == [] and .bindings == [] and .channels.telegram.allowFrom == [] and
-  .plugins.allow == ["trilha-aprovacao"] and .plugins.entries["trilha-aprovacao"].enabled == true' \
+  .plugins.allow == ["codex", "trilha-aprovacao"] and
+  .plugins.entries.codex.enabled == true and
+  .plugins.entries["trilha-aprovacao"].enabled == true' \
   "${configuracao}" >/dev/null
 jq -e '.estado == "REVOGADO" and (has("hashDoToken") | not)' \
   "${estado}/provisionamentos/${vinculo_dois}.json" >/dev/null

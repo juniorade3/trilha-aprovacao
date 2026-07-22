@@ -14,7 +14,7 @@ agente=""
 sessao=""
 arquivo_do_token=""
 url_mcp=""
-modelo="openai/gpt-5.6"
+modelo="openai/gpt-5.5"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

@@ -14,7 +14,7 @@ identificador_do_agente=""
 identificador_da_sessao=""
 arquivo_do_token=""
 url_mcp=""
-modelo="openai/gpt-5.6"
+modelo="openai/gpt-5.5"
 
 uso() {
   printf '%s\n' \
