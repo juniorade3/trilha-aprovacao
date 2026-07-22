@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ServicoDeVinculosDoTelegram {
     private static final String ESCOPOS_INICIAIS =
-            "agenda:ler revisoes:ler prioridades:ler progresso:ler historico:ler "
-                    + "estrutura:ler operacoes:ler";
+            "planejamento:ler prioridades:ler concursos:ler estudos:ler "
+                    + "operacoes:ler";
 
     private final RepositorioDeVinculosDeCanal vinculos;
     private final RepositorioDeCredenciaisDeIntegracao credenciais;
@@ -133,12 +133,19 @@ public class ServicoDeVinculosDoTelegram {
         OffsetDateTime agora = agora();
         String hash = segredos.hash(normalizarCodigo(codigo));
         VinculoDeCanalPersistido persistido = vinculos
-                .findByCodigoDeVinculoHashAndEstado(
-                        hash, EstadoDoVinculoDeCanal.PENDENTE)
+                .findByCodigoDeVinculoHash(hash)
                 .orElseThrow(() -> new RecursoNaoEncontrado(
                         "CODIGO_DE_VINCULO_NAO_ENCONTRADO",
                         "Codigo de vinculo nao encontrado."));
         VinculoDeCanal vinculo = persistido.paraDominio();
+        if (vinculo.estado() == EstadoDoVinculoDeCanal.ATIVO) {
+            return repetirTroca(vinculo, codigo, bot, identificadorExterno,
+                    identificadorDoChat, agora);
+        }
+        if (vinculo.estado() != EstadoDoVinculoDeCanal.PENDENTE) {
+            throw new RecursoNaoEncontrado("CODIGO_DE_VINCULO_NAO_ENCONTRADO",
+                    "Codigo de vinculo nao encontrado.");
+        }
         if (!vinculo.codigoValidoEm(agora)) {
             vinculo.expirar(agora);
             persistido.atualizarDe(vinculo);
@@ -158,11 +165,53 @@ public class ServicoDeVinculosDoTelegram {
         }
         persistido.atualizarDe(vinculo);
         vinculos.flush();
-        CredencialEmitida emitida = emitirCredencial(vinculo.identificador(), agora);
+        CredencialEmitida emitida = emitirCredencial(
+                vinculo.identificador(), codigo, agora);
         auditar(vinculo.identificadorDoUsuario(), vinculo.identificador(),
                 "VINCULO_ATIVADO", hash, "GATEWAY_TELEGRAM", "TELEGRAM",
                 "SUCESSO", agora);
         return new ResultadoDaTrocaDoCodigo(persistido.paraDominio(), emitida);
+    }
+
+    @Transactional
+    public VinculoDeCanal registrarProvisionamento(UUID identificadorDoVinculo,
+            long bot, long telegram, long chat, String agente, String sessao) {
+        OffsetDateTime agora = agora();
+        VinculoDeCanalPersistido persistido = vinculos
+                .encontrarParaProvisionamento(identificadorDoVinculo)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "VINCULO_DO_TELEGRAM_NAO_ENCONTRADO",
+                        "Vinculo do Telegram nao encontrado."));
+        VinculoDeCanal vinculo = persistido.paraDominio();
+        if (vinculo.estado() != EstadoDoVinculoDeCanal.ATIVO
+                || vinculo.identificadorDoBot() != bot
+                || !java.util.Objects.equals(vinculo.identificadorExterno(), telegram)
+                || !java.util.Objects.equals(vinculo.identificadorDoChat(), chat)) {
+            throw new RecursoNaoEncontrado(
+                    "VINCULO_DO_TELEGRAM_NAO_ENCONTRADO",
+                    "Vinculo do Telegram nao encontrado.");
+        }
+        if (vinculo.provisionadoEm() != null) {
+            if (segredos.corresponde(vinculo.identificadorDoAgente(), agente)
+                    && segredos.corresponde(
+                            vinculo.identificadorDaSessao(), sessao)) {
+                return vinculo;
+            }
+            throw new ConflitoDeDominio("VINCULO_JA_PROVISIONADO",
+                    "O vinculo ja pertence a outro agente ou sessao.");
+        }
+        try {
+            vinculo.registrarProvisionamento(agente, sessao, agora);
+        } catch (IllegalArgumentException | IllegalStateException excecao) {
+            throw new RegraDeDominio("PROVISIONAMENTO_INVALIDO",
+                    excecao.getMessage());
+        }
+        persistido.atualizarDe(vinculo);
+        vinculos.flush();
+        auditar(vinculo.identificadorDoUsuario(), vinculo.identificador(),
+                "AGENTE_OPENCLAW_PROVISIONADO", null, "GATEWAY_TELEGRAM",
+                "OPENCLAW", "SUCESSO", agora);
+        return persistido.paraDominio();
     }
 
     private CodigoDeVinculoGerado criarVinculoPendente(UUID usuario,
@@ -178,8 +227,9 @@ public class ServicoDeVinculosDoTelegram {
         return new CodigoDeVinculoGerado(codigo, salvo.codigoExpiraEm(), salvo);
     }
 
-    private CredencialEmitida emitirCredencial(UUID vinculo, OffsetDateTime agora) {
-        String token = segredos.gerarToken();
+    private CredencialEmitida emitirCredencial(UUID vinculo, String codigo,
+            OffsetDateTime agora) {
+        String token = tokenDoVinculo(vinculo, codigo);
         String prefixo = token.substring(0, Math.min(16, token.length()));
         CredencialDeIntegracao credencial = CredencialDeIntegracao.criar(vinculo,
                 segredos.hash(token), prefixo, ESCOPOS_INICIAIS,
@@ -187,6 +237,38 @@ public class ServicoDeVinculosDoTelegram {
         CredencialDeIntegracao salva = credenciais.saveAndFlush(
                 new CredencialDeIntegracaoPersistida(credencial)).paraDominio();
         return new CredencialEmitida(token, salva);
+    }
+
+    private ResultadoDaTrocaDoCodigo repetirTroca(VinculoDeCanal vinculo,
+            String codigo, long bot, long telegram, long chat,
+            OffsetDateTime agora) {
+        if (!agora.isBefore(vinculo.codigoExpiraEm())
+                || vinculo.identificadorDoBot() != bot
+                || !java.util.Objects.equals(vinculo.identificadorExterno(), telegram)
+                || !java.util.Objects.equals(vinculo.identificadorDoChat(), chat)) {
+            throw new RecursoNaoEncontrado("CODIGO_DE_VINCULO_NAO_ENCONTRADO",
+                    "Codigo de vinculo nao encontrado.");
+        }
+        CredencialDeIntegracao credencial = credenciais
+                .findFirstByIdentificadorDoVinculoAndRevogadoEmIsNullOrderByCriadoEmDesc(
+                        vinculo.identificador())
+                .map(CredencialDeIntegracaoPersistida::paraDominio)
+                .filter(item -> item.ativaEm(agora))
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "CREDENCIAL_DE_INTEGRACAO_NAO_ENCONTRADA",
+                        "Credencial de integracao nao encontrada."));
+        String token = tokenDoVinculo(vinculo.identificador(), codigo);
+        if (!segredos.corresponde(credencial.tokenHash(), segredos.hash(token))) {
+            throw new ConflitoDeDominio("TROCA_DE_VINCULO_NAO_REPETIVEL",
+                    "Solicite uma nova rotacao da integracao.");
+        }
+        return new ResultadoDaTrocaDoCodigo(vinculo,
+                new CredencialEmitida(token, credencial));
+    }
+
+    private String tokenDoVinculo(UUID vinculo, String codigo) {
+        return segredos.derivarToken("credencial-mcp\n" + vinculo + "\n"
+                + normalizarCodigo(codigo));
     }
 
     private void revogarCredenciais(UUID vinculo, OffsetDateTime agora) {

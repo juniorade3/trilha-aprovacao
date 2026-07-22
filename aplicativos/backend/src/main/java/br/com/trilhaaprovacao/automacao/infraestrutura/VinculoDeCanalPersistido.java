@@ -27,6 +27,11 @@ public class VinculoDeCanalPersistido {
     private String codigoDeVinculoHash;
     @Column(name = "codigo_expira_em", nullable = false) private OffsetDateTime codigoExpiraEm;
     @Column(name = "codigo_consumido_em") private OffsetDateTime codigoConsumidoEm;
+    @Column(name = "identificador_do_agente", length = 160)
+    private String identificadorDoAgente;
+    @Column(name = "identificador_da_sessao", length = 160)
+    private String identificadorDaSessao;
+    @Column(name = "provisionado_em") private OffsetDateTime provisionadoEm;
     @Column(name = "criado_em", nullable = false) private OffsetDateTime criadoEm;
     @Column(name = "atualizado_em", nullable = false) private OffsetDateTime atualizadoEm;
     @Column(name = "revogado_em") private OffsetDateTime revogadoEm;
@@ -51,6 +56,9 @@ public class VinculoDeCanalPersistido {
         codigoDeVinculoHash = vinculo.codigoDeVinculoHash();
         codigoExpiraEm = vinculo.codigoExpiraEm();
         codigoConsumidoEm = vinculo.codigoConsumidoEm();
+        identificadorDoAgente = vinculo.identificadorDoAgente();
+        identificadorDaSessao = vinculo.identificadorDaSessao();
+        provisionadoEm = vinculo.provisionadoEm();
         atualizadoEm = vinculo.atualizadoEm();
         revogadoEm = vinculo.revogadoEm();
     }
@@ -59,10 +67,17 @@ public class VinculoDeCanalPersistido {
         return VinculoDeCanal.reconstituir(identificador, identificadorDoUsuario,
                 canal, identificadorDoBot, identificadorExterno, identificadorDoChat,
                 estado, codigoDeVinculoHash, codigoExpiraEm, codigoConsumidoEm,
+                identificadorDoAgente, identificadorDaSessao, provisionadoEm,
                 criadoEm, atualizadoEm, revogadoEm, versao);
     }
 
     public UUID identificador() { return identificador; }
     public UUID identificadorDoUsuario() { return identificadorDoUsuario; }
     public EstadoDoVinculoDeCanal estado() { return estado; }
+    public Long identificadorDoBot() { return identificadorDoBot; }
+    public Long identificadorExterno() { return identificadorExterno; }
+    public Long identificadorDoChat() { return identificadorDoChat; }
+    public String identificadorDoAgente() { return identificadorDoAgente; }
+    public String identificadorDaSessao() { return identificadorDaSessao; }
+    public OffsetDateTime provisionadoEm() { return provisionadoEm; }
 }

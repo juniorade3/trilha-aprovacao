@@ -21,6 +21,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 @EnableWebSecurity
@@ -45,14 +46,14 @@ public class ConfiguracaoDeSeguranca {
     @Bean SecurityContextRepository repositorioDeContexto() { return new HttpSessionSecurityContextRepository(); }
 
     @Bean
+    @Order(3)
     SecurityFilterChain filtroDeSeguranca(HttpSecurity http, SecurityContextRepository repositorioDeContexto, ObjectMapper mapeador) throws Exception {
         CookieCsrfTokenRepository csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrf.setCookieCustomizer(cookie -> cookie.sameSite("Lax").path("/"));
         http
                 .csrf(configuracao -> configuracao
                         .csrfTokenRepository(csrf)
-                        .ignoringRequestMatchers(
-                                "/api/v1/integracoes-confiaveis/telegram/vinculos"))
+                        )
                 .securityContext(configuracao -> configuracao.securityContextRepository(repositorioDeContexto).requireExplicitSave(true))
                 .sessionManagement(configuracao -> configuracao.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(autorizacao -> autorizacao
@@ -61,7 +62,6 @@ public class ConfiguracaoDeSeguranca {
                                 "/api/v1/autenticacao/csrf",
                                 "/api/v1/autenticacao/cadastro",
                                 "/api/v1/autenticacao/login",
-                                "/api/v1/integracoes-confiaveis/telegram/vinculos",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**")

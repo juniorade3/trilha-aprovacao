@@ -2,14 +2,16 @@
 
 ## Finalidade e estado
 
-Este documento define os contratos planejados entre o OpenClaw e a Trilha da
-Aprovacao, os fluxos conversacionais e as fronteiras entre consulta, preparacao,
-confirmacao e aplicacao. Ele nao registra ferramenta implementada, integracao
-validada nem resultado de teste.
+Este documento define os contratos entre o OpenClaw e a Trilha da Aprovacao, os
+fluxos conversacionais e as fronteiras entre consulta, preparacao, confirmacao e
+aplicacao. O catalogo de consultas da Sprint 02 e o transporte MCP ja estao
+implementados; preparacoes, confirmacoes e fluxos das sprints seguintes
+continuam planejados. Os resultados executados ficam registrados em
+`ACEITE-SPRINT-02.md`.
 
-O MCP sera uma porta tipada para casos de uso especificos. Nao existira
-ferramenta generica para chamar uma rota HTTP, executar SQL, acessar arquivos ou
-escolher livremente um usuario. A aplicacao web e os casos de uso do monolito
+O MCP e uma porta tipada para casos de uso especificos. Nao existe ferramenta
+generica para chamar uma rota HTTP, executar SQL, acessar arquivos ou escolher
+livremente um usuario. A aplicacao web e os casos de uso do monolito
 continuarao sendo a fonte de verdade.
 
 ## Fronteiras do contrato
@@ -52,7 +54,7 @@ mas nao alteram concurso, conteudo, estudo, evidencia ou planejamento.
 
 ### Credencial MCP
 
-Cada vinculo ativo tera uma credencial MCP exclusiva. O token apresentado ao
+Cada vinculo ativo tem uma credencial MCP exclusiva. O token apresentado ao
 MCP resolve, no backend:
 
 - o usuario da Trilha;

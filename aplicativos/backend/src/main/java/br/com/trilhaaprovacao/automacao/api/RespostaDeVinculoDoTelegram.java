@@ -13,6 +13,8 @@ public record RespostaDeVinculoDoTelegram(
         long identificadorDoBot,
         Long identificadorExterno,
         Long identificadorDoChat,
+        boolean provisionado,
+        String identificadorDoAgente,
         OffsetDateTime vinculadoEm,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,
@@ -22,6 +24,7 @@ public record RespostaDeVinculoDoTelegram(
         return new RespostaDeVinculoDoTelegram(vinculo.identificador(), vinculo.canal(),
                 vinculo.estado(), vinculo.identificadorDoBot(),
                 vinculo.identificadorExterno(), vinculo.identificadorDoChat(),
+                vinculo.provisionadoEm() != null, vinculo.identificadorDoAgente(),
                 vinculo.codigoConsumidoEm(), vinculo.criadoEm(),
                 vinculo.atualizadoEm(), vinculo.revogadoEm());
     }

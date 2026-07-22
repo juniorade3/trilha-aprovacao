@@ -1,0 +1,33 @@
+{
+  "id": "trilha-aprovacao",
+  "name": "Trilha da Aprovacao",
+  "description": "Encaminha codigos de vinculo do Telegram ao integrador interno da Trilha.",
+  "version": "2026.7.1",
+  "activation": {
+    "onStartup": true
+  },
+  "commandAliases": [
+    {
+      "name": "conectar",
+      "kind": "runtime-slash"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "urlDoIntegrador": {
+        "type": "string",
+        "pattern": "^https?://[^\\s/?#]+(?::[0-9]{1,5})?/?$",
+        "maxLength": 2048,
+        "default": "http://integrador:8090"
+      },
+      "tempoLimiteEmMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 15000,
+        "default": 5000
+      }
+    }
+  }
+}

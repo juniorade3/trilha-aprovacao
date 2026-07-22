@@ -16,6 +16,9 @@ public final class VinculoDeCanal {
     private String codigoDeVinculoHash;
     private OffsetDateTime codigoExpiraEm;
     private OffsetDateTime codigoConsumidoEm;
+    private String identificadorDoAgente;
+    private String identificadorDaSessao;
+    private OffsetDateTime provisionadoEm;
     private OffsetDateTime atualizadoEm;
     private OffsetDateTime revogadoEm;
     private long versao;
@@ -24,7 +27,9 @@ public final class VinculoDeCanal {
             CanalDeIntegracao canal, long identificadorDoBot, Long identificadorExterno,
             Long identificadorDoChat, EstadoDoVinculoDeCanal estado,
             String codigoDeVinculoHash, OffsetDateTime codigoExpiraEm,
-            OffsetDateTime codigoConsumidoEm, OffsetDateTime criadoEm,
+            OffsetDateTime codigoConsumidoEm, String identificadorDoAgente,
+            String identificadorDaSessao, OffsetDateTime provisionadoEm,
+            OffsetDateTime criadoEm,
             OffsetDateTime atualizadoEm, OffsetDateTime revogadoEm, long versao) {
         this.identificador = Objects.requireNonNull(identificador);
         this.identificadorDoUsuario = Objects.requireNonNull(identificadorDoUsuario);
@@ -39,6 +44,9 @@ public final class VinculoDeCanal {
         this.codigoDeVinculoHash = codigoDeVinculoHash;
         this.codigoExpiraEm = codigoExpiraEm;
         this.codigoConsumidoEm = codigoConsumidoEm;
+        this.identificadorDoAgente = identificadorDoAgente;
+        this.identificadorDaSessao = identificadorDaSessao;
+        this.provisionadoEm = provisionadoEm;
         this.criadoEm = Objects.requireNonNull(criadoEm);
         this.atualizadoEm = Objects.requireNonNull(atualizadoEm);
         this.revogadoEm = revogadoEm;
@@ -56,7 +64,7 @@ public final class VinculoDeCanal {
         }
         return new VinculoDeCanal(UUID.randomUUID(), usuario, CanalDeIntegracao.TELEGRAM,
                 bot, null, null, EstadoDoVinculoDeCanal.PENDENTE, codigoHash,
-                expiraEm, null, agora, agora, null, 0);
+                expiraEm, null, null, null, null, agora, agora, null, 0);
     }
 
     public static VinculoDeCanal reconstituir(UUID identificador, UUID usuario,
@@ -67,7 +75,23 @@ public final class VinculoDeCanal {
             OffsetDateTime atualizadoEm, OffsetDateTime revogadoEm, long versao) {
         return new VinculoDeCanal(identificador, usuario, canal, bot,
                 identificadorExterno, identificadorDoChat, estado, codigoHash,
-                codigoExpiraEm, codigoConsumidoEm, criadoEm, atualizadoEm,
+                codigoExpiraEm, codigoConsumidoEm, null, null, null,
+                criadoEm, atualizadoEm,
+                revogadoEm, versao);
+    }
+
+    public static VinculoDeCanal reconstituir(UUID identificador, UUID usuario,
+            CanalDeIntegracao canal, long bot, Long identificadorExterno,
+            Long identificadorDoChat, EstadoDoVinculoDeCanal estado,
+            String codigoHash, OffsetDateTime codigoExpiraEm,
+            OffsetDateTime codigoConsumidoEm, String identificadorDoAgente,
+            String identificadorDaSessao, OffsetDateTime provisionadoEm,
+            OffsetDateTime criadoEm, OffsetDateTime atualizadoEm,
+            OffsetDateTime revogadoEm, long versao) {
+        return new VinculoDeCanal(identificador, usuario, canal, bot,
+                identificadorExterno, identificadorDoChat, estado, codigoHash,
+                codigoExpiraEm, codigoConsumidoEm, identificadorDoAgente,
+                identificadorDaSessao, provisionadoEm, criadoEm, atualizadoEm,
                 revogadoEm, versao);
     }
 
@@ -110,6 +134,20 @@ public final class VinculoDeCanal {
         atualizadoEm = agora;
     }
 
+    public void registrarProvisionamento(String agente, String sessao,
+            OffsetDateTime agora) {
+        if (estado != EstadoDoVinculoDeCanal.ATIVO) {
+            throw new IllegalStateException(
+                    "Somente vinculo ativo pode ser provisionado.");
+        }
+        identificadorDoAgente = exigirIdentificador(
+                agente, "Identificador do agente");
+        identificadorDaSessao = exigirIdentificador(
+                sessao, "Identificador da sessao");
+        provisionadoEm = Objects.requireNonNull(agora);
+        atualizadoEm = agora;
+    }
+
     public boolean codigoValidoEm(OffsetDateTime instante) {
         return estado == EstadoDoVinculoDeCanal.PENDENTE
                 && codigoDeVinculoHash != null && instante.isBefore(codigoExpiraEm);
@@ -130,6 +168,22 @@ public final class VinculoDeCanal {
             throw new IllegalArgumentException(
                     "Vinculo ativo exige uma conversa privada com o bot.");
         }
+        boolean provisionamentoIncompleto = identificadorDoAgente == null
+                ^ identificadorDaSessao == null;
+        provisionamentoIncompleto = provisionamentoIncompleto
+                || ((identificadorDoAgente == null) != (provisionadoEm == null));
+        if (provisionamentoIncompleto) {
+            throw new IllegalArgumentException(
+                    "Provisionamento exige agente, sessao e instante.");
+        }
+    }
+
+    private String exigirIdentificador(String valor, String campo) {
+        if (valor == null || valor.isBlank() || valor.trim().length() > 160) {
+            throw new IllegalArgumentException(
+                    campo + " deve conter entre 1 e 160 caracteres.");
+        }
+        return valor.trim();
     }
 
     public UUID identificador() { return identificador; }
@@ -142,6 +196,9 @@ public final class VinculoDeCanal {
     public String codigoDeVinculoHash() { return codigoDeVinculoHash; }
     public OffsetDateTime codigoExpiraEm() { return codigoExpiraEm; }
     public OffsetDateTime codigoConsumidoEm() { return codigoConsumidoEm; }
+    public String identificadorDoAgente() { return identificadorDoAgente; }
+    public String identificadorDaSessao() { return identificadorDaSessao; }
+    public OffsetDateTime provisionadoEm() { return provisionadoEm; }
     public OffsetDateTime criadoEm() { return criadoEm; }
     public OffsetDateTime atualizadoEm() { return atualizadoEm; }
     public OffsetDateTime revogadoEm() { return revogadoEm; }

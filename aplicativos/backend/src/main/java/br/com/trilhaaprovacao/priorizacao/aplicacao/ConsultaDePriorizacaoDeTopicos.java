@@ -45,7 +45,8 @@ public class ConsultaDePriorizacaoDeTopicos {
         this.contextos = contextos;
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ,
+            noRollbackFor = RegraDeDominio.class)
     public ResultadoDaPriorizacaoDeTopicos consultar(
             UUID usuario, LocalDate referencia, UUID materia) {
         if (usuario == null || referencia == null) {

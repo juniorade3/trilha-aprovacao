@@ -1,0 +1,190 @@
+{
+  "secrets": {
+    "providers": {
+      "arquivo": {
+        "source": "file",
+        "path": "/run/secrets/segredos-openclaw.json",
+        "mode": "json",
+        "maxBytes": 65536
+      }
+    },
+    "defaults": {
+      "file": "arquivo"
+    }
+  },
+  "models": {
+    "providers": {
+      "openai": {
+        "apiKey": {
+          "source": "file",
+          "provider": "arquivo",
+          "id": "/openai/apiKey"
+        },
+        "agentRuntime": {
+          "id": "openclaw"
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai/gpt-5.6"
+      },
+      "contextInjection": "always",
+      "memorySearch": {
+        "enabled": false
+      },
+      "userTimezone": "America/Sao_Paulo",
+      "timeFormat": "24"
+    },
+    "list": []
+  },
+  "bindings": [],
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": {
+        "source": "file",
+        "provider": "arquivo",
+        "id": "/telegram/tokenDoBot"
+      },
+      "configWrites": false,
+      "dmPolicy": "allowlist",
+      "allowFrom": [],
+      "groupPolicy": "disabled",
+      "execApprovals": {
+        "enabled": false
+      },
+      "actions": {
+        "reactions": false,
+        "sendMessage": true,
+        "poll": false,
+        "deleteMessage": false,
+        "editMessage": false,
+        "sticker": false,
+        "createForumTopic": false,
+        "editForumTopic": false
+      },
+      "richMessages": false,
+      "linkPreview": false,
+      "silentErrorReplies": true,
+      "reactionNotifications": "off",
+      "reactionLevel": "off",
+      "historyLimit": 0,
+      "dmHistoryLimit": 20
+    }
+  },
+  "commands": {
+    "native": false,
+    "nativeSkills": false,
+    "text": false,
+    "bash": false,
+    "config": false,
+    "mcp": false,
+    "plugins": false,
+    "debug": false,
+    "restart": false,
+    "useAccessGroups": true,
+    "ownerDisplay": "hash"
+  },
+  "session": {
+    "scope": "per-sender",
+    "dmScope": "per-channel-peer",
+    "typingMode": "message",
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "30d",
+      "maxEntries": 10000
+    }
+  },
+  "tools": {
+    "profile": "minimal",
+    "deny": [
+      "session_status",
+      "group:runtime",
+      "group:fs",
+      "group:web",
+      "group:sessions",
+      "group:memory",
+      "group:ui",
+      "group:automation",
+      "group:messaging",
+      "group:nodes",
+      "group:agents",
+      "group:media"
+    ],
+    "sessions": {
+      "visibility": "self"
+    },
+    "agentToAgent": {
+      "enabled": false,
+      "allow": []
+    },
+    "elevated": {
+      "enabled": false
+    },
+    "loopDetection": {
+      "enabled": true,
+      "historySize": 30,
+      "warningThreshold": 8,
+      "unknownToolThreshold": 5,
+      "criticalThreshold": 14,
+      "globalCircuitBreakerThreshold": 20
+    }
+  },
+  "cron": {
+    "enabled": false
+  },
+  "plugins": {
+    "enabled": true,
+    "allow": [
+      "trilha-aprovacao"
+    ],
+    "entries": {
+      "trilha-aprovacao": {
+        "enabled": true,
+        "config": {
+          "urlDoIntegrador": "http://integrador:8090",
+          "tempoLimiteEmMs": 5000
+        }
+      }
+    }
+  },
+  "mcp": {
+    "servers": {},
+    "sessionIdleTtlMs": 600000
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "controlUi": {
+      "enabled": false
+    },
+    "terminal": {
+      "enabled": false
+    },
+    "auth": {
+      "mode": "token",
+      "token": {
+        "source": "file",
+        "provider": "arquivo",
+        "id": "/gateway/token"
+      },
+      "rateLimit": {
+        "maxAttempts": 5,
+        "windowMs": 60000,
+        "lockoutMs": 300000,
+        "exemptLoopback": false
+      }
+    },
+    "tailscale": {
+      "mode": "off"
+    },
+    "reload": {
+      "mode": "hybrid",
+      "debounceMs": 500
+    }
+  }
+}

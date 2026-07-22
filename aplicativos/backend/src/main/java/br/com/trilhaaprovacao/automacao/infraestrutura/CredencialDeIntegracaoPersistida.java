@@ -47,4 +47,8 @@ public class CredencialDeIntegracaoPersistida {
                 identificadorDoVinculo, tokenHash, prefixo, escopos, expiraEm,
                 ultimoUsoEm, revogadoEm, criadoEm, versao);
     }
+
+    public UUID identificador() { return identificador; }
+    public UUID identificadorDoVinculo() { return identificadorDoVinculo; }
+    public String escopos() { return escopos; }
 }
