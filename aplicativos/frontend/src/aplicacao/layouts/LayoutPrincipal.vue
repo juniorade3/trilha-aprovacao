@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
+import { assistenteTelegramEstaHabilitado } from '@/aplicacao/configuracao/funcionalidades'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
 import RegistroRapidoDeEstudo from '@/modulos/estudos/RegistroRapidoDeEstudo.vue'
 import type { TipoDeEstudo } from '@/modulos/estudos/apiDeEstudos'
@@ -15,6 +16,7 @@ interface DadosIniciaisDoRegistroRapido {
 
 const sessao = usarSessao()
 const roteador = useRouter()
+const assistenteTelegramHabilitado = assistenteTelegramEstaHabilitado()
 const menuAberto = ref(false)
 const registroRapidoAberto = ref(false)
 const dadosIniciaisDoRegistroRapido = ref<DadosIniciaisDoRegistroRapido>()
@@ -106,6 +108,15 @@ onBeforeUnmount(() => {
             {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
           </span>
           <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
+          <RouterLink
+            v-if="assistenteTelegramHabilitado"
+            class="botao-de-icone"
+            to="/integracoes/telegram"
+            aria-label="Integração com o Telegram"
+            title="Integração com o Telegram"
+          >
+            <i class="bi bi-robot" aria-hidden="true"></i>
+          </RouterLink>
           <button
             class="botao-de-icone"
             type="button"

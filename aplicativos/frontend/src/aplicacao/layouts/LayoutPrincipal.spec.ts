@@ -3,8 +3,12 @@
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent, nextTick } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+
+vi.mock('@/aplicacao/configuracao/funcionalidades', () => ({
+  assistenteTelegramEstaHabilitado: () => true,
+}))
 
 import LayoutPrincipal from './LayoutPrincipal.vue'
 
@@ -36,6 +40,11 @@ describe('LayoutPrincipal', () => {
     expect(layout.get('.navegacao-principal').text()).toContain('Planejamento')
     expect(layout.get('.navegacao-principal').text()).not.toContain('Histórico')
     expect(layout.get('.navegacao-movel').text()).toContain('Planejar')
+    expect(
+      layout
+        .get('a[aria-label="Integração com o Telegram"]')
+        .attributes('href'),
+    ).toBe('/integracoes/telegram')
     layout.unmount()
   })
 

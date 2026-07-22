@@ -111,6 +111,7 @@ class DocumentacaoDaApiIntegracaoTest {
                 "Evidências",
                 "Priorização de tópicos",
                 "Revisões espaçadas",
+                "Automação assistida",
                 "Dashboard");
         assertThat(documento.at("/paths/~1api~1v1~1dashboard/get/security/0/sessao")
                 .isMissingNode()).isFalse();

@@ -49,7 +49,10 @@ public class ConfiguracaoDeSeguranca {
         CookieCsrfTokenRepository csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrf.setCookieCustomizer(cookie -> cookie.sameSite("Lax").path("/"));
         http
-                .csrf(configuracao -> configuracao.csrfTokenRepository(csrf))
+                .csrf(configuracao -> configuracao
+                        .csrfTokenRepository(csrf)
+                        .ignoringRequestMatchers(
+                                "/api/v1/integracoes-confiaveis/telegram/vinculos"))
                 .securityContext(configuracao -> configuracao.securityContextRepository(repositorioDeContexto).requireExplicitSave(true))
                 .sessionManagement(configuracao -> configuracao.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(autorizacao -> autorizacao
@@ -58,6 +61,7 @@ public class ConfiguracaoDeSeguranca {
                                 "/api/v1/autenticacao/csrf",
                                 "/api/v1/autenticacao/cadastro",
                                 "/api/v1/autenticacao/login",
+                                "/api/v1/integracoes-confiaveis/telegram/vinculos",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**")

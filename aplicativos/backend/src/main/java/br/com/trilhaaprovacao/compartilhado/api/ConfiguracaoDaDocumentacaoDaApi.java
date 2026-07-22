@@ -70,6 +70,8 @@ public class ConfiguracaoDaDocumentacaoDaApi {
                                 "Lacunas e ranking consultivo dos topicos exigidos."),
                         new Tag().name("Revisões espaçadas").description(
                                 "Agenda deterministica de revisoes dos topicos exigidos."),
+                        new Tag().name("Automação assistida").description(
+                                "Vinculos de canal e historico de operacoes assistidas."),
                         new Tag().name("Dashboard").description("Visão objetiva do concurso ativo.")));
     }
 
