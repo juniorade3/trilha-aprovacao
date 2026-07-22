@@ -43,6 +43,18 @@ public interface RepositorioDeVinculosDeCanal
     Optional<VinculoDeCanalPersistido> findByCodigoDeVinculoHashAndEstado(
             String codigoHash, EstadoDoVinculoDeCanal estado);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<VinculoDeCanalPersistido> findByCodigoDeVinculoHash(
+            String codigoHash);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select v from VinculoDeCanalPersistido v
+            where v.identificador = :identificador
+            """)
+    Optional<VinculoDeCanalPersistido> encontrarParaProvisionamento(
+            @Param("identificador") UUID identificador);
+
     boolean existsByCanalAndIdentificadorDoBotAndIdentificadorExternoAndEstado(
             CanalDeIntegracao canal, long bot, long identificadorExterno,
             EstadoDoVinculoDeCanal estado);

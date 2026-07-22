@@ -17,6 +17,7 @@
     <properties>
         <java.version>21</java.version>
         <versao.archunit>1.4.2</versao.archunit>
+        <versao.mcp>2.0.0</versao.mcp>
         <versao.springdoc>3.0.3</versao.springdoc>
         <versao.testcontainers>2.0.5</versao.testcontainers>
     </properties>
@@ -55,6 +56,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>${versao.mcp}</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

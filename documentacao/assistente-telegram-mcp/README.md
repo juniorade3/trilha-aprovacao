@@ -8,14 +8,16 @@ O primeiro valor entregue será permitir que um usuário vinculado pergunte, por
 
 Nenhuma etapa descrita como futura neste documento deve ser interpretada como resultado já executado.
 
-## Estado base
+## Estado da implementacao
 
-- Repositório base: `main` no commit `9e4d534`.
-- Última migration conhecida: `V15`.
+- O planejamento iniciou em `main` no commit `9e4d534`, com a migration V15.
+- A Sprint 02 partiu de `main` no commit `d6a59e156ce15eabcf7667b789fc634632e27bcf`, depois da integracao da Sprint 01.
+- A migration mais recente na branch da Sprint 02 e a V17.
 - Baseline executado em 21 de julho de 2026: 151 testes de backend e 131 testes de frontend aprovados.
 - Porta da Sprint 0 executada em 21 de julho de 2026: `docker compose config` aprovado e `make verificar` aprovado, incluindo empacotamento do backend, tipos, lint, testes, build, formatação e auditoria do frontend com zero vulnerabilidades.
-- As migrations, dependências e resultados dos testes deverão ser confirmados novamente no início de cada sprint.
-- Os resultados de segurança, integração com Telegram, conformidade MCP e validação do OpenClaw permanecem planejados até sua execução e registro factual.
+- O [aceite da Sprint 01](ACEITE-SPRINT-01.md) registra os resultados executados da identidade e das operacoes assistidas.
+- O [aceite da Sprint 02](ACEITE-SPRINT-02.md) registra os testes MCP, PostgreSQL V1-V17 e validacoes do OpenClaw ja executados. A repeticao integral de `make verificar` ainda esta pendente e a feature flag permanece desligada.
+- As dependencias e os resultados devem ser confirmados novamente em cada sprint; itens sem evidencia no aceite correspondente continuam planejados.
 
 ## Arquitetura
 
@@ -129,6 +131,8 @@ Estados previstos para uma operação: `PREPARADA`, `AGUARDANDO_CONFIRMACAO`, `C
 ### Sprint 2 — MCP e provisionamento OpenClaw
 
 Branch: `feature/assistente-02-mcp-openclaw`.
+
+Estado factual: implementado na branch e validado nos itens registrados em [ACEITE-SPRINT-02.md](ACEITE-SPRINT-02.md); a porta integral ainda aguarda a nova execucao de `make verificar`.
 
 - adicionar endpoint MCP Streamable HTTP e segurança stateless exclusiva;
 - provisionar agente, sessão e credencial isolados por vínculo;

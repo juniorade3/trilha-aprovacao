@@ -17,14 +17,22 @@ import br.com.trilhaaprovacao.automacao.aplicacao.CodigoDeVinculoExpirado;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
+import br.com.trilhaaprovacao.automacao.infraestrutura.ValidadorDeAssinaturaDoGateway;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +44,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -49,7 +58,9 @@ import tools.jackson.databind.ObjectMapper;
         "trilha.automacao.habilitada=true",
         "trilha.automacao.identificador-do-bot=123456789",
         "trilha.automacao.segredo-de-hash=segredo-de-hash-exclusivo-dos-testes",
-        "trilha.automacao.chave-do-gateway=chave-exclusiva-do-gateway-de-teste",
+        "trilha.automacao.identificador-da-chave-do-gateway=gateway-openclaw-teste",
+        "trilha.automacao.segredo-do-gateway=segredo-do-gateway-exclusivo-dos-testes-123456789",
+        "trilha.automacao.limite-do-gateway-por-minuto=500",
         "trilha.automacao.validade-do-codigo=PT10M",
         "trilha.automacao.validade-da-credencial=P90D"
 })
@@ -57,8 +68,10 @@ import tools.jackson.databind.ObjectMapper;
 @Testcontainers
 class AutomacaoIntegracaoTest {
     private static final long IDENTIFICADOR_DO_BOT = 123456789L;
-    private static final String CHAVE_DO_GATEWAY =
-            "chave-exclusiva-do-gateway-de-teste";
+    private static final String IDENTIFICADOR_DA_CHAVE_DO_GATEWAY =
+            "gateway-openclaw-teste";
+    private static final String SEGREDO_DO_GATEWAY =
+            "segredo-do-gateway-exclusivo-dos-testes-123456789";
 
     @Container
     static final PostgreSQLContainer POSTGRESQL =
@@ -84,33 +97,35 @@ class AutomacaoIntegracaoTest {
     @BeforeEach
     void limparBanco() {
         banco.execute("""
-                TRUNCATE TABLE eventos_de_auditoria_da_automacao,
+                TRUNCATE TABLE requisicoes_confiaveis_da_automacao,
+                    eventos_de_auditoria_da_automacao,
                     operacoes_assistidas, credenciais_de_integracao,
                     vinculos_de_canal, usuarios CASCADE
                 """);
     }
 
     @Test
-    void deveAplicarV1AteV16EmPostgresqlVazioComRestricoesEAppendOnly()
+    void deveAplicarV1AteV17EmPostgresqlVazioComRestricoesEAppendOnly()
             throws Exception {
         assertThat(banco.queryForObject("""
                 SELECT max(version::integer)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(16);
+                """, Integer.class)).isEqualTo(17);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(16);
+                """, Integer.class)).isEqualTo(17);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                   AND table_name IN (
                     'vinculos_de_canal', 'credenciais_de_integracao',
-                    'operacoes_assistidas', 'eventos_de_auditoria_da_automacao')
-                """, Integer.class)).isEqualTo(4);
+                    'operacoes_assistidas', 'eventos_de_auditoria_da_automacao',
+                    'requisicoes_confiaveis_da_automacao')
+                """, Integer.class)).isEqualTo(5);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM pg_indexes
@@ -118,10 +133,12 @@ class AutomacaoIntegracaoTest {
                   AND indexname IN (
                     'uk_vinculos_de_canal_usuario_ativo_ou_pendente',
                     'uk_vinculos_de_canal_externo_ativo',
+                    'uk_vinculos_de_canal_sessao_ativa',
                     'uk_credenciais_de_integracao_ativa_por_vinculo',
                     'uk_operacoes_assistidas_update_confirmacao',
-                    'idx_eventos_de_auditoria_correlacao')
-                """, Integer.class)).isEqualTo(5);
+                    'idx_eventos_de_auditoria_correlacao',
+                    'idx_requisicoes_confiaveis_idempotencia')
+                """, Integer.class)).isEqualTo(7);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM information_schema.referential_constraints
@@ -193,17 +210,18 @@ class AutomacaoIntegracaoTest {
                 .andExpect(jsonPath("$.estado").value("PENDENTE"))
                 .andExpect(jsonPath("$.identificadorExterno").value(nullValue()));
 
-        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", "chave-incorreta")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.codigo").value("ACESSO_NEGADO"));
+        String corpoValido = corpoDaTroca(
+                gerado.codigo(), 998877L, 998877L);
+        api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoValido, "chave-incorreta", UUID.randomUUID().toString()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.codigo")
+                        .value("ASSINATURA_DO_GATEWAY_INVALIDA"));
 
-        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(gerado.codigo(), 998877L, 887766L)))
+        api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoDaTroca(gerado.codigo(), 998877L, 887766L)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.codigo")
                         .value("VINCULO_DO_TELEGRAM_INVALIDO"));
@@ -212,18 +230,24 @@ class AutomacaoIntegracaoTest {
                 """, String.class, gerado.identificadorDoVinculo()))
                 .isEqualTo("PENDENTE");
 
-        String resposta = api.perform(post(
-                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
+        String idempotenciaDaTroca = UUID.randomUUID().toString();
+        String resposta = api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoValido, IDENTIFICADOR_DA_CHAVE_DO_GATEWAY,
+                        idempotenciaDaTroca))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.vinculo.estado").value("ATIVO"))
                 .andExpect(jsonPath("$.vinculo.identificadorExterno").value(998877L))
+                .andExpect(jsonPath("$.vinculo.provisionado").value(false))
                 .andExpect(jsonPath("$.token", not(nullValue())))
                 .andExpect(jsonPath("$.prefixo", not(nullValue())))
-                .andExpect(jsonPath("$.escopos", hasSize(7)))
+                .andExpect(jsonPath("$.escopos", hasSize(5)))
+                .andExpect(jsonPath("$.escopos[0]").value("planejamento:ler"))
+                .andExpect(jsonPath("$.escopos[1]").value("prioridades:ler"))
+                .andExpect(jsonPath("$.escopos[2]").value("concursos:ler"))
+                .andExpect(jsonPath("$.escopos[3]").value("estudos:ler"))
+                .andExpect(jsonPath("$.escopos[4]").value("operacoes:ler"))
                 .andReturn().getResponse().getContentAsString();
         String token = json.readTree(resposta).get("token").asText();
         assertThat(token).startsWith("mcp_");
@@ -235,17 +259,76 @@ class AutomacaoIntegracaoTest {
                 .hasSize(64)
                 .isNotEqualTo(token);
 
-        api.perform(post("/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(gerado.codigo(), 998877L, 998877L)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.codigo")
-                        .value("CODIGO_DE_VINCULO_NAO_ENCONTRADO"));
+        String repetida = api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoValido, IDENTIFICADOR_DA_CHAVE_DO_GATEWAY,
+                        idempotenciaDaTroca))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(repetida).get("token").asText()).isEqualTo(token);
         assertThat(banco.queryForObject("""
                 SELECT count(*) FROM credenciais_de_integracao
                 WHERE vinculo_id = ?
                 """, Integer.class, gerado.identificadorDoVinculo())).isEqualTo(1);
+
+        String agente = "agente-openclaw-vinculo";
+        String sessaoDoAgente = "sessao-openclaw-vinculo";
+        api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos/"
+                                + gerado.identificadorDoVinculo()
+                                + "/provisionamento",
+                        corpoDoProvisionamento(998877L, 998877L, agente,
+                                sessaoDoAgente)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.provisionado").value(true))
+                .andExpect(jsonPath("$.identificadorDoAgente").value(agente));
+        assertThat(banco.queryForObject("""
+                SELECT identificador_da_sessao
+                FROM vinculos_de_canal WHERE identificador = ?
+                """, String.class, gerado.identificadorDoVinculo()))
+                .isEqualTo(sessaoDoAgente);
+    }
+
+    @Test
+    void deveValidarHmacReplayEIdempotenciaDoGateway() throws Exception {
+        MockHttpSession sessao = criarContaEEntrar("gateway@example.com");
+        CodigoGerado codigo = gerarCodigo(sessao);
+        String caminho = "/api/v1/integracoes-confiaveis/telegram/vinculos";
+        String corpo = corpoDaTroca(codigo.codigo(), 212121L, 212121L);
+        String idempotencia = "troca-gateway-212121";
+        String nonce = UUID.randomUUID().toString().replace("-", "");
+        long instante = Instant.now().getEpochSecond();
+
+        String primeira = api.perform(postConfiavel(caminho, corpo,
+                        IDENTIFICADOR_DA_CHAVE_DO_GATEWAY, idempotencia,
+                        nonce, instante))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        api.perform(postConfiavel(caminho, corpo,
+                        IDENTIFICADOR_DA_CHAVE_DO_GATEWAY, idempotencia,
+                        nonce, instante))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("REQUISICAO_DO_GATEWAY_REPETIDA"));
+
+        String repetida = api.perform(postConfiavel(caminho, corpo,
+                        IDENTIFICADOR_DA_CHAVE_DO_GATEWAY, idempotencia))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(repetida).get("token").asText()).isEqualTo(
+                json.readTree(primeira).get("token").asText());
+
+        api.perform(postConfiavel(caminho,
+                        corpoDaTroca(codigo.codigo(), 212121L, 313131L),
+                        IDENTIFICADOR_DA_CHAVE_DO_GATEWAY, idempotencia))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("CHAVE_DE_IDEMPOTENCIA_REUTILIZADA"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM credenciais_de_integracao
+                WHERE vinculo_id = ?
+                """, Integer.class, codigo.identificadorDoVinculo()))
+                .isEqualTo(1);
     }
 
     @Test
@@ -307,6 +390,40 @@ class AutomacaoIntegracaoTest {
     }
 
     @Test
+    void deveProvisionarMesmoAgenteIdempotentementeERecusarOutraSessao()
+            throws Exception {
+        MockHttpSession sessaoWeb = criarContaEEntrar("provisionamento@example.com");
+        VinculoCriado criado = vincular(sessaoWeb, 515151L, 515151L);
+        String caminho = "/api/v1/integracoes-confiaveis/telegram/vinculos/"
+                + criado.identificadorDoVinculo() + "/provisionamento";
+        String mesmoCorpo = corpoDoProvisionamento(515151L, 515151L,
+                criado.identificadorDoAgente(), criado.identificadorDaSessao());
+
+        api.perform(postConfiavel(caminho, mesmoCorpo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.provisionado").value(true));
+        api.perform(postConfiavel(caminho,
+                        corpoDoProvisionamento(515151L, 515151L,
+                                criado.identificadorDoAgente(), "outra-sessao")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo")
+                        .value("VINCULO_JA_PROVISIONADO"));
+
+        api.perform(get("/api/v1/integracoes/telegram/vinculo")
+                        .session(sessaoWeb))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.provisionado").value(true))
+                .andExpect(jsonPath("$.identificadorDoAgente")
+                        .value(criado.identificadorDoAgente()));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM eventos_de_auditoria_da_automacao
+                WHERE vinculo_id = ?
+                  AND acao = 'AGENTE_OPENCLAW_PROVISIONADO'
+                """, Integer.class, criado.identificadorDoVinculo()))
+                .isEqualTo(1);
+    }
+
+    @Test
     void devePrepararRotacaoRevogandoAcessoAnteriorEExigirNovaConexao()
             throws Exception {
         MockHttpSession sessao = criarContaEEntrar("rotacao@example.com");
@@ -336,11 +453,9 @@ class AutomacaoIntegracaoTest {
                 WHERE vinculo_id = ? AND revogado_em IS NULL
                 """, Integer.class, anterior.identificadorDoVinculo())).isZero();
 
-        String novaResposta = api.perform(post(
-                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(codigo, 444555L, 444555L)))
+        String novaResposta = api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoDaTroca(codigo, 444555L, 444555L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vinculo.identificador").value(
                         novoVinculo.toString()))
@@ -475,7 +590,8 @@ class AutomacaoIntegracaoTest {
     }
 
     @Test
-    void deveRejeitarRestricoesDeUnicidadeEJsonDaV16() throws Exception {
+    void deveRejeitarRestricoesDeUnicidadeJsonEProvisionamentoDaV17()
+            throws Exception {
         MockHttpSession sessao = criarContaEEntrar("restricoes@example.com");
         UUID usuario = identificarUsuario("restricoes@example.com");
         CodigoGerado primeiro = gerarCodigo(sessao);
@@ -516,6 +632,13 @@ class AutomacaoIntegracaoTest {
                   AND table_name = 'vinculos_de_canal'
                   AND column_name = 'bot'
                 """, String.class)).isEqualTo("NO");
+
+        assertThatThrownBy(() -> banco.update("""
+                UPDATE vinculos_de_canal
+                SET identificador_do_agente = 'agente-sem-sessao'
+                WHERE identificador = ?
+                """, primeiro.identificadorDoVinculo()))
+                .isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -579,15 +702,25 @@ class AutomacaoIntegracaoTest {
     private VinculoCriado vincular(MockHttpSession sessao, long telegram, long chat)
             throws Exception {
         CodigoGerado codigo = gerarCodigo(sessao);
-        String resposta = api.perform(post(
-                        "/api/v1/integracoes-confiaveis/telegram/vinculos")
-                        .header("X-Chave-Do-Gateway", CHAVE_DO_GATEWAY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDaTroca(codigo.codigo(), telegram, chat)))
+        String resposta = api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
+                        corpoDaTroca(codigo.codigo(), telegram, chat)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
+        String agente = "agente-" + codigo.identificadorDoVinculo();
+        String identificadorDaSessao =
+                "sessao-" + codigo.identificadorDoVinculo();
+        api.perform(postConfiavel(
+                        "/api/v1/integracoes-confiaveis/telegram/vinculos/"
+                                + codigo.identificadorDoVinculo()
+                                + "/provisionamento",
+                        corpoDoProvisionamento(
+                                telegram, chat, agente, identificadorDaSessao)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.provisionado").value(true));
         return new VinculoCriado(codigo.identificadorDoVinculo(),
-                json.readTree(resposta).get("token").asText());
+                json.readTree(resposta).get("token").asText(), agente,
+                identificadorDaSessao);
     }
 
     private br.com.trilhaaprovacao.automacao.dominio.OperacaoAssistida
@@ -625,6 +758,74 @@ class AutomacaoIntegracaoTest {
                 {"codigo":"%s","identificadorDoBot":%d,
                  "identificadorDoTelegram":%d,"identificadorDoChat":%d}
                 """.formatted(codigo, IDENTIFICADOR_DO_BOT, telegram, chat);
+    }
+
+    private String corpoDoProvisionamento(long telegram, long chat,
+            String agente, String sessao) {
+        return """
+                {"identificadorDoBot":%d,"identificadorDoTelegram":%d,
+                 "identificadorDoChat":%d,"identificadorDoAgente":"%s",
+                 "identificadorDaSessao":"%s"}
+                """.formatted(IDENTIFICADOR_DO_BOT, telegram, chat,
+                        agente, sessao);
+    }
+
+    private MockHttpServletRequestBuilder postConfiavel(
+            String caminho, String corpo) {
+        return postConfiavel(caminho, corpo,
+                IDENTIFICADOR_DA_CHAVE_DO_GATEWAY,
+                UUID.randomUUID().toString());
+    }
+
+    private MockHttpServletRequestBuilder postConfiavel(String caminho,
+            String corpo, String chave, String idempotencia) {
+        return postConfiavel(caminho, corpo, chave, idempotencia,
+                UUID.randomUUID().toString().replace("-", ""),
+                Instant.now().getEpochSecond());
+    }
+
+    private MockHttpServletRequestBuilder postConfiavel(String caminho,
+            String corpo, String chave, String idempotencia, String nonce,
+            long instante) {
+        String hashDoCorpo = sha256(corpo);
+        String canonico = "TRILHA-HMAC-V1\n" + chave + "\n" + instante
+                + "\n" + nonce + "\nPOST\n" + caminho + "\n"
+                + hashDoCorpo + "\n" + idempotencia;
+        return post(caminho)
+                .header(ValidadorDeAssinaturaDoGateway.CABECALHO_DA_CHAVE,
+                        chave)
+                .header(ValidadorDeAssinaturaDoGateway.CABECALHO_DO_INSTANTE,
+                        String.valueOf(instante))
+                .header(ValidadorDeAssinaturaDoGateway.CABECALHO_DO_NONCE,
+                        nonce)
+                .header(ValidadorDeAssinaturaDoGateway.CABECALHO_DA_ASSINATURA,
+                        hmac(canonico))
+                .header(ValidadorDeAssinaturaDoGateway.CABECALHO_DA_IDEMPOTENCIA,
+                        idempotencia)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo);
+    }
+
+    private String sha256(String valor) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(valor.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException excecao) {
+            throw new IllegalStateException("SHA-256 indisponivel.", excecao);
+        }
+    }
+
+    private String hmac(String valor) {
+        try {
+            Mac autenticador = Mac.getInstance("HmacSHA256");
+            autenticador.init(new SecretKeySpec(
+                    SEGREDO_DO_GATEWAY.getBytes(StandardCharsets.UTF_8),
+                    "HmacSHA256"));
+            return HexFormat.of().formatHex(autenticador.doFinal(
+                    valor.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException excecao) {
+            throw new IllegalStateException("HMAC-SHA-256 indisponivel.", excecao);
+        }
     }
 
     private void inserirVinculoPendente(UUID identificador, UUID usuario,
@@ -668,6 +869,7 @@ class AutomacaoIntegracaoTest {
     private record CodigoGerado(String codigo, UUID identificadorDoVinculo) {
     }
 
-    private record VinculoCriado(UUID identificadorDoVinculo, String token) {
+    private record VinculoCriado(UUID identificadorDoVinculo, String token,
+            String identificadorDoAgente, String identificadorDaSessao) {
     }
 }

@@ -45,6 +45,14 @@ trilha:
     habilitada: ${ASSISTENTE_TELEGRAM_HABILITADO:false}
     identificador-do-bot: ${IDENTIFICADOR_DO_BOT_TELEGRAM:0}
     segredo-de-hash: ${SEGREDO_DE_HASH_DA_AUTOMACAO:}
-    chave-do-gateway: ${CHAVE_DO_GATEWAY_OPENCLAW:}
+    identificador-da-chave-do-gateway: ${IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW:gateway-openclaw}
+    segredo-do-gateway: ${SEGREDO_DO_GATEWAY_OPENCLAW:}
+    tolerancia-do-gateway: ${TOLERANCIA_DO_GATEWAY_OPENCLAW:PT2M}
+    limite-do-gateway-por-minuto: ${LIMITE_DO_GATEWAY_POR_MINUTO:60}
+    limite-do-corpo-do-gateway: ${LIMITE_DO_CORPO_DO_GATEWAY:65536}
+    retencao-de-nonces: ${RETENCAO_DE_NONCES_DO_GATEWAY:PT168H}
     validade-do-codigo: ${VALIDADE_DO_CODIGO_DO_TELEGRAM:PT10M}
     validade-da-credencial: ${VALIDADE_DA_CREDENCIAL_MCP:P90D}
+    mcp:
+      origens-permitidas: ${ORIGENS_PERMITIDAS_NO_MCP:http://localhost:5173,http://127.0.0.1:5173}
+      hosts-permitidos: ${HOSTS_PERMITIDOS_NO_MCP:localhost:*,127.0.0.1:*,backend:8080,host.docker.internal:8080}

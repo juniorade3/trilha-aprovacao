@@ -1,0 +1,214 @@
+name: trilha-openclaw
+
+services:
+  gateway:
+    image: ghcr.io/openclaw/openclaw:2026.7.1@sha256:6a31d44b2944e7adcd2b582bf6fb463111264ebca97a0201795b799135bd102c
+    user: "1000:1000"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2.0
+    environment:
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspaces
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      OPENCLAW_NIX_MODE: "1"
+      TZ: America/Sao_Paulo
+      NODE_ENV: production
+    volumes:
+      - type: bind
+        source: ${OPENCLAW_DIRETORIO_ESTADO:?defina OPENCLAW_DIRETORIO_ESTADO}
+        target: /home/node/.openclaw
+      - type: bind
+        source: ${OPENCLAW_ARQUIVO_SEGREDOS:?defina OPENCLAW_ARQUIVO_SEGREDOS}
+        target: /run/secrets/segredos-openclaw.json
+        read_only: true
+      - type: bind
+        source: ./plugin-trilha
+        target: /home/node/.openclaw/extensions/trilha-aprovacao
+        read_only: true
+    depends_on:
+      broker-credenciais:
+        condition: service_healthy
+      integrador:
+        condition: service_healthy
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
+      - /home/node/.cache:rw,noexec,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    command:
+      - node
+      - dist/index.js
+      - gateway
+      - --bind
+      - loopback
+      - --port
+      - "18789"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - saida
+      - credenciais
+      - integracoes
+
+  broker-credenciais:
+    image: ghcr.io/openclaw/openclaw:2026.7.1@sha256:6a31d44b2944e7adcd2b582bf6fb463111264ebca97a0201795b799135bd102c
+    user: "1000:1000"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    volumes:
+      - type: bind
+        source: ${OPENCLAW_DIRETORIO_CREDENCIAIS_MCP:?defina OPENCLAW_DIRETORIO_CREDENCIAIS_MCP}
+        target: /run/secrets/credenciais-mcp
+        read_only: true
+      - type: bind
+        source: ./scripts/broker-de-credenciais-mcp.mjs
+        target: /opt/trilha/broker-de-credenciais-mcp.mjs
+        read_only: true
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    command:
+      - node
+      - /opt/trilha/broker-de-credenciais-mcp.mjs
+      - /run/secrets/credenciais-mcp
+      - "18890"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:18890/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - credenciais
+      - saida
+
+  integrador:
+    build:
+      context: .
+      dockerfile: Dockerfile.integrador
+    image: trilha-openclaw-integrador:2026.7.1
+    user: "1000:1000"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      OPENCLAW_DIRETORIO_ESTADO: /home/node/.openclaw
+      OPENCLAW_DIRETORIO_CREDENCIAIS_MCP: /run/secrets/credenciais-mcp
+      OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT: /run/secrets/identificador-bot
+      OPENCLAW_ARQUIVO_SEGREDO_GATEWAY: /run/secrets/segredo-gateway
+      OPENCLAW_DIRETORIO_SCRIPTS: /opt/trilha/scripts
+      URL_DO_BACKEND_DA_TRILHA: ${URL_DO_BACKEND_DA_TRILHA:-http://host.docker.internal:8080}
+      URL_MCP_DA_TRILHA: ${URL_MCP_DA_TRILHA:-http://host.docker.internal:8080/mcp}
+      IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW: ${IDENTIFICADOR_DA_CHAVE_DO_GATEWAY_OPENCLAW:-gateway-openclaw}
+      IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW: ${IDENTIFICADOR_DA_CONTA_DO_BOT_OPENCLAW:-default}
+      MODELO_OPENAI_DO_ASSISTENTE: ${MODELO_OPENAI_DO_ASSISTENTE:-openai/gpt-5.6}
+      LIMITE_DE_VINCULOS_POR_TELEGRAM: ${LIMITE_DE_VINCULOS_POR_TELEGRAM:-5}
+      JANELA_DE_VINCULOS_POR_TELEGRAM_EM_MS: ${JANELA_DE_VINCULOS_POR_TELEGRAM_EM_MS:-600000}
+      LIMITE_GLOBAL_DE_VINCULOS_POR_MINUTO: ${LIMITE_GLOBAL_DE_VINCULOS_POR_MINUTO:-100}
+      PORTA_DO_INTEGRADOR: "8090"
+      TZ: America/Sao_Paulo
+      NODE_ENV: production
+    volumes:
+      - type: bind
+        source: ${OPENCLAW_DIRETORIO_ESTADO:?defina OPENCLAW_DIRETORIO_ESTADO}
+        target: /home/node/.openclaw
+      - type: bind
+        source: ${OPENCLAW_DIRETORIO_CREDENCIAIS_MCP:?defina OPENCLAW_DIRETORIO_CREDENCIAIS_MCP}
+        target: /run/secrets/credenciais-mcp
+      - type: bind
+        source: ${OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT:?defina OPENCLAW_ARQUIVO_IDENTIFICADOR_BOT}
+        target: /run/secrets/identificador-bot
+        read_only: true
+      - type: bind
+        source: ${OPENCLAW_ARQUIVO_SEGREDO_GATEWAY:?defina OPENCLAW_ARQUIVO_SEGREDO_GATEWAY}
+        target: /run/secrets/segredo-gateway
+        read_only: true
+      - type: bind
+        source: ./scripts
+        target: /opt/trilha/scripts
+        read_only: true
+      - type: bind
+        source: ./modelos
+        target: /opt/trilha/modelos
+        read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777
+      - /home/node/.cache:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=1000,gid=1000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    command:
+      - node
+      - /opt/trilha/scripts/integrador-de-vinculos.mjs
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8090/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - saida
+      - integracoes
+
+networks:
+  saida:
+  credenciais:
+    internal: true
+  integracoes:
+    internal: true

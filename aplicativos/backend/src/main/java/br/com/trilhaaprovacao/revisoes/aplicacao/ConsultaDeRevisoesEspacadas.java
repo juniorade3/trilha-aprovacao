@@ -40,7 +40,8 @@ public class ConsultaDeRevisoesEspacadas {
         this.contextos = contextos;
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ,
+            noRollbackFor = RegraDeDominio.class)
     public ResultadoDaAgendaDeRevisoes consultar(
             UUID usuario, LocalDate dataDeReferencia, LocalDate ate) {
         if (usuario == null || dataDeReferencia == null || ate == null) {
