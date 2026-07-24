@@ -126,6 +126,7 @@ describe('PlanejamentoHojePagina', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     chamadas.obterExecucaoEmAndamento.mockResolvedValue(undefined)
     chamadas.obterExecucaoDoBloco.mockRejectedValue(new Error('sem execucao'))
     chamadas.listarTopicosParaRegistro.mockResolvedValue([])
@@ -496,6 +497,81 @@ describe('PlanejamentoHojePagina', () => {
 
     expect(pagina.get('.bloco-em-andamento').text()).toContain('Primeiro bloco')
     expect(pagina.get('.cronometro-da-execucao').text()).toMatch(/00:01:0[4-6]/)
+  })
+
+  it('pausa e retoma o cronometro sem contar o intervalo pausado', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-24T12:00:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue({
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: '2026-07-24T11:59:00Z',
+        criadoEm: '2026-07-24T11:59:00Z',
+        atualizadoEm: '2026-07-24T11:59:00Z',
+        versao: 0,
+      },
+    })
+
+    const pagina = await montar()
+    expect(pagina.get('.cronometro-da-execucao').text()).toBe('00:01:00')
+
+    await pagina
+      .findAll('.bloco-em-andamento button')
+      .find((botao) => botao.text().includes('Pausar'))!
+      .trigger('click')
+    vi.advanceTimersByTime(30_000)
+    await pagina.vm.$nextTick()
+
+    expect(pagina.text()).toContain('Cronômetro pausado')
+    expect(pagina.get('.cronometro-da-execucao').text()).toBe('00:01:00')
+
+    await pagina
+      .findAll('.bloco-em-andamento button')
+      .find((botao) => botao.text().includes('Retomar'))!
+      .trigger('click')
+    vi.advanceTimersByTime(10_000)
+    await pagina.vm.$nextTick()
+
+    expect(pagina.get('.cronometro-da-execucao').text()).toBe('00:01:10')
+  })
+
+  it('mantem o cronometro pausado depois de recarregar a pagina', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-24T12:00:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.obterExecucaoEmAndamento.mockResolvedValue({
+      bloco: {
+        ...bloco('bloco-1', 'Primeiro bloco', 1),
+        estado: 'EM_ANDAMENTO',
+      },
+      execucao: {
+        identificador: 'execucao-1',
+        identificadorDoBloco: 'bloco-1',
+        iniciadaEm: '2026-07-24T11:59:00Z',
+        criadoEm: '2026-07-24T11:59:00Z',
+        atualizadoEm: '2026-07-24T11:59:00Z',
+        versao: 0,
+      },
+    })
+
+    const pagina = await montar()
+    await pagina
+      .findAll('.bloco-em-andamento button')
+      .find((botao) => botao.text().includes('Pausar'))!
+      .trigger('click')
+    pagina.unmount()
+    vi.advanceTimersByTime(30_000)
+
+    const recarregada = await montar()
+
+    expect(recarregada.text()).toContain('Cronômetro pausado')
+    expect(recarregada.get('.cronometro-da-execucao').text()).toBe('00:01:00')
   })
 
   it('conclui uma execucao informando a duracao', async () => {

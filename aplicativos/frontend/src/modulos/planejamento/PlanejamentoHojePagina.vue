@@ -72,9 +72,13 @@ const observacaoCorrigida = ref('')
 const evidenciaDaExecucao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
 const evidenciaDaCorrecao = ref<ModeloDeEvidencia>({ padroesDeErro: [] })
 const agora = ref(Date.now())
+const pausado = ref(false)
+const pausaIniciadaEm = ref<number>()
+const milissegundosPausados = ref(0)
 let cancelamento: AbortController | undefined
 let cancelamentoDasRevisoes: AbortController | undefined
 let temporizador: number | undefined
+const chaveDaPausa = 'trilha:planejamento:pausa'
 
 function dataLocalAtual() {
   const partes = new Intl.DateTimeFormat('en-US', {
@@ -121,11 +125,15 @@ const datasDaSemana = computed(() => {
 
 const segundosDecorridos = computed(() => {
   if (!execucaoAtual.value) return 0
+  const fimDoIntervaloAtual = pausado.value
+    ? (pausaIniciadaEm.value ?? agora.value)
+    : agora.value
   return Math.max(
     0,
     Math.floor(
-      (agora.value -
-        new Date(execucaoAtual.value.execucao.iniciadaEm).getTime()) /
+      (fimDoIntervaloAtual -
+        new Date(execucaoAtual.value.execucao.iniciadaEm).getTime() -
+        milissegundosPausados.value) /
         1000,
     ),
   )
@@ -229,10 +237,12 @@ async function carregar() {
     )
     try {
       execucaoAtual.value = await obterExecucaoEmAndamento()
+      restaurarPausa()
     } catch (causa) {
-      if (causa instanceof ErroDaApi && causa.status === 404)
+      if (causa instanceof ErroDaApi && causa.status === 404) {
         execucaoAtual.value = undefined
-      else throw causa
+        limparPausa()
+      } else throw causa
     }
     const pares = await Promise.all(
       planejamento.value.realizados.map(async (bloco) => {
@@ -380,6 +390,7 @@ async function iniciar(bloco: BlocoDeEstudo) {
       bloco.identificador,
       dataConsultada,
     )
+    limparPausa()
     agora.value = Date.now()
     aviso.value =
       'Bloco iniciado. O cronômetro continuará mesmo após recarregar.'
@@ -389,6 +400,76 @@ async function iniciar(bloco: BlocoDeEstudo) {
   } finally {
     processando.value = false
   }
+}
+
+function persistirPausa() {
+  const identificador = execucaoAtual.value?.execucao.identificador
+  if (!identificador) return
+  localStorage.setItem(
+    chaveDaPausa,
+    JSON.stringify({
+      identificadorDaExecucao: identificador,
+      pausado: pausado.value,
+      pausaIniciadaEm: pausaIniciadaEm.value,
+      milissegundosPausados: milissegundosPausados.value,
+    }),
+  )
+}
+
+function limparPausa() {
+  pausado.value = false
+  pausaIniciadaEm.value = undefined
+  milissegundosPausados.value = 0
+  localStorage.removeItem(chaveDaPausa)
+}
+
+function restaurarPausa() {
+  const identificador = execucaoAtual.value?.execucao.identificador
+  const pausaPersistida = localStorage.getItem(chaveDaPausa)
+  pausado.value = false
+  pausaIniciadaEm.value = undefined
+  milissegundosPausados.value = 0
+  if (!identificador || !pausaPersistida) return
+  try {
+    const pausa = JSON.parse(pausaPersistida) as {
+      identificadorDaExecucao?: string
+      pausado?: boolean
+      pausaIniciadaEm?: number
+      milissegundosPausados?: number
+    }
+    if (pausa.identificadorDaExecucao !== identificador) {
+      localStorage.removeItem(chaveDaPausa)
+      return
+    }
+    pausado.value = pausa.pausado === true
+    pausaIniciadaEm.value =
+      typeof pausa.pausaIniciadaEm === 'number'
+        ? pausa.pausaIniciadaEm
+        : undefined
+    milissegundosPausados.value = Math.max(0, pausa.milissegundosPausados ?? 0)
+  } catch {
+    limparPausa()
+  }
+}
+
+function alternarPausa() {
+  if (!execucaoAtual.value) return
+  const instante = Date.now()
+  agora.value = instante
+  if (pausado.value) {
+    milissegundosPausados.value += Math.max(
+      0,
+      instante - (pausaIniciadaEm.value ?? instante),
+    )
+    pausaIniciadaEm.value = undefined
+    pausado.value = false
+    aviso.value = 'Cronômetro retomado.'
+  } else {
+    pausaIniciadaEm.value = instante
+    pausado.value = true
+    aviso.value = 'Cronômetro pausado.'
+  }
+  persistirPausa()
 }
 
 async function abrirFinalizacao(acao: 'CONCLUIR' | 'INTERROMPER') {
@@ -439,6 +520,7 @@ async function finalizar() {
         ? 'Bloco concluído.'
         : 'Bloco encerrado como parcialmente concluído.'
     execucaoAtual.value = undefined
+    limparPausa()
     acaoDeFinalizacao.value = undefined
     await recarregarPlanejamentoERevisoes()
   } catch (causa) {
@@ -851,7 +933,21 @@ onBeforeUnmount(() => {
         <strong class="cronometro-da-execucao" aria-label="Tempo decorrido">{{
           cronometro
         }}</strong>
+        <span v-if="pausado" class="mt-2">Cronômetro pausado</span>
         <div class="d-flex flex-wrap gap-2 mt-3">
+          <button
+            class="btn btn-outline-light"
+            type="button"
+            :disabled="processando"
+            @click="alternarPausa"
+          >
+            <i
+              class="bi"
+              :class="pausado ? 'bi-play-fill' : 'bi-pause-fill'"
+              aria-hidden="true"
+            ></i>
+            {{ pausado ? 'Retomar' : 'Pausar' }}
+          </button>
           <button
             class="btn btn-primary"
             type="button"
