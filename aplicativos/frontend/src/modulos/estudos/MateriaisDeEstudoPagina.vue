@@ -69,6 +69,11 @@ const identificadorDoMaterialNaRota = computed(() => {
   return typeof identificador === 'string' ? identificador : undefined
 })
 
+const identificadorDoTopicoNaRota = computed(() => {
+  const identificador = rota.query.topico
+  return typeof identificador === 'string' ? identificador : undefined
+})
+
 const materiaisExibidos = computed(() => {
   const filtrados =
     filtroDeTipo.value === 'TODOS'
@@ -113,6 +118,7 @@ async function carregar() {
         pesquisa.value,
         incluirArquivados.value,
         requisicao.signal,
+        identificadorDoTopicoNaRota.value,
       ),
       listarTodasAsMaterias('', false, requisicao.signal),
     ])
@@ -142,6 +148,13 @@ async function carregar() {
       materialSelecionado.value = materialAtualizado
       coberturaAberta.value =
         coberturaAberta.value || Boolean(identificadorDoMaterialNaRota.value)
+      await carregarCoberturas(requisicao.signal)
+    } else if (
+      identificadorDoTopicoNaRota.value &&
+      materiais.value.length === 1
+    ) {
+      materialSelecionado.value = materiais.value[0]
+      coberturaAberta.value = true
       await carregarCoberturas(requisicao.signal)
     } else if (identificadorDoMaterialNaRota.value) {
       versaoDoCarregamentoDeCoberturas += 1
@@ -416,6 +429,8 @@ watch(identificadorDoMaterialNaRota, async (identificador) => {
   erro.value = 'O material informado não foi encontrado na sua biblioteca.'
 })
 
+watch(identificadorDoTopicoNaRota, () => carregar())
+
 onMounted(() => carregar())
 onBeforeUnmount(() => {
   versaoDoCarregamentoDeCoberturas += 1
@@ -444,6 +459,14 @@ onBeforeUnmount(() => {
     </CabecalhoDaPagina>
 
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
+    <p
+      v-if="identificadorDoTopicoNaRota"
+      class="alert alert-info"
+      role="status"
+    >
+      Mostrando somente os materiais ativos que cobrem o tópico selecionado no
+      planejamento.
+    </p>
 
     <form class="card barra-da-biblioteca" @submit.prevent="carregar">
       <div class="campo-de-busca">
@@ -512,12 +535,16 @@ onBeforeUnmount(() => {
       class="card"
       :titulo="
         materiais.length === 0
-          ? 'Nenhum material encontrado'
+          ? identificadorDoTopicoNaRota
+            ? 'Nenhum material ativo cobre este tópico'
+            : 'Nenhum material encontrado'
           : 'Nenhum material corresponde ao filtro'
       "
       :descricao="
         materiais.length === 0
-          ? 'Cadastre a primeira fonte da sua biblioteca.'
+          ? identificadorDoTopicoNaRota
+            ? 'Revise a cobertura dos materiais da sua biblioteca.'
+            : 'Cadastre a primeira fonte da sua biblioteca.'
           : 'Escolha outro tipo para voltar a ver sua biblioteca.'
       "
       icone="bi-file-earmark-plus"
@@ -683,6 +710,16 @@ onBeforeUnmount(() => {
       descricao="Escolha somente tópicos realmente cobertos por esta fonte."
       @fechar="fecharCobertura"
     >
+      <a
+        v-if="materialSelecionado.endereco"
+        class="btn btn-primary mb-4"
+        :href="materialSelecionado.endereco"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Abrir material
+        <i class="bi bi-box-arrow-up-right ms-2" aria-hidden="true"></i>
+      </a>
       <form class="formulario-da-aplicacao" @submit.prevent="vincularTopico">
         <label>
           <span>Matéria</span>

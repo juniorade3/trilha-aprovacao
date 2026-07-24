@@ -91,6 +91,47 @@ class MateriaisEEstudosIntegracaoTest {
     }
 
     @Test
+    void deveListarAtalhosAtivosPorTopicoFiltrarMateriaisEIsolarUsuario()
+            throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("atalhos.a@example.com");
+        String materia = criarMateria(sessaoA, "Direito Constitucional");
+        String topico = criarTopico(sessaoA, materia, "Direitos fundamentais");
+        String materialAtivo = criarMaterial(sessaoA, "Aula 01");
+        String materialArquivado = criarMaterial(sessaoA, "Aula antiga");
+        criarMaterial(sessaoA, "Aula sem cobertura");
+        adicionarCobertura(sessaoA, materialAtivo, topico);
+        adicionarCobertura(sessaoA, materialArquivado, topico);
+        api.perform(post("/api/v1/materiais/{id}/arquivamento", materialArquivado)
+                        .session(sessaoA).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"arquivado\":true}"))
+                .andExpect(status().isOk());
+
+        api.perform(get("/api/v1/materiais").session(sessaoA)
+                        .param("identificadorDoTopico", topico))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDeItens").value(1))
+                .andExpect(jsonPath("$.itens[0].identificador").value(materialAtivo));
+        api.perform(get("/api/v1/materiais/atalhos-por-topico").session(sessaoA)
+                        .param("identificadoresDosTopicos", topico))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].identificadorDoTopico").value(topico))
+                .andExpect(jsonPath("$[0].identificadorDoMaterial").value(materialAtivo))
+                .andExpect(jsonPath("$[0].tituloDoMaterial").value("Aula 01"));
+
+        MockHttpSession sessaoB = criarContaEEntrar("atalhos.b@example.com");
+        api.perform(get("/api/v1/materiais").session(sessaoB)
+                        .param("identificadorDoTopico", topico))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDeItens").value(0));
+        api.perform(get("/api/v1/materiais/atalhos-por-topico").session(sessaoB)
+                        .param("identificadoresDosTopicos", topico))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void deveValidarCoberturaDuracaoEPreservarEstudoAoRemoverVinculo()
             throws Exception {
         MockHttpSession sessao = criarContaEEntrar("pessoa.a@example.com");

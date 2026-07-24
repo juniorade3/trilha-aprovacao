@@ -208,6 +208,24 @@ describe('MateriaisDeEstudoPagina', () => {
       '',
       true,
       expect.any(AbortSignal),
+      undefined,
+    )
+  })
+
+  it('filtra pelo topico vindo do planejamento e abre o unico material', async () => {
+    const pagina = await montarPagina('/materiais?topico=topico-1')
+
+    expect(chamadas.listarTodosOsMateriaisDeEstudo).toHaveBeenCalledWith(
+      '',
+      false,
+      expect.any(AbortSignal),
+      'topico-1',
+    )
+    expect(pagina.text()).toContain(
+      'Mostrando somente os materiais ativos que cobrem o tópico',
+    )
+    expect(pagina.get('[role="dialog"]').text()).toContain(
+      'Curso de Constitucional',
     )
   })
 

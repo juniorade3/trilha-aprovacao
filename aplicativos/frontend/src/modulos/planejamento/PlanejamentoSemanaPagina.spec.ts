@@ -28,6 +28,7 @@ const chamadas = vi.hoisted(() => ({
   obterHistoricoSemanal: vi.fn(),
   obterPlanoSemanal: vi.fn(),
   reordenarBlocos: vi.fn(),
+  listarMateriaisRelacionadosAosTopicos: vi.fn(),
 }))
 
 vi.mock('./apiDePlanejamento', () => ({
@@ -55,6 +56,11 @@ vi.mock('./apiDePlanejamento', () => ({
 vi.mock('@/modulos/materias/apiDeConteudos', () => ({
   listarTodasAsMaterias: chamadas.listarTodasAsMaterias,
   listarTodosOsTopicos: chamadas.listarTodosOsTopicos,
+}))
+
+vi.mock('@/modulos/estudos/apiDeEstudos', () => ({
+  listarMateriaisRelacionadosAosTopicos:
+    chamadas.listarMateriaisRelacionadosAosTopicos,
 }))
 
 import PlanejamentoSemanaPagina from './PlanejamentoSemanaPagina.vue'
@@ -135,9 +141,20 @@ async function montarPagina(foco?: string) {
     routes: [
       {
         path: '/planejamento/semana',
+        name: 'planejamento-semana',
         component: PlanejamentoSemanaPagina,
       },
       { path: '/estudos', component: { template: '<div>Histórico</div>' } },
+      {
+        path: '/materiais',
+        name: 'materiais-de-estudo',
+        component: { template: '<div>Materiais</div>' },
+      },
+      {
+        path: '/materiais/:identificador',
+        name: 'material-detalhe',
+        component: { template: '<div>Material</div>' },
+      },
     ],
   })
   await roteador.push({
@@ -196,6 +213,7 @@ describe('PlanejamentoSemanaPagina', () => {
       planoSemanal(180, [blocoDeEstudo()], 'CANCELADO'),
     )
     chamadas.reordenarBlocos.mockResolvedValue(planoSemanal())
+    chamadas.listarMateriaisRelacionadosAosTopicos.mockResolvedValue([])
     chamadas.listarMateriasParaGeracao.mockResolvedValue([
       {
         identificadorDaMateria: 'materia-1',
@@ -508,6 +526,38 @@ describe('PlanejamentoSemanaPagina', () => {
       inicio,
       foco: 'bloco-revisao',
     })
+  })
+
+  it('abre diretamente o material associado ao topico ao clicar no card', async () => {
+    const bloco = {
+      ...blocoDeEstudo(),
+      identificadorDaMateria: 'materia-1',
+      identificadorDoTopico: 'topico-1',
+    }
+    chamadas.obterPlanoSemanal.mockResolvedValue(planoSemanal(180, [bloco]))
+    chamadas.listarMateriaisRelacionadosAosTopicos.mockResolvedValue([
+      {
+        identificadorDoTopico: 'topico-1',
+        identificadorDoMaterial: 'material-1',
+        tituloDoMaterial: 'Banco de dados — Aula 01',
+      },
+    ])
+
+    const { pagina, roteador } = await montarPagina()
+    const cartao = pagina.get('#bloco-planejado-bloco-1')
+
+    expect(chamadas.listarMateriaisRelacionadosAosTopicos).toHaveBeenCalledWith(
+      ['topico-1'],
+    )
+    expect(cartao.attributes('role')).toBe('link')
+    expect(cartao.attributes('tabindex')).toBe('0')
+    expect(cartao.text()).toContain('Abrir material')
+
+    await cartao.trigger('click')
+    await flushPromises()
+
+    expect(roteador.currentRoute.value.name).toBe('material-detalhe')
+    expect(roteador.currentRoute.value.params.identificador).toBe('material-1')
   })
 
   it('fecha a geracao aberta antes de carregar outra semana', async () => {
