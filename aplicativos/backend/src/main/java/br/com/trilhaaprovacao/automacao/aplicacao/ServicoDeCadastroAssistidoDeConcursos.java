@@ -99,7 +99,7 @@ public class ServicoDeCadastroAssistidoDeConcursos {
         dados.put("nadaFoiAlterado", true);
         dados.put("codigoDeConfirmacao", preparada.codigoDeConfirmacao());
         dados.put("fraseDeConfirmacao",
-                "CONFIRMAR " + preparada.codigoDeConfirmacao());
+                "/confirmar " + preparada.codigoDeConfirmacao());
         dados.put("expiraEm", preparada.operacao().expiraEm());
         return new ResultadoDaConsultaMcp("1",
                 contexto.identificadorDaCorrelacao(),

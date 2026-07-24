@@ -3,6 +3,10 @@ package br.com.trilhaaprovacao.automacao.aplicacao;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas.OperacaoPreparada;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ContextoDaChamadaMcp;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
+import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
+import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
+import br.com.trilhaaprovacao.evidencias.aplicacao.DadosDaEvidencia;
+import br.com.trilhaaprovacao.evidencias.aplicacao.ServicoDeEvidenciasDeAprendizagem;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ResultadoDaPreviaDoReplanejamento;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeGeracaoDeterministica;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeReplanejamento;
@@ -33,6 +37,7 @@ public class ServicoDePreparacoesMcp {
     private final ServicoDeReplanejamento replanejamento;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ServicoDeOperacoesCriticasMcp operacoesCriticas;
+    private final ServicoDeEvidenciasDeAprendizagem evidencias;
     private final JdbcTemplate banco;
     private final ObjectMapper mapeador;
 
@@ -41,6 +46,7 @@ public class ServicoDePreparacoesMcp {
             ServicoDeReplanejamento replanejamento,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
             ServicoDeOperacoesCriticasMcp operacoesCriticas,
+            ServicoDeEvidenciasDeAprendizagem evidencias,
             JdbcTemplate banco,
             ObjectMapper mapeador) {
         this.operacoes = operacoes;
@@ -48,6 +54,7 @@ public class ServicoDePreparacoesMcp {
         this.replanejamento = replanejamento;
         this.cadastroDeConcursos = cadastroDeConcursos;
         this.operacoesCriticas = operacoesCriticas;
+        this.evidencias = evidencias;
         this.banco = banco;
         this.mapeador = mapeador;
     }
@@ -57,6 +64,7 @@ public class ServicoDePreparacoesMcp {
             ContextoDaChamadaMcp contexto, Map<String, Object> argumentos) {
         UUID usuario = contexto.identidade().identificadorDoUsuario();
         Map<String, Object> proposta = new LinkedHashMap<>(argumentos);
+        validarEvidencia(tipo, proposta);
         Map<String, Object> versoes = switch (tipo) {
             case "REGISTRO_DE_ESTUDO" -> versoesDoTopico(usuario,
                     uuid(argumentos, "identificadorDoTopico"),
@@ -99,7 +107,7 @@ public class ServicoDePreparacoesMcp {
         dados.put("proposta", proposta);
         dados.put("codigoDeConfirmacao",
                 preparada.codigoDeConfirmacao());
-        dados.put("fraseDeConfirmacao", "CONFIRMAR "
+        dados.put("fraseDeConfirmacao", "/confirmar "
                 + preparada.codigoDeConfirmacao());
         dados.put("expiraEm", preparada.operacao().expiraEm());
         return new ResultadoDaConsultaMcp("1",
@@ -258,6 +266,28 @@ public class ServicoDePreparacoesMcp {
     private String json(Object valor) {
         try { return mapeador.writeValueAsString(valor); }
         catch (Exception excecao) { throw new IllegalArgumentException(excecao); }
+    }
+
+    private void validarEvidencia(String tipo, Map<String, Object> proposta) {
+        if (!Set.of("REGISTRO_DE_ESTUDO", "CORRECAO_DO_ESTUDO",
+                "CONCLUSAO_DO_BLOCO", "INTERRUPCAO_DO_BLOCO").contains(tipo)) {
+            return;
+        }
+        DadosDaEvidencia dados;
+        try {
+            Object valor = proposta.get("evidencia");
+            dados = valor == null ? null
+                    : mapeador.convertValue(valor, DadosDaEvidencia.class);
+        } catch (IllegalArgumentException excecao) {
+            throw new RegraDeDominio("EVIDENCIA_INVALIDA",
+                    "Os dados da evidencia sao invalidos.");
+        }
+        boolean exigeResultado = Set.of(
+                "REGISTRO_DE_ESTUDO", "CORRECAO_DO_ESTUDO").contains(tipo);
+        TipoDeEstudo tipoDeEstudo = exigeResultado
+                ? TipoDeEstudo.valueOf(texto(proposta, "tipoDeEstudo"))
+                : null;
+        evidencias.validar(tipoDeEstudo, dados, exigeResultado);
     }
 
     private UUID uuid(Map<String, Object> mapa, String chave) {

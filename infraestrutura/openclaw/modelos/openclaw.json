@@ -82,7 +82,7 @@
   "commands": {
     "native": false,
     "nativeSkills": false,
-    "text": false,
+    "text": true,
     "bash": false,
     "config": false,
     "mcp": false,

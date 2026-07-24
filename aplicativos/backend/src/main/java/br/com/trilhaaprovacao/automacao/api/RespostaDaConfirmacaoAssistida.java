@@ -15,6 +15,6 @@ public record RespostaDaConfirmacaoAssistida(
         return new RespostaDaConfirmacaoAssistida(
                 RespostaDeOperacaoAssistida.de(resultado.operacao(), mapeador),
                 resultado.exigeNovaConfirmacao(), codigo,
-                codigo == null ? null : "CONFIRMAR " + codigo);
+                codigo == null ? null : "/confirmar " + codigo);
     }
 }

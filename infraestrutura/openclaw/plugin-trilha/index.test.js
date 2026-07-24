@@ -142,7 +142,7 @@ test("configura os atalhos conversacionais sem transforma-los em comandos privil
     "desconectar", "privacidade",
   ]);
   assert.equal(new Set(nomes).size, nomes.length);
-  assert.equal(configuracao.commands.text, false);
+  assert.equal(configuracao.commands.text, true);
   assert.equal(configuracao.tools.deny.includes("group:messaging"), true);
   assert.equal(configuracao.tools.profile, "minimal");
   assert.equal(configuracao.tools.deny.includes("group:runtime"), true);
@@ -178,7 +178,10 @@ test("confirma operacao somente pelo adaptador confiavel", async () => {
   let chamada;
   criarPluginDaTrilha({ buscar: async (url, opcoes) => {
     chamada = { url, opcoes }; return { status: 200 };
-  }}).register({ pluginConfig: {}, registerCommand: (comando) => comandos.push(comando) });
+  }}).register({
+    pluginConfig: {},
+    registerCommand: (comando) => comandos.push(comando),
+  });
   const confirmar = comandos.find((comando) => comando.name === "confirmar");
   assert.equal(confirmar.requireAuth, true);
   const resposta = await confirmar.handler(contextoPrivado({
@@ -193,4 +196,24 @@ test("confirma operacao somente pelo adaptador confiavel", async () => {
     identificadorDoChat: "123456789", identificadorDaContaDoBot: "principal",
     identificadorDoUpdate: "update-10",
   });
+});
+
+test("distingue contexto invalido e vinculo ausente na confirmacao", async () => {
+  for (const [status, mensagem] of [
+    [400, MENSAGENS.contextoDaConfirmacaoInvalido],
+    [404, MENSAGENS.vinculoDaConfirmacaoNaoEncontrado],
+  ]) {
+    const comandos = [];
+    criarPluginDaTrilha({ buscar: async () => ({
+      status,
+      async json() { return {}; },
+    }) }).register({
+      pluginConfig: {},
+      registerCommand: (comando) => comandos.push(comando),
+    });
+    const confirmar = comandos.find((comando) => comando.name === "confirmar");
+    assert.deepEqual(await confirmar.handler(contextoPrivado({
+      args: "2345678A",
+    })), { text: mensagem });
+  }
 });

@@ -2,7 +2,9 @@
 
 Plugin nativo compatível com OpenClaw `2026.7.1`. Ele registra
 `/conectar <codigo>` com `requireAuth: false`, porque o vínculo ocorre antes de o
-Telegram fazer parte da lista autorizada. O manipulador aceita apenas o canal
+Telegram fazer parte da lista autorizada. A confirmação usa exclusivamente o
+comando nativo `/confirmar <codigo>`, processado antes de a conversa ser
+encaminhada ao runtime do agente. Os manipuladores aceitam apenas o canal
 `telegram` em conversa privada cujo remetente, origem e destino coincidam com o
 mesmo identificador numérico.
 

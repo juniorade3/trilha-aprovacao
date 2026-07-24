@@ -30,18 +30,10 @@ public class ServicoDeEvidenciasDeAprendizagem {
 
     public EvidenciaDeAprendizagem registrar(UUID usuario, UUID topico, UUID registro,
             TipoDeEstudo tipo, DadosDaEvidencia dados, boolean exigirResultado) {
-        validarObrigatoriedade(tipo, dados, exigirResultado);
-        if (dados == null) {
+        EvidenciaDeAprendizagem evidencia = validarECriar(
+                registro, tipo, dados, exigirResultado);
+        if (evidencia == null) {
             return null;
-        }
-        EvidenciaDeAprendizagem evidencia;
-        try {
-            evidencia = EvidenciaDeAprendizagem.criar(registro,
-                    dados.quantidadeDeQuestoes(), dados.quantidadeDeAcertos(),
-                    dados.nivelDeRecordacao(), dados.dificuldadePercebida(),
-                    dados.padroesDeErro());
-        } catch (IllegalArgumentException excecao) {
-            throw new RegraDeDominio("EVIDENCIA_INVALIDA", excecao.getMessage());
         }
         evidencias.saveAndFlush(new EvidenciaDeAprendizagemPersistida(evidencia));
         for (var dadoDoPadrao : evidencia.padroesDeErro()) {
@@ -57,6 +49,27 @@ public class ServicoDeEvidenciasDeAprendizagem {
                     dadoDoPadrao.quantidadeDeOcorrencias()));
         }
         return evidencia;
+    }
+
+    public void validar(TipoDeEstudo tipo, DadosDaEvidencia dados,
+            boolean exigirResultado) {
+        validarECriar(UUID.randomUUID(), tipo, dados, exigirResultado);
+    }
+
+    private EvidenciaDeAprendizagem validarECriar(UUID registro,
+            TipoDeEstudo tipo, DadosDaEvidencia dados, boolean exigirResultado) {
+        validarObrigatoriedade(tipo, dados, exigirResultado);
+        if (dados == null) {
+            return null;
+        }
+        try {
+            return EvidenciaDeAprendizagem.criar(registro,
+                    dados.quantidadeDeQuestoes(), dados.quantidadeDeAcertos(),
+                    dados.nivelDeRecordacao(), dados.dificuldadePercebida(),
+                    dados.padroesDeErro());
+        } catch (IllegalArgumentException excecao) {
+            throw new RegraDeDominio("EVIDENCIA_INVALIDA", excecao.getMessage());
+        }
     }
 
     public Optional<EvidenciaDeAprendizagem> obterPorRegistro(UUID registro) {

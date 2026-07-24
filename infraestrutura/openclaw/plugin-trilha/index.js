@@ -22,6 +22,8 @@ const MENSAGENS = Object.freeze({
   confirmacaoAplicada: "Operacao confirmada e aplicada na Trilha.",
   confirmacaoReforcada: "Primeira confirmacao aceita. Confirme novamente com: ",
   confirmacaoRecusada: "A operacao expirou, mudou ou o codigo nao confere. Solicite uma nova previa.",
+  contextoDaConfirmacaoInvalido: "O adaptador recusou o contexto do comando de confirmacao.",
+  vinculoDaConfirmacaoNaoEncontrado: "O adaptador nao encontrou o vinculo ativo deste Telegram.",
 });
 
 function lerConfiguracao(pluginConfig) {
@@ -84,6 +86,12 @@ function criarManipuladorDeConfirmacao({ buscar, configuracao }) {
           && dados?.codigo === "NOVA_CONFIRMACAO_EXIGIDA"
           && typeof dados.proximaFrase === "string") {
         return { text: MENSAGENS.confirmacaoReforcada + dados.proximaFrase };
+      }
+      if (resposta.status === 400) {
+        return { text: MENSAGENS.contextoDaConfirmacaoInvalido };
+      }
+      if (resposta.status === 404) {
+        return { text: MENSAGENS.vinculoDaConfirmacaoNaoEncontrado };
       }
       return { text: resposta.status >= 200 && resposta.status < 300
         ? MENSAGENS.confirmacaoAplicada : MENSAGENS.confirmacaoRecusada };

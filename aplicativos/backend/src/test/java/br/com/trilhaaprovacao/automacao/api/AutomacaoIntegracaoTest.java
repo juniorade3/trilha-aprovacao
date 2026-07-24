@@ -19,10 +19,13 @@ import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAplicacaoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeVinculosDoTelegram;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesCriticasMcp;
+import br.com.trilhaaprovacao.automacao.infraestrutura.ContextoDaChamadaMcp;
+import br.com.trilhaaprovacao.automacao.infraestrutura.IdentidadeDaIntegracaoMcp;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ValidadorDeAssinaturaDoGateway;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
+import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
 import br.com.trilhaaprovacao.concursos.aplicacao.ServicoDaEstruturaDeConcursos;
 import br.com.trilhaaprovacao.concursos.dominio.SituacaoDoConcurso;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +37,7 @@ import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -674,6 +678,61 @@ class AutomacaoIntegracaoTest {
         assertThat(banco.queryForObject("""
                 SELECT count(*) FROM registros_de_estudo WHERE topico_id = ?
                 """, Integer.class, topico)).isEqualTo(1);
+    }
+
+    @Test
+    void deveRejeitarEvidenciaIncoerenteAntesDePrepararOperacao()
+            throws Exception {
+        criarContaEEntrar("evidencia-previa@example.com");
+        UUID usuario = identificarUsuario("evidencia-previa@example.com");
+        var codigo = vinculos.gerarCodigo(usuario);
+        var troca = vinculos.trocarCodigo(codigo.codigo(), IDENTIFICADOR_DO_BOT,
+                998878L, 998878L);
+        UUID vinculo = troca.vinculo().identificador();
+        vinculos.registrarProvisionamento(vinculo, IDENTIFICADOR_DO_BOT,
+                998878L, 998878L, "agente-evidencia", "sessao-evidencia");
+        UUID materia = UUID.randomUUID();
+        UUID topico = UUID.randomUUID();
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO materias (identificador, usuario_id, nome,
+                  nome_normalizado, arquivada, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Direito', 'direito', false, ?, ?, 0)
+                """, materia, usuario, agora, agora);
+        banco.update("""
+                INSERT INTO topicos_da_materia (identificador, materia_id, nome,
+                  nome_normalizado, ordem, arquivado, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Autarquias', 'autarquias', 1, false, ?, ?, 0)
+                """, topico, materia, agora, agora);
+        var identidade = new IdentidadeDaIntegracaoMcp(usuario, vinculo,
+                UUID.randomUUID(), IDENTIFICADOR_DO_BOT, 998878L,
+                "agente-evidencia", "sessao-evidencia", 0,
+                Set.of("estudos:escrever"));
+        var contexto = new ContextoDaChamadaMcp(
+                identidade, UUID.randomUUID(), "update-evidencia");
+        Map<String, Object> argumentos = Map.of(
+                "identificadorDoTopico", topico.toString(),
+                "dataHora", agora.toString(),
+                "duracaoEmMinutos", 25,
+                "tipoDeEstudo", "QUESTOES",
+                "evidencia", Map.of(
+                        "quantidadeDeQuestoes", 7,
+                        "quantidadeDeAcertos", 6,
+                        "padroesDeErro", List.of(
+                                Map.of("descricao", "Regime das autarquias",
+                                        "quantidadeDeOcorrencias", 1),
+                                Map.of("descricao", "Tipos de descentralizacao",
+                                        "quantidadeDeOcorrencias", 1))));
+
+        assertThatThrownBy(() -> preparacoes.preparar(
+                "REGISTRO_DE_ESTUDO", contexto, argumentos))
+                .isInstanceOf(RegraDeDominio.class)
+                .hasMessageContaining(
+                        "A soma dos padroes nao pode superar a quantidade de erros");
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM operacoes_assistidas
+                 WHERE usuario_id = ?
+                """, Integer.class, usuario)).isZero();
     }
 
     @Test

@@ -55,7 +55,7 @@ public class ServicoDeOperacoesCriticasMcp {
         dados.put("impacto", impacto(tipo));
         dados.put("codigoDeConfirmacao", preparada.codigoDeConfirmacao());
         dados.put("fraseDeConfirmacao",
-                "CONFIRMAR " + preparada.codigoDeConfirmacao());
+                "/confirmar " + preparada.codigoDeConfirmacao());
         dados.put("aviso", "Sera exigido um segundo codigo no mesmo chat e sessao.");
         dados.put("expiraEm", preparada.operacao().expiraEm());
         return new ResultadoDaConsultaMcp("1",

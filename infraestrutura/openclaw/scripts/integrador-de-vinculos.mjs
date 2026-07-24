@@ -40,6 +40,7 @@ const CAMINHO_DA_CONFIRMACAO =
   "/api/v1/integracoes-confiaveis/telegram/operacoes/confirmacao";
 const CAMINHO_LOCAL_DA_CONFIRMACAO = "/v1/operacoes/telegram/confirmacao";
 const FORMATO_DO_CODIGO_DE_CONFIRMACAO = /^[23456789A-HJ-NP-Z]{8}$/;
+const FORMATO_DO_CODIGO_DE_ERRO_DO_BACKEND = /^[A-Z][A-Z0-9_]{2,79}$/;
 
 class ErroDoIntegrador extends Error {
   constructor(codigo, estadoHttp) {
@@ -311,7 +312,7 @@ async function confirmarOperacao(requisicao, configuracao, buscar) {
       const dados = JSON.parse(retorno.bytes.toString("utf8"));
       if (dados?.exigeNovaConfirmacao === true
           && typeof dados.proximaFrase === "string"
-          && /^CONFIRMAR [23456789A-HJ-NP-Z]{8}$/.test(dados.proximaFrase)) {
+          && /^\/confirmar [23456789A-HJ-NP-Z]{8}$/.test(dados.proximaFrase)) {
         return { estado: 200, codigo: "NOVA_CONFIRMACAO_EXIGIDA",
           proximaFrase: dados.proximaFrase };
       }
@@ -321,7 +322,17 @@ async function confirmarOperacao(requisicao, configuracao, buscar) {
     return { estado: 200, codigo: "OPERACAO_APLICADA" };
   }
   if ([404, 409, 410, 422].includes(retorno.status)) {
-    throw new ErroDoIntegrador("CONFIRMACAO_RECUSADA", 409);
+    let codigo = "CONFIRMACAO_RECUSADA";
+    try {
+      const resposta = JSON.parse(retorno.bytes.toString("utf8"));
+      if (typeof resposta?.codigo === "string"
+          && FORMATO_DO_CODIGO_DE_ERRO_DO_BACKEND.test(resposta.codigo)) {
+        codigo = resposta.codigo;
+      }
+    } catch {
+      // Uma recusa malformada continua sendo tratada sem expor o corpo.
+    }
+    throw new ErroDoIntegrador(codigo, 409);
   }
   throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
 }

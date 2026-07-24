@@ -89,6 +89,8 @@ function responderJson(resposta, estado, corpo) {
 function criarBackendFalso({
   estadoDaTroca = 200,
   estadosDoProvisionamento = [200],
+  estadoDaConfirmacao = 200,
+  codigoDaConfirmacao = "CONFIRMACAO_EXPIRADA_OU_INVALIDA",
 } = {}) {
   const chamadas = { troca: 0, provisionamento: 0, confirmacao: 0,
     assinaturasInvalidas: 0 };
@@ -131,6 +133,11 @@ function criarBackendFalso({
       assert.equal(requisicao.codigo, "2345678A");
       assert.equal(requisicao.identificadorDaSessao,
         `sessao:${IDENTIFICADOR_DO_VINCULO}`);
+      if (estadoDaConfirmacao !== 200) {
+        responderJson(resposta, estadoDaConfirmacao,
+          { codigo: codigoDaConfirmacao });
+        return;
+      }
       responderJson(resposta, 200, { estado: "APLICADA" });
       return;
     }
@@ -315,6 +322,22 @@ test("confirma pelo vinculo provisionado sem expor o segredo do gateway", async 
     assert.deepEqual(JSON.parse(resposta.texto), { codigo: "OPERACAO_APLICADA" });
     assert.equal(cenario.backend.chamadas.confirmacao, 1);
     assert.equal(cenario.backend.chamadas.assinaturasInvalidas, 0);
+  } finally {
+    await cenario.encerrar();
+  }
+});
+
+test("preserva somente o codigo seguro da recusa de confirmacao", async () => {
+  const cenario = await criarCenario({
+    estadoDaConfirmacao: 409,
+    codigoDaConfirmacao: "PREVIA_DE_AUTOMACAO_DESATUALIZADA",
+  });
+  try {
+    assert.equal((await vincular(cenario, corpoDoPlugin())).status, 200);
+    const resposta = await confirmar(cenario);
+    assert.equal(resposta.status, 409);
+    assert.deepEqual(JSON.parse(resposta.texto),
+      { codigo: "PREVIA_DE_AUTOMACAO_DESATUALIZADA" });
   } finally {
     await cenario.encerrar();
   }

@@ -1,0 +1,1 @@
+Environment=PATH=/home/junior/.nvm/versions/node/v20.20.1/bin:/home/junior/.sdkman/candidates/quarkus/current/bin:/home/junior/.sdkman/candidates/java/current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin OLLAMA_MODELS=/mnt/dados/ollama-modelos
