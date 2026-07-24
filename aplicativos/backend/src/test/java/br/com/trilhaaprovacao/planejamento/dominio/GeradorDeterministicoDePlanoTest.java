@@ -63,6 +63,19 @@ class GeradorDeterministicoDePlanoTest {
     }
 
     @Test
+    void deveRespeitarQuantidadeDeMateriasConfiguradaPorDia() {
+        var umaMateria = gerar(materias(), topicos(materias()), dias(200), 50, 1)
+                .dias().getFirst();
+        var quatroMaterias = gerar(materias(), topicos(materias()), dias(200), 50, 4)
+                .dias().getFirst();
+
+        assertThat(umaMateria.blocosSugeridos()).hasSize(1);
+        assertThat(quatroMaterias.blocosSugeridos()).hasSize(4)
+                .extracting(BlocoSugerido::identificadorDaMateria)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
     void deveDistribuirSetentaMinutosEmDoisBlocosSemViolarDuracaoMinima() {
         var dia = gerar(materias(), topicos(materias()), dias(70), 50)
                 .dias().getFirst();
@@ -114,8 +127,19 @@ class GeradorDeterministicoDePlanoTest {
             List<CandidatoDeMateriaParaGeracao> materias,
             List<CandidatoDeTopicoParaGeracao> topicos,
             List<EntradaDoDiaParaGeracao> dias, int duracao) {
+        return gerar(materias, topicos, dias, duracao,
+                ConfiguracaoDaGeracaoDeterministica
+                        .QUANTIDADE_PADRAO_DE_MATERIAS_POR_DIA);
+    }
+
+    private PreviaDaGeracaoDaSemana gerar(
+            List<CandidatoDeMateriaParaGeracao> materias,
+            List<CandidatoDeTopicoParaGeracao> topicos,
+            List<EntradaDoDiaParaGeracao> dias, int duracao,
+            int quantidadeDeMateriasPorDia) {
         return gerador.gerar(PLANO, SEGUNDA, materias, topicos, List.of(), dias,
-                new ConfiguracaoDaGeracaoDeterministica(duracao));
+                new ConfiguracaoDaGeracaoDeterministica(
+                        duracao, quantidadeDeMateriasPorDia));
     }
 
     private List<CandidatoDeMateriaParaGeracao> materias() {

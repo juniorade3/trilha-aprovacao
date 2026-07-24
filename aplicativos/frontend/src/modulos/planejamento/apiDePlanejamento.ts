@@ -463,6 +463,7 @@ export function gerarPreviaDeterministica(
   identificadorDoPlano: string,
   dataDeReferencia: string,
   duracaoDoBlocoPrincipalEmMinutos: number,
+  quantidadeDeMateriasPorDia = 3,
 ): Promise<PreviaDaGeracao> {
   return requisitar<PreviaDaGeracao>(
     `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica/previa`,
@@ -471,6 +472,7 @@ export function gerarPreviaDeterministica(
       body: JSON.stringify({
         dataDeReferencia,
         duracaoDoBlocoPrincipalEmMinutos,
+        quantidadeDeMateriasPorDia,
       }),
     },
   )
@@ -482,6 +484,7 @@ export function aplicarGeracaoDeterministica(
   duracaoDoBlocoPrincipalEmMinutos: number,
   substituirBlocosGerados: boolean,
   assinaturaDaPrevia: string,
+  quantidadeDeMateriasPorDia = 3,
 ): Promise<ResultadoDaAplicacaoDaGeracao> {
   return requisitar<ResultadoDaAplicacaoDaGeracao>(
     `/v1/planos-semanais/${identificadorDoPlano}/geracao-deterministica`,
@@ -490,6 +493,7 @@ export function aplicarGeracaoDeterministica(
       body: JSON.stringify({
         dataDeReferencia,
         duracaoDoBlocoPrincipalEmMinutos,
+        quantidadeDeMateriasPorDia,
         substituirBlocosGerados,
         assinaturaDaPrevia,
       }),

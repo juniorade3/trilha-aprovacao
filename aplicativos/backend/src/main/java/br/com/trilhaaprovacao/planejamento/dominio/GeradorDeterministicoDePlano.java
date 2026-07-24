@@ -18,8 +18,6 @@ import java.util.function.Predicate;
 public final class GeradorDeterministicoDePlano {
     private static final int DURACAO_MINIMA =
             DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA;
-    private static final int META_DE_MATERIAS =
-            DistribuidorDeterministicoDeCapacidade.LIMITE_DE_MATERIAS;
     public static final int DURACAO_DA_REVISAO_ESPECIFICA_EM_MINUTOS = 20;
     public static final int LIMITE_DE_REVISOES_ESPECIFICAS_POR_DIA = 3;
 
@@ -48,6 +46,7 @@ public final class GeradorDeterministicoDePlano {
                 .filter(item -> materiasIncluidas.contains(item.identificadorDaMateria()))
                 .sorted(ordemDosTopicos()).toList();
         if (topicos.isEmpty()) throw new SemTopicosElegiveisParaGeracao();
+        int metaDeMaterias = configuracao.quantidadeDeMateriasPorDia();
 
         List<EntradaDoDiaParaGeracao> entradas = ordenarEValidarDias(diasInformados);
         LocalDate ultimoDia = entradas.getLast().data();
@@ -140,7 +139,7 @@ public final class GeradorDeterministicoDePlano {
                     vagasDeRevisao--;
                 }
 
-                int vagas = Math.max(0, META_DE_MATERIAS - materiasDoDia.size());
+                int vagas = Math.max(0, metaDeMaterias - materiasDoDia.size());
                 List<CandidatoDeMateriaParaGeracao> materiasComTopico = candidatos.stream()
                         .filter(item -> !materiasDoDia.contains(item.identificadorDaMateria()))
                         .filter(item -> possuiTopicoDisponivel(item.identificadorDaMateria(),
@@ -170,7 +169,7 @@ public final class GeradorDeterministicoDePlano {
                         int duracao = duracaoBase
                                 + (indice < excedenteDistribuivel ? 1 : 0);
                         sugeridos.add(blocoPrincipal(escolhido, topico, duracao,
-                                materiasDoDiaAnterior, quantidade));
+                                materiasDoDiaAnterior, quantidade, metaDeMaterias));
                         materiasDoDia.add(escolhido.identificadorDaMateria());
                         carga.merge(escolhido.identificadorDaMateria(), duracao, Integer::sum);
                         ocorrencias.merge(escolhido.identificadorDaMateria(), 1, Integer::sum);
@@ -180,7 +179,7 @@ public final class GeradorDeterministicoDePlano {
                     }
                 }
 
-                if (vagas > 0 && quantidade < Math.min(META_DE_MATERIAS, vagas)) {
+                if (vagas > 0 && quantidade < Math.min(metaDeMaterias, vagas)) {
                     String codigo = livres < DURACAO_MINIMA
                             ? "DISPONIBILIDADE_INSUFICIENTE"
                             : "POUCOS_TOPICOS_ELEGIVEIS";
@@ -213,9 +212,10 @@ public final class GeradorDeterministicoDePlano {
                     revisoesSemAlocacao
                             + " revisao(oes) devida(s) nao couberam integralmente na semana."));
         }
-        if (candidatos.size() < META_DE_MATERIAS) {
+        if (candidatos.size() < metaDeMaterias) {
             avisosDaSemana.add(justificativa("POUCAS_MATERIAS_ELEGIVEIS",
-                    "A meta de tres materias depende de ao menos tres materias incluidas."));
+                    "A meta de " + metaDeMaterias
+                            + " materia(s) por dia depende de materias elegiveis suficientes."));
         }
         return new PreviaDaGeracaoDaSemana(plano, dias, avisosDaSemana);
     }
@@ -315,11 +315,12 @@ public final class GeradorDeterministicoDePlano {
 
     private BlocoSugerido blocoPrincipal(CandidatoDeMateriaParaGeracao materia,
             CandidatoDeTopicoParaGeracao topico, int duracao,
-            Set<UUID> materiasDoDiaAnterior, int quantidade) {
+            Set<UUID> materiasDoDiaAnterior, int quantidade,
+            int metaDeMaterias) {
         TipoDeAtividade tipo = topico.jaFoiEstudado()
                 ? TipoDeAtividade.QUESTOES : TipoDeAtividade.TEORIA;
         List<JustificativaDaGeracao> justificativas = new ArrayList<>(
-                justificativas(materia, materiasDoDiaAnterior, quantidade));
+                justificativas(materia, materiasDoDiaAnterior, quantidade, metaDeMaterias));
         justificativas.add(justificativa(
                 "GRUPO_" + topico.grupoDaPriorizacao().name(),
                 "Topico selecionado no grupo "
@@ -352,7 +353,7 @@ public final class GeradorDeterministicoDePlano {
 
     private List<JustificativaDaGeracao> justificativas(
             CandidatoDeMateriaParaGeracao candidato, Set<UUID> materiasDoDiaAnterior,
-            int quantidade) {
+            int quantidade, int metaDeMaterias) {
         List<JustificativaDaGeracao> resultado = new ArrayList<>();
         resultado.add(justificativa("PRIORIDADE_" + candidato.prioridade().name(),
                 "Materia com prioridade " + candidato.prioridade().name().toLowerCase() + "."));
@@ -362,9 +363,10 @@ public final class GeradorDeterministicoDePlano {
             resultado.add(justificativa("ALTERNANCIA_ENTRE_DIAS",
                     "Favorece alternancia em relacao ao dia anterior."));
         }
-        if (quantidade == META_DE_MATERIAS) {
-            resultado.add(justificativa("META_DE_TRES_MATERIAS",
-                    "Contribui para a meta de tres materias distintas no dia."));
+        if (quantidade == metaDeMaterias) {
+            resultado.add(justificativa("META_DE_MATERIAS_POR_DIA",
+                    "Contribui para a meta de " + metaDeMaterias
+                            + " materia(s) distinta(s) no dia."));
         }
         return List.copyOf(resultado);
     }

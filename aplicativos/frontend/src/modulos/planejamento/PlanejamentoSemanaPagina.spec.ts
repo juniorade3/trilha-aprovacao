@@ -361,6 +361,7 @@ describe('PlanejamentoSemanaPagina', () => {
       'plano-1',
       '2026-07-22',
       50,
+      3,
     )
     expect(chamadas.aplicarGeracaoDeterministica).not.toHaveBeenCalled()
     expect(roteador.currentRoute.value.query).toEqual({ inicio })
@@ -448,6 +449,7 @@ describe('PlanejamentoSemanaPagina', () => {
       'plano-1',
       dataDeReferenciaEsperada(),
       50,
+      3,
     )
     expect(chamadas.aplicarGeracaoDeterministica).toHaveBeenCalledWith(
       'plano-1',
@@ -455,6 +457,7 @@ describe('PlanejamentoSemanaPagina', () => {
       50,
       false,
       'assinatura-da-pagina',
+      3,
     )
     expect(pagina.text()).toContain('1 bloco(s) aplicado(s)')
     expect(pagina.text()).toContain('Gerado')

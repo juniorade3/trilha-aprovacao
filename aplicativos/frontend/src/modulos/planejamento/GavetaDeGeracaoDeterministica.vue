@@ -29,6 +29,7 @@ const etapa = ref<'PRIORIDADES' | 'CONFIGURACAO' | 'PREVIA'>('PRIORIDADES')
 const materias = ref<MateriaParaGeracao[]>([])
 const previa = ref<PreviaDaGeracao>()
 const duracaoPrincipal = ref(50)
+const quantidadeDeMateriasPorDia = ref(3)
 const carregando = ref(true)
 const processando = ref(false)
 const erro = ref('')
@@ -101,9 +102,23 @@ function criarAssinaturaDaPrevia() {
   return JSON.stringify({
     dataDeReferencia: propriedades.dataDeReferencia,
     duracaoPrincipal: Number(duracaoPrincipal.value),
+    quantidadeDeMateriasPorDia: Number(quantidadeDeMateriasPorDia.value),
     prioridades: prioridadesOrdenadas(),
   })
 }
+
+const configuracaoInvalida = computed(() => {
+  const duracao = Number(duracaoPrincipal.value)
+  const quantidade = Number(quantidadeDeMateriasPorDia.value)
+  return (
+    !Number.isInteger(duracao) ||
+    duracao < 25 ||
+    duracao > 180 ||
+    !Number.isInteger(quantidade) ||
+    quantidade < 1 ||
+    quantidade > 20
+  )
+})
 
 const prioridadesNaoSalvas = computed(
   () =>
@@ -180,11 +195,15 @@ async function salvarPrioridades() {
 
 async function solicitarPrevia(mensagemAposCalculo = '') {
   const duracaoPrincipalSolicitada = Number(duracaoPrincipal.value)
+  const quantidadeDeMateriasSolicitada = Number(
+    quantidadeDeMateriasPorDia.value,
+  )
   const assinaturaSolicitada = criarAssinaturaDaPrevia()
   previa.value = await gerarPreviaDeterministica(
     propriedades.identificadorDoPlano,
     propriedades.dataDeReferencia,
     duracaoPrincipalSolicitada,
+    quantidadeDeMateriasSolicitada,
   )
   assinaturaLocalDaPrevia.value = assinaturaSolicitada
   avisoDePreviaRecalculada.value = mensagemAposCalculo
@@ -264,6 +283,7 @@ async function aplicar(substituirBlocosGerados: boolean) {
       Number(duracaoPrincipal.value),
       substituirBlocosGerados,
       previa.value.assinaturaDaPrevia,
+      Number(quantidadeDeMateriasPorDia.value),
     )
     confirmacaoDeRegeneracaoAberta.value = false
     emitir('aplicado', resultado)
@@ -440,6 +460,22 @@ onMounted(carregarMaterias)
           />
           <small>Entre 25 e 180 minutos.</small>
         </label>
+        <label>
+          <span>Matérias por dia</span>
+          <input
+            v-model.number="quantidadeDeMateriasPorDia"
+            class="form-control"
+            type="number"
+            min="1"
+            max="20"
+            step="1"
+            required
+          />
+          <small>
+            Entre 1 e 20. O cálculo poderá usar menos se faltar capacidade ou
+            matéria elegível.
+          </small>
+        </label>
       </div>
       <div class="d-flex gap-2">
         <button
@@ -452,7 +488,7 @@ onMounted(carregarMaterias)
         <button
           class="btn btn-primary flex-grow-1"
           type="button"
-          :disabled="processando"
+          :disabled="processando || configuracaoInvalida"
           @click="calcularPrevia()"
         >
           {{ processando ? 'Calculando…' : 'Calcular prévia' }}

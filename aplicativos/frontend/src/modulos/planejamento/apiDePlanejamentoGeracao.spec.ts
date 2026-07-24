@@ -15,8 +15,8 @@ describe('apiDePlanejamento - geracao deterministica', () => {
     requisitar.mockResolvedValue({})
   })
 
-  it('solicita a previa com referencia e duracao principal', async () => {
-    await gerarPreviaDeterministica('plano-1', '2026-07-21', 50)
+  it('solicita a previa com referencia, duracao e materias por dia', async () => {
+    await gerarPreviaDeterministica('plano-1', '2026-07-21', 50, 4)
 
     expect(requisitar).toHaveBeenCalledWith(
       '/v1/planos-semanais/plano-1/geracao-deterministica/previa',
@@ -25,6 +25,7 @@ describe('apiDePlanejamento - geracao deterministica', () => {
         body: JSON.stringify({
           dataDeReferencia: '2026-07-21',
           duracaoDoBlocoPrincipalEmMinutos: 50,
+          quantidadeDeMateriasPorDia: 4,
         }),
       },
     )
@@ -37,6 +38,7 @@ describe('apiDePlanejamento - geracao deterministica', () => {
       75,
       true,
       'assinatura-1',
+      5,
     )
 
     expect(requisitar).toHaveBeenCalledWith(
@@ -46,6 +48,7 @@ describe('apiDePlanejamento - geracao deterministica', () => {
         body: JSON.stringify({
           dataDeReferencia: '2026-07-21',
           duracaoDoBlocoPrincipalEmMinutos: 75,
+          quantidadeDeMateriasPorDia: 5,
           substituirBlocosGerados: true,
           assinaturaDaPrevia: 'assinatura-1',
         }),

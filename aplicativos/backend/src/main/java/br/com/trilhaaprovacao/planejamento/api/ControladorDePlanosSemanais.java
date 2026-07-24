@@ -166,7 +166,8 @@ public class ControladorDePlanosSemanais {
             @Valid @RequestBody RequisicaoDePreviaDaGeracao requisicao,
             Authentication autenticacao) {
         var configuracao = new ConfiguracaoDaGeracaoDeterministica(
-                requisicao.duracaoDoBlocoPrincipalEmMinutos());
+                requisicao.duracaoDoBlocoPrincipalEmMinutos(),
+                quantidadeDeMateriasPorDia(requisicao.quantidadeDeMateriasPorDia()));
         return RespostaDaPreviaDaGeracao.de(geracao.gerarPrevia(
                 usuarioAtual.obter(autenticacao), identificador,
                 requisicao.dataDeReferencia(), configuracao));
@@ -202,7 +203,8 @@ public class ControladorDePlanosSemanais {
             @Valid @RequestBody RequisicaoDeAplicacaoDaGeracao requisicao,
             Authentication autenticacao) {
         var configuracao = new ConfiguracaoDaGeracaoDeterministica(
-                requisicao.duracaoDoBlocoPrincipalEmMinutos());
+                requisicao.duracaoDoBlocoPrincipalEmMinutos(),
+                quantidadeDeMateriasPorDia(requisicao.quantidadeDeMateriasPorDia()));
         return RespostaDaAplicacaoDaGeracao.de(geracao.aplicar(
                 usuarioAtual.obter(autenticacao), identificador,
                 requisicao.dataDeReferencia(), configuracao,
@@ -313,5 +315,11 @@ public class ControladorDePlanosSemanais {
             Authentication autenticacao) {
         return RespostaDePlanoSemanal.de(servico.ativarPlanoSemanal(
                 usuarioAtual.obter(autenticacao), identificador));
+    }
+
+    private int quantidadeDeMateriasPorDia(Integer quantidadeInformada) {
+        return quantidadeInformada == null
+                ? ConfiguracaoDaGeracaoDeterministica.QUANTIDADE_PADRAO_DE_MATERIAS_POR_DIA
+                : quantidadeInformada;
     }
 }

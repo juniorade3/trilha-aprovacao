@@ -156,7 +156,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
 
     await componente.find('button.btn-primary.flex-grow-1').trigger('click')
     await flushPromises()
-    expect(chamadas.gerar).toHaveBeenCalledWith('plano-1', '2026-07-21', 50)
+    expect(chamadas.gerar).toHaveBeenCalledWith('plano-1', '2026-07-21', 50, 3)
     expect(componente.findAll('.dia-da-previa')).toHaveLength(7)
     expect(componente.text()).toContain('Nada foi aplicado ao seu plano')
     expect(componente.text()).toContain('Normalização de dados')
@@ -176,6 +176,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       false,
       'assinatura-1',
+      3,
     )
     expect(componente.emitted('aplicado')).toHaveLength(1)
   })
@@ -232,6 +233,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       false,
       'assinatura-2',
+      3,
     )
     expect(componente.emitted('aplicado')).toHaveLength(1)
   })
@@ -322,13 +324,14 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect(componente.text()).not.toContain('Prévia desatualizada.')
   })
 
-  it('preserva prioridades e duracao ao voltar entre todas as etapas', async () => {
+  it('preserva prioridades, duracao e materias por dia entre as etapas', async () => {
     const componente = await montar()
     await componente.find('select').setValue('ALTA')
     await componente.get('button.btn-primary.w-100').trigger('click')
     await flushPromises()
     const duracoes = componente.findAll('input[type="number"]')
     await duracoes[0]!.setValue('75')
+    await duracoes[1]!.setValue('4')
     await componente.get('button.btn-primary.flex-grow-1').trigger('click')
     await flushPromises()
 
@@ -348,7 +351,10 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect((duracoesPreservadas[0]!.element as HTMLInputElement).value).toBe(
       '75',
     )
-    expect(duracoesPreservadas).toHaveLength(1)
+    expect((duracoesPreservadas[1]!.element as HTMLInputElement).value).toBe(
+      '4',
+    )
+    expect(duracoesPreservadas).toHaveLength(2)
 
     await componente
       .findAll('.etapa-da-geracao')
@@ -366,6 +372,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
     await flushPromises()
     const duracoes = componente.findAll('input[type="number"]')
     await duracoes[0]!.setValue('75')
+    await duracoes[1]!.setValue('4')
 
     await componente.get('button.btn-primary.flex-grow-1').trigger('click')
     await flushPromises()
@@ -387,12 +394,14 @@ describe('GavetaDeGeracaoDeterministica', () => {
       'plano-1',
       '2026-07-21',
       75,
+      4,
     )
     expect(chamadas.gerar).toHaveBeenNthCalledWith(
       2,
       'plano-1',
       '2026-07-21',
       75,
+      4,
     )
 
     await componente
@@ -410,7 +419,10 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect((duracoesPreservadas[0]!.element as HTMLInputElement).value).toBe(
       '75',
     )
-    expect(duracoesPreservadas).toHaveLength(1)
+    expect((duracoesPreservadas[1]!.element as HTMLInputElement).value).toBe(
+      '4',
+    )
+    expect(duracoesPreservadas).toHaveLength(2)
   })
 
   it('confirma regeneracao preservando manuais e ajustados', async () => {
@@ -443,6 +455,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       true,
       'assinatura-1',
+      3,
     )
   })
 
@@ -511,6 +524,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       true,
       'assinatura-1',
+      3,
     )
     expect(chamadas.aplicar).toHaveBeenNthCalledWith(
       2,
@@ -519,6 +533,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       true,
       'assinatura-1',
+      3,
     )
     expect(componente.emitted('aplicado')).toHaveLength(1)
   })
@@ -606,7 +621,12 @@ describe('GavetaDeGeracaoDeterministica', () => {
     await componente.get('button.btn-primary.flex-grow-1').trigger('click')
     await flushPromises()
 
-    expect(chamadas.gerar).toHaveBeenLastCalledWith('plano-1', '2026-07-21', 60)
+    expect(chamadas.gerar).toHaveBeenLastCalledWith(
+      'plano-1',
+      '2026-07-21',
+      60,
+      3,
+    )
     expect(componente.find('[role="status"]').exists()).toBe(false)
     const aplicar = componente
       .findAll('button')
@@ -620,6 +640,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       60,
       false,
       'assinatura-1',
+      3,
     )
   })
 
@@ -672,6 +693,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       false,
       'assinatura-1',
+      3,
     )
     expect(componente.emitted('aplicado')).toHaveLength(1)
   })
@@ -713,6 +735,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
       50,
       true,
       'assinatura-1',
+      3,
     )
   })
 

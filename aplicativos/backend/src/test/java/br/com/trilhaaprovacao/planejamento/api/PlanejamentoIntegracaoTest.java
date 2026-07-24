@@ -641,7 +641,8 @@ class PlanejamentoIntegracaoTest {
         assertThatQuantidade("prioridades_de_materias_no_plano", 2);
 
         String configuracao = """
-                {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50}
+                {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50,
+                 "quantidadeDeMateriasPorDia":2}
                 """.formatted(SEGUNDA);
         String primeira = api.perform(post(
                         "/api/v1/planos-semanais/{id}/geracao-deterministica/previa", planoA)
@@ -649,8 +650,8 @@ class PlanejamentoIntegracaoTest {
                         .content(configuracao))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dias.length()").value(7))
-                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(3))
-                .andExpect(jsonPath("$.dias[0].capacidade.minutosSugeridos").value(150))
+                .andExpect(jsonPath("$.dias[0].blocosSugeridos.length()").value(2))
+                .andExpect(jsonPath("$.dias[0].capacidade.minutosSugeridos").value(100))
                 .andExpect(jsonPath("$.aplicada").value(false))
                 .andReturn().getResponse().getContentAsString();
         String segunda = api.perform(post(
