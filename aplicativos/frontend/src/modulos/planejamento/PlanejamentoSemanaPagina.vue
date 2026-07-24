@@ -12,6 +12,10 @@ import {
   type Materia,
   type Topico,
 } from '@/modulos/materias/apiDeConteudos'
+import {
+  listarMateriaisRelacionadosAosTopicos,
+  type MaterialRelacionadoAoTopico,
+} from '@/modulos/estudos/apiDeEstudos'
 import EditorDeBloco from './EditorDeBloco.vue'
 import GavetaDeGeracaoDeterministica from './GavetaDeGeracaoDeterministica.vue'
 import GavetaDeReplanejamento from './GavetaDeReplanejamento.vue'
@@ -50,6 +54,9 @@ const conflito = ref(false)
 const formulario = reactive<Record<string, number>>({})
 const materias = ref<Materia[]>([])
 const topicos = ref<Topico[]>([])
+const materiaisPorTopico = ref<Record<string, MaterialRelacionadoAoTopico[]>>(
+  {},
+)
 const editorAberto = ref(false)
 const blocoEmEdicao = ref<BlocoDeEstudo>()
 const blocoParaExcluir = ref<BlocoDeEstudo>()
@@ -203,6 +210,34 @@ async function carregarConteudos() {
   }
 }
 
+async function carregarAtalhosDosMateriais(planoObtido: PlanoSemanal) {
+  materiaisPorTopico.value = {}
+  const identificadores = [
+    ...new Set(
+      planoObtido.blocos
+        .map((bloco) => bloco.identificadorDoTopico)
+        .filter((identificador): identificador is string =>
+          Boolean(identificador),
+        ),
+    ),
+  ]
+  if (identificadores.length === 0) return
+  try {
+    const relacionados =
+      await listarMateriaisRelacionadosAosTopicos(identificadores)
+    materiaisPorTopico.value = relacionados.reduce<
+      Record<string, MaterialRelacionadoAoTopico[]>
+    >((agrupados, item) => {
+      const materiais = agrupados[item.identificadorDoTopico] ?? []
+      materiais.push(item)
+      agrupados[item.identificadorDoTopico] = materiais
+      return agrupados
+    }, {})
+  } catch {
+    materiaisPorTopico.value = {}
+  }
+}
+
 async function carregar() {
   carregando.value = true
   erro.value = ''
@@ -210,15 +245,19 @@ async function carregar() {
   conflito.value = false
   plano.value = undefined
   historico.value = undefined
+  materiaisPorTopico.value = {}
   try {
     const planoObtido = await obterPlanoSemanal(dataInicial.value)
     plano.value = planoObtido
     preencherFormulario(planoObtido)
-    await carregarConteudos()
-    historico.value = await obterHistoricoSemanal(
-      planoObtido.identificador,
-      dataInicial.value,
-    )
+    const [, historicoObtido] = await Promise.all([
+      Promise.all([
+        carregarConteudos(),
+        carregarAtalhosDosMateriais(planoObtido),
+      ]),
+      obterHistoricoSemanal(planoObtido.identificador, dataInicial.value),
+    ])
+    historico.value = historicoObtido
   } catch (causa) {
     if (!(causa instanceof ErroDaApi && causa.status === 404)) {
       erro.value =
@@ -272,6 +311,38 @@ function nomeDoTopico(bloco: BlocoDeEstudo) {
   return topicos.value.find(
     (topico) => topico.identificador === bloco.identificadorDoTopico,
   )?.nome
+}
+
+function materiaisDoBloco(bloco: BlocoDeEstudo) {
+  return bloco.identificadorDoTopico
+    ? (materiaisPorTopico.value[bloco.identificadorDoTopico] ?? [])
+    : []
+}
+
+function possuiMaterial(bloco: BlocoDeEstudo) {
+  return materiaisDoBloco(bloco).length > 0
+}
+
+function abrirMaterialDoBloco(bloco: BlocoDeEstudo, evento?: MouseEvent) {
+  if (
+    evento?.target instanceof Element &&
+    evento.target.closest('a, button, input, select, textarea, summary')
+  )
+    return
+
+  const relacionados = materiaisDoBloco(bloco)
+  if (relacionados.length === 0 || !bloco.identificadorDoTopico) return
+  if (relacionados.length === 1) {
+    void roteador.push({
+      name: 'material-detalhe',
+      params: { identificador: relacionados[0]!.identificadorDoMaterial },
+    })
+    return
+  }
+  void roteador.push({
+    name: 'materiais-de-estudo',
+    query: { topico: bloco.identificadorDoTopico },
+  })
 }
 
 function rotuloDoTipo(tipo: BlocoDeEstudo['tipoDeAtividade']) {
@@ -601,6 +672,7 @@ async function irParaSemanaAtual() {
 watch(
   () => rota.query.inicio,
   async (inicio) => {
+    if (rota.name !== 'planejamento-semana') return
     geracaoAberta.value = false
     replanejamentoAberto.value = false
     if (!inicioValido(inicio)) {
@@ -895,7 +967,17 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
                 v-for="(bloco, posicao) in blocosDaData(data)"
                 :id="`bloco-planejado-${bloco.identificador}`"
                 :key="bloco.identificador"
-                tabindex="-1"
+                :class="{ 'bloco-com-material': possuiMaterial(bloco) }"
+                :tabindex="possuiMaterial(bloco) ? 0 : -1"
+                :role="possuiMaterial(bloco) ? 'link' : undefined"
+                :aria-label="
+                  possuiMaterial(bloco)
+                    ? `${bloco.titulo}. Abrir material correspondente`
+                    : undefined
+                "
+                @click="abrirMaterialDoBloco(bloco, $event)"
+                @keydown.enter.self.prevent="abrirMaterialDoBloco(bloco)"
+                @keydown.space.self.prevent="abrirMaterialDoBloco(bloco)"
               >
                 <div class="conteudo-do-bloco-planejado">
                   <span class="ordem-do-bloco">{{ bloco.ordem }}</span>
@@ -930,6 +1012,14 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
                         — {{ nomeDoTopico(bloco) }}</template
                       >
                     </small>
+                    <span
+                      v-if="possuiMaterial(bloco)"
+                      class="atalho-do-material"
+                      aria-hidden="true"
+                    >
+                      <i class="bi bi-book" aria-hidden="true"></i>
+                      Abrir material
+                    </span>
                     <small v-if="bloco.quantidadeDeReagendamentos">
                       Reagendado {{ bloco.quantidadeDeReagendamentos }}
                       {{
@@ -1323,6 +1413,30 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
 .lista-de-blocos-do-dia > li:focus-visible {
   outline: 3px solid rgba(13, 125, 115, 0.45);
   outline-offset: 3px;
+}
+
+.lista-de-blocos-do-dia > li.bloco-com-material {
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    border-color: rgba(13, 125, 115, 0.55);
+    box-shadow: 0 0.45rem 1rem rgba(15, 45, 62, 0.1);
+    transform: translateY(-1px);
+  }
+}
+
+.atalho-do-material {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+  color: var(--bs-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .grade-do-historico-semanal {

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
@@ -67,15 +68,35 @@ public class ControladorDeMateriaisEEstudos {
     public RespostaPaginada<RespostaDeMaterial> listarMateriais(
             @RequestParam(defaultValue = "") String pesquisa,
             @RequestParam(defaultValue = "false") boolean incluirArquivados,
+            @RequestParam(required = false) UUID identificadorDoTopico,
             @RequestParam(defaultValue = "0") @Min(0) int pagina,
             @RequestParam(defaultValue = "12") @Min(1) @Max(100) int tamanho,
             Authentication autenticacao) {
         var resultado = servico.listarMateriais(usuario(autenticacao), pesquisa,
-                incluirArquivados, pagina, tamanho);
+                incluirArquivados, identificadorDoTopico, pagina, tamanho);
         return new RespostaPaginada<>(
                 resultado.map(RespostaDeMaterial::de).getContent(),
                 resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages());
+    }
+
+    @GetMapping("/materiais/atalhos-por-topico")
+    @Operation(summary = "Lista materiais ativos associados aos tópicos informados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Atalhos listados."),
+            @ApiResponse(responseCode = "400", description = "Parâmetros inválidos."),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou expirada.")
+    })
+    public List<RespostaDeMaterialRelacionadoAoTopico> listarAtalhosPorTopico(
+            @RequestParam
+            @Size(min = 1, max = 100)
+            List<UUID> identificadoresDosTopicos,
+            Authentication autenticacao) {
+        return servico.listarMateriaisAtivosDosTopicos(
+                        usuario(autenticacao), identificadoresDosTopicos)
+                .stream()
+                .map(RespostaDeMaterialRelacionadoAoTopico::de)
+                .toList();
     }
 
     @GetMapping("/materiais/{identificador}")

@@ -65,16 +65,39 @@ public class ServicoDeMateriaisEEstudos {
 
     @Transactional(readOnly = true)
     public Page<MaterialDeEstudo> listarMateriais(UUID usuario, String pesquisa,
-            boolean incluirArquivados, int pagina, int tamanho) {
+            boolean incluirArquivados, UUID identificadorDoTopico,
+            int pagina, int tamanho) {
         var paginacao = PageRequest.of(pagina, tamanho, Sort.by("titulo").ascending());
         String termo = pesquisa == null ? "" : pesquisa.trim();
-        Page<MaterialDeEstudoPersistido> resultado = incluirArquivados
-                ? materiais.findByIdentificadorDoUsuarioAndTituloContainingIgnoreCase(
-                        usuario, termo, paginacao)
-                : materiais
-                        .findByIdentificadorDoUsuarioAndArquivadoAndTituloContainingIgnoreCase(
-                                usuario, false, termo, paginacao);
+        Page<MaterialDeEstudoPersistido> resultado;
+        if (identificadorDoTopico != null) {
+            resultado = materiais.listarPorTopico(usuario, identificadorDoTopico,
+                    termo, incluirArquivados, paginacao);
+        } else {
+            resultado = incluirArquivados
+                    ? materiais.findByIdentificadorDoUsuarioAndTituloContainingIgnoreCase(
+                            usuario, termo, paginacao)
+                    : materiais
+                            .findByIdentificadorDoUsuarioAndArquivadoAndTituloContainingIgnoreCase(
+                                    usuario, false, termo, paginacao);
+        }
         return resultado.map(MaterialDeEstudoPersistido::paraDominio);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MaterialRelacionadoAoTopico> listarMateriaisAtivosDosTopicos(
+            UUID usuario, List<UUID> identificadoresDosTopicos) {
+        if (identificadoresDosTopicos == null || identificadoresDosTopicos.isEmpty()) {
+            return List.of();
+        }
+        return coberturas.listarMateriaisAtivosDosTopicos(
+                        usuario, identificadoresDosTopicos.stream().distinct().toList())
+                .stream()
+                .map(item -> new MaterialRelacionadoAoTopico(
+                        item.getIdentificadorDoTopico(),
+                        item.getIdentificadorDoMaterial(),
+                        item.getTituloDoMaterial()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

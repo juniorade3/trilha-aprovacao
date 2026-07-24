@@ -94,6 +94,12 @@ export type CoberturaDeTopico = {
   criadoEm: string
 }
 
+export type MaterialRelacionadoAoTopico = {
+  identificadorDoTopico: string
+  identificadorDoMaterial: string
+  tituloDoMaterial: string
+}
+
 export type RegistroDeEstudo = {
   identificador: string
   identificadorDoTopico: string
@@ -158,6 +164,7 @@ export function listarMateriaisDeEstudo(
   sinal?: AbortSignal,
   pagina = 0,
   tamanho = 100,
+  identificadorDoTopico?: string,
 ) {
   const parametros = new URLSearchParams({
     pesquisa,
@@ -165,6 +172,8 @@ export function listarMateriaisDeEstudo(
     pagina: String(pagina),
     tamanho: String(tamanho),
   })
+  if (identificadorDoTopico)
+    parametros.set('identificadorDoTopico', identificadorDoTopico)
   return requisitar<RespostaPaginada<MaterialDeEstudo>>(
     `/v1/materiais?${parametros}`,
     { signal: sinal },
@@ -175,6 +184,7 @@ export async function listarTodosOsMateriaisDeEstudo(
   pesquisa = '',
   incluirArquivados = false,
   sinal?: AbortSignal,
+  identificadorDoTopico?: string,
 ) {
   const primeiraPagina = await listarMateriaisDeEstudo(
     pesquisa,
@@ -182,6 +192,7 @@ export async function listarTodosOsMateriaisDeEstudo(
     sinal,
     0,
     100,
+    identificadorDoTopico,
   )
   if (primeiraPagina.totalDePaginas <= 1) return primeiraPagina.itens
   const demaisPaginas = await Promise.all(
@@ -192,6 +203,7 @@ export async function listarTodosOsMateriaisDeEstudo(
         sinal,
         indice + 1,
         100,
+        identificadorDoTopico,
       ),
     ),
   )
@@ -199,6 +211,19 @@ export async function listarTodosOsMateriaisDeEstudo(
     ...primeiraPagina.itens,
     ...demaisPaginas.flatMap((pagina) => pagina.itens),
   ]
+}
+
+export function listarMateriaisRelacionadosAosTopicos(
+  identificadoresDosTopicos: string[],
+  sinal?: AbortSignal,
+) {
+  const parametros = new URLSearchParams()
+  for (const identificador of identificadoresDosTopicos)
+    parametros.append('identificadoresDosTopicos', identificador)
+  return requisitar<MaterialRelacionadoAoTopico[]>(
+    `/v1/materiais/atalhos-por-topico?${parametros}`,
+    { signal: sinal },
+  )
 }
 
 export function criarMaterialDeEstudo(dados: DadosDeMaterial) {
