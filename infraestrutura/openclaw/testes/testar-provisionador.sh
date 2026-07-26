@@ -74,6 +74,7 @@ argumentos=(
   --diretorio-credenciais-mcp "${credenciais}"
   --identificador-vinculo "${vinculo_um}"
   --identificador-bot 700000001
+  --identificador-conta-bot principal
   --identificador-telegram 800000001
   --identificador-chat 800000001
   --identificador-agente "${agente_um}"
@@ -82,15 +83,51 @@ argumentos=(
   --url-mcp "${url_mcp}"
 )
 "${diretorio_do_modulo}/scripts/provisionar-vinculo.sh" "${argumentos[@]}" >/dev/null
+workspace_um="${estado}/workspaces/${agente_um}"
+metadados_v2="${temporario}/provisionamento-v2.json"
+jq '.versao = 2
+  | del(.identificadorDaContaDoBot, .modeloDoWorkspace)' \
+  "${estado}/provisionamentos/${vinculo_um}.json" > "${metadados_v2}"
+chmod 600 "${metadados_v2}"
+mv "${metadados_v2}" "${estado}/provisionamentos/${vinculo_um}.json"
+configuracao_sem_conta="${temporario}/openclaw-sem-conta.json"
+jq 'del(.bindings[0].match.accountId)' "${estado}/openclaw.json" \
+  > "${configuracao_sem_conta}"
+chmod 600 "${configuracao_sem_conta}"
+mv "${configuracao_sem_conta}" "${estado}/openclaw.json"
+printf 'MODELO_ANTIGO\n' > "${workspace_um}/AGENTS.md"
+printf 'arquivo desconhecido preservado\n' > "${workspace_um}/NOTAS-LOCAIS.md"
+plugin_um="trilha-mcp-${vinculo_um//-/}"
+diretorio_plugin_um="${workspace_um}/.openclaw/extensions/${plugin_um}"
+chmod 600 "${diretorio_plugin_um}/proxy-mcp-http-stdio.mjs"
+printf 'PROXY_ANTIGO\n' > "${diretorio_plugin_um}/proxy-mcp-http-stdio.mjs"
+printf '{"mcpServers":{"trilha":{"toolFilter":{"include":["ferramenta_antiga"]}}}}\n' \
+  > "${diretorio_plugin_um}/.mcp.json"
+chmod 600 "${workspace_um}/AGENTS.md" "${workspace_um}/NOTAS-LOCAIS.md" \
+  "${diretorio_plugin_um}/.mcp.json"
+chmod 500 "${diretorio_plugin_um}/proxy-mcp-http-stdio.mjs"
+configuracao_sem_plugin="${temporario}/openclaw-sem-plugin.json"
+jq --arg plugin "${plugin_um}" \
+  '.plugins.allow = [.plugins.allow[] | select(. != $plugin)]' \
+  "${estado}/openclaw.json" > "${configuracao_sem_plugin}"
+chmod 600 "${configuracao_sem_plugin}"
+mv "${configuracao_sem_plugin}" "${estado}/openclaw.json"
 "${diretorio_do_modulo}/scripts/provisionar-vinculo.sh" "${argumentos[@]}" >/dev/null
+cmp "${diretorio_do_modulo}/modelos/workspace/AGENTS.md" \
+  "${workspace_um}/AGENTS.md"
+cmp "${diretorio_do_modulo}/scripts/proxy-mcp-http-stdio.mjs" \
+  "${diretorio_plugin_um}/proxy-mcp-http-stdio.mjs"
+[[ "$(<"${workspace_um}/NOTAS-LOCAIS.md")" == "arquivo desconhecido preservado" ]]
 
 configuracao="${estado}/openclaw.json"
-plugin_um="trilha-mcp-${vinculo_um//-/}"
 arquivo_mcp_um="${estado}/workspaces/${agente_um}/.openclaw/extensions/${plugin_um}/.mcp.json"
 arquivo_credencial_um="${credenciais}/${vinculo_um}.json"
 jq -e --arg agente "${agente_um}" '.agents.list | length == 1 and .[0].id == $agente' \
   "${configuracao}" >/dev/null
-jq -e '(.bindings | length == 1) and .channels.telegram.allowFrom == ["800000001"]' \
+jq -e '(.bindings | length == 1) and
+   .bindings[0].match.accountId == "principal" and
+   .bindings[0].match.peer.id == "800000001" and
+   .channels.telegram.allowFrom == ["800000001"]' \
   "${configuracao}" >/dev/null
 jq -e --arg plugin "${plugin_um}" \
   '(.plugins.allow | index($plugin)) != null and
@@ -110,7 +147,9 @@ jq -e --arg vinculo "${vinculo_um}" \
    .mcpServers.trilha.args == ["./proxy-mcp-http-stdio.mjs", ("http://broker-credenciais:18890/mcp/" + $vinculo)] and
    (.mcpServers.trilha | has("url") | not) and
    (.mcpServers.trilha | has("headers") | not) and
-   (.mcpServers.trilha.toolFilter.include | length == 24)' "${arquivo_mcp_um}" >/dev/null
+   (.mcpServers.trilha.toolFilter.include | length == 24) and
+   (.mcpServers.trilha.toolFilter.include | unique | length == 24)' "${arquivo_mcp_um}" >/dev/null
+[[ "$(stat -c '%a' "${arquivo_mcp_um}")" == "600" ]]
 [[ -x "${estado}/workspaces/${agente_um}/.openclaw/extensions/${plugin_um}/proxy-mcp-http-stdio.mjs" ]]
 jq -e --arg token "${valor_token_um}" --arg agente "${agente_um}" \
   --arg sessao "sessao:${vinculo_um}" \
@@ -119,6 +158,29 @@ jq -e --arg token "${valor_token_um}" --arg agente "${agente_um}" \
 [[ -f "${arquivo_credencial_um}" && ! -L "${arquivo_credencial_um}" ]]
 [[ "$(stat -c '%a' "${arquivo_credencial_um}")" == "600" ]]
 ! grep -R -q -- "${valor_token_um}" "${estado}"
+jq -e --arg hash "$(sha256sum \
+    "${diretorio_do_modulo}/modelos/workspace/AGENTS.md" | cut -d' ' -f1)" \
+  '.versao == 3 and .identificadorDaContaDoBot == "principal" and
+   .identificadorDaSessao == ("sessao:" + .identificadorDoVinculo) and
+   .modeloDoWorkspace.versao == 1 and
+   .modeloDoWorkspace.hashes["AGENTS.md"] == $hash and
+   .registradoNoBackendEm == null' \
+  "${estado}/provisionamentos/${vinculo_um}.json" >/dev/null
+
+mv "${workspace_um}/AGENTS.md" "${workspace_um}/AGENTS.md.regular"
+ln -s "${diretorio_do_modulo}/modelos/workspace/AGENTS.md" \
+  "${workspace_um}/AGENTS.md"
+if "${diretorio_do_modulo}/scripts/sincronizar-workspaces.sh" \
+  --diretorio-estado "${estado}" \
+  --identificador-conta-bot principal >/dev/null 2>&1; then
+  printf 'Falha: arquivo gerenciado simbolico foi aceito na sincronizacao.\n' >&2
+  exit 1
+fi
+rm "${workspace_um}/AGENTS.md"
+mv "${workspace_um}/AGENTS.md.regular" "${workspace_um}/AGENTS.md"
+"${diretorio_do_modulo}/scripts/sincronizar-workspaces.sh" \
+  --diretorio-estado "${estado}" \
+  --identificador-conta-bot principal >/dev/null
 
 porta_broker="${temporario}/porta-broker"
 node "${diretorio_do_modulo}/scripts/broker-de-credenciais-mcp.mjs" \
@@ -142,6 +204,7 @@ processos=("${processo_broker}")
 if "${diretorio_do_modulo}/scripts/provisionar-vinculo.sh" \
   --diretorio-estado "${estado}" --diretorio-credenciais-mcp "${credenciais}" \
   --identificador-vinculo "${vinculo_dois}" --identificador-bot 700000001 \
+  --identificador-conta-bot principal \
   --identificador-telegram 800000001 --identificador-chat 800000001 \
   --identificador-agente "${agente_dois}" --identificador-sessao "sessao:${vinculo_dois}" \
   --token-mcp-arquivo "${token_dois}" --url-mcp "${url_mcp}" >/dev/null 2>&1; then
@@ -186,13 +249,15 @@ jq -e '.registradoNoBackendEm != null' "${estado}/provisionamentos/${vinculo_um}
 "${diretorio_do_modulo}/scripts/rotacionar-token-mcp.sh" \
   --diretorio-estado "${estado}" --diretorio-credenciais-mcp "${credenciais}" \
   --identificador-vinculo-anterior "${vinculo_um}" --identificador-vinculo-novo "${vinculo_dois}" \
-  --identificador-bot 700000001 --identificador-telegram 800000001 --identificador-chat 800000001 \
+  --identificador-bot 700000001 --identificador-conta-bot principal \
+  --identificador-telegram 800000001 --identificador-chat 800000001 \
   --identificador-agente "${agente_dois}" --identificador-sessao "sessao:${vinculo_dois}" \
   --token-mcp-arquivo "${token_dois}" --url-mcp "${url_mcp}" >/dev/null
 "${diretorio_do_modulo}/scripts/rotacionar-token-mcp.sh" \
   --diretorio-estado "${estado}" --diretorio-credenciais-mcp "${credenciais}" \
   --identificador-vinculo-anterior "${vinculo_um}" --identificador-vinculo-novo "${vinculo_dois}" \
-  --identificador-bot 700000001 --identificador-telegram 800000001 --identificador-chat 800000001 \
+  --identificador-bot 700000001 --identificador-conta-bot principal \
+  --identificador-telegram 800000001 --identificador-chat 800000001 \
   --identificador-agente "${agente_dois}" --identificador-sessao "sessao:${vinculo_dois}" \
   --token-mcp-arquivo "${token_dois}" --url-mcp "${url_mcp}" >/dev/null
 

@@ -4,6 +4,7 @@ import br.com.trilhaaprovacao.automacao.dominio.CanalDeIntegracao;
 import br.com.trilhaaprovacao.automacao.dominio.EstadoDoVinculoDeCanal;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -60,7 +61,27 @@ public interface RepositorioDeVinculosDeCanal
             EstadoDoVinculoDeCanal estado);
 
     Optional<VinculoDeCanalPersistido>
+            findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndEstado(
+                    CanalDeIntegracao canal, long bot, long identificadorExterno,
+                    EstadoDoVinculoDeCanal estado);
+
+    Optional<VinculoDeCanalPersistido>
             findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatAndEstado(
                     CanalDeIntegracao canal, long bot, long identificadorExterno,
                     long identificadorDoChat, EstadoDoVinculoDeCanal estado);
+
+    List<VinculoDeCanalPersistido>
+            findByCanalAndIdentificadorDoBotAndIdentificadorDoChatAndEstadoOrderByCriadoEmDesc(
+                    CanalDeIntegracao canal, long bot,
+                    long identificadorDoChat, EstadoDoVinculoDeCanal estado);
+
+    List<VinculoDeCanalPersistido>
+            findByCanalAndIdentificadorExternoAndIdentificadorDoChatAndEstadoOrderByCriadoEmDesc(
+                    CanalDeIntegracao canal, long identificadorExterno,
+                    long identificadorDoChat, EstadoDoVinculoDeCanal estado);
+
+    List<VinculoDeCanalPersistido>
+            findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatOrderByCriadoEmDesc(
+                    CanalDeIntegracao canal, long bot,
+                    long identificadorExterno, long identificadorDoChat);
 }

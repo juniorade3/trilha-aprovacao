@@ -605,15 +605,18 @@ public class CatalogoDeFerramentasMcp {
         return objeto(Map.ofEntries(
                 Map.entry("identificadorDaOperacao", uuid()),
                 Map.entry("tipo", texto(80)),
-                Map.entry("estado", constante("AGUARDANDO_CONFIRMACAO")),
+                Map.entry("estado", enumeracao("PREPARADA",
+                        "AGUARDANDO_CONFIRMACAO", "CONFIRMADA", "APLICADA",
+                        "CANCELADA", "EXPIRADA", "FALHOU")),
                 Map.entry("resumo", texto(500)),
                 Map.entry("proposta", Map.of("type", "object")),
-                Map.entry("codigoDeConfirmacao", texto(8)),
-                Map.entry("fraseDeConfirmacao", texto(30)),
-                Map.entry("expiraEm", dataHora())),
+                Map.entry("codigoDeConfirmacao", nuloOu(texto(8))),
+                Map.entry("fraseDeConfirmacao", nuloOu(texto(30))),
+                Map.entry("expiraEm", dataHora()),
+                Map.entry("resultado", nuloOu(Map.of("type", "object")))),
                 List.of("identificadorDaOperacao", "tipo", "estado",
                         "resumo", "proposta", "codigoDeConfirmacao",
-                        "fraseDeConfirmacao", "expiraEm"));
+                        "fraseDeConfirmacao", "expiraEm", "resultado"));
     }
 
     private Map<String, Object> esquemaDaSaida(

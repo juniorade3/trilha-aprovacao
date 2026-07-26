@@ -24,7 +24,7 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                     .withPassword("teste");
 
     @Test
-    void deveAplicarAteV17EmPostgresqlVazioComTodasAsGarantias() {
+    void deveAplicarAteV17Ponto1EmPostgresqlVazioComTodasAsGarantias() {
         var resultado = Flyway.configure()
                 .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(),
                         POSTGRESQL.getPassword())
@@ -34,12 +34,12 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword()));
 
         assertThat(resultado.success).isTrue();
-        assertThat(resultado.targetSchemaVersion).isEqualTo("17");
+        assertThat(resultado.targetSchemaVersion).isEqualTo("17.1");
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(17);
+                """, Integer.class)).isEqualTo(18);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history

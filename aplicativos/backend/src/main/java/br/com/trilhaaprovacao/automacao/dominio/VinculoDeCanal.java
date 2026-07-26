@@ -106,10 +106,6 @@ public final class VinculoDeCanal {
         if (telegram <= 0 || chat <= 0) {
             throw new IllegalArgumentException("Identificadores do Telegram devem ser positivos.");
         }
-        if (telegram != chat) {
-            throw new IllegalArgumentException(
-                    "O vinculo exige uma conversa privada com o bot.");
-        }
         identificadorExterno = telegram;
         identificadorDoChat = chat;
         estado = EstadoDoVinculoDeCanal.ATIVO;
@@ -164,9 +160,9 @@ public final class VinculoDeCanal {
             throw new IllegalArgumentException("Vinculo ativo exige identidade do Telegram.");
         }
         if (estado == EstadoDoVinculoDeCanal.ATIVO
-                && !identificadorExterno.equals(identificadorDoChat)) {
+                && (identificadorExterno <= 0 || identificadorDoChat <= 0)) {
             throw new IllegalArgumentException(
-                    "Vinculo ativo exige uma conversa privada com o bot.");
+                    "Vinculo ativo exige identificadores positivos do Telegram.");
         }
         boolean provisionamentoIncompleto = identificadorDoAgente == null
                 ^ identificadorDaSessao == null;

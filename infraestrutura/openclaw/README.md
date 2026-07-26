@@ -33,9 +33,10 @@ sem porta publicada       | HMAC + idempotencia + provisionamento
 O plugin `trilha-aprovacao` recebe somente o codigo e os identificadores da DM
 fornecidos pelo runtime. Ele chama o integrador por uma rede Docker interna e nao
 recebe segredo, token MCP ou corpo do backend. O integrador valida um schema
-fechado, exige que chat e remetente sejam o mesmo identificador numerico, aplica
-limites por Telegram e global, assina a troca do codigo com HMAC e executa os
-provisionadores existentes. Depois do provisionamento local, um retry conclui
+fechado, exige identificadores positivos de remetente e chat vindos da conversa
+direta validada, confere a conta do bot, aplica limites por Telegram e global,
+assina a troca do codigo com HMAC e executa os provisionadores existentes.
+Depois do provisionamento local, um retry conclui
 diretamente o registro no backend sem depender de o codigo continuar valido.
 Recibos de idempotencia guardam somente hash, estado e UUID.
 
@@ -43,8 +44,11 @@ O `mcp.servers` global permanece vazio. Cada workspace recebe um plugin Codex
 minimo em `.openclaw/extensions`, descoberto somente pelo runtime daquele
 agente e ativado explicitamente em `plugins.allow`. Um proxy stdio local
 encaminha o protocolo para a URL interna e opaca do vinculo, contornando a
-incompatibilidade do Codex com `cwd` em MCP HTTP nessa versao do OpenClaw. O
-plugin nao contem token, cabecalho de autenticacao nem caminho de segredo.
+incompatibilidade do Codex com `cwd` em MCP HTTP nessa versao do OpenClaw.
+Como o adaptador Codex do OpenClaw `2026.7.1` nao projeta `toolFilter`, o proxy
+le a allowlist regular `0600` do proprio `.mcp.json`, filtra `tools/list` e
+rejeita localmente qualquer `tools/call` fora dela antes do broker. O plugin
+nao contem token, cabecalho de autenticacao nem caminho de segredo.
 
 O broker, em outro processo e sem montar o estado do agente, resolve um arquivo externo `0600` por vinculo e injeta `Authorization`, `X-Identificador-Do-Agente` e `X-Identificador-Da-Sessao`. O backend valida os tres contra o vinculo ativo; nenhum deles e argumento controlado pelo modelo. O broker aceita somente `POST /mcp/{vinculo}`, limita o corpo, nao segue redirecionamentos e nunca repassa cabecalhos de identidade enviados pelo cliente.
 
@@ -74,7 +78,8 @@ navegador, nodes, Docker, mensagens externas ou administracao.
   `openai/gpt-5.5` e o plugin Codex;
 - perfil de ferramentas `minimal`, sem `exec` ou `process`, e negacao explicita
   dos grupos de runtime e filesystem, desabilitando o modo de codigo nativo;
-- somente ferramentas `trilha__*` explicitamente permitidas, filtradas tambem no servidor MCP;
+- somente ferramentas `trilha__*` explicitamente permitidas; `toolFilter`
+  documenta a politica e o proxy stdio sempre a aplica antes do broker;
 - configuracao por chat, comandos administrativos, exec approvals e cron desabilitados;
 - container sem capacidades Linux, sem privilegios, sem Docker socket e com raiz somente leitura;
 - Gateway em loopback e nenhuma porta publicada;
@@ -87,6 +92,9 @@ navegador, nodes, Docker, mensagens externas ou administracao.
   MCP obrigatoriamente fora do repositorio e separados entre si;
 - token MCP de entrada, credencial persistida e segredo HMAC devem ser arquivos regulares, nao links simbolicos, com permissao `0600`;
 - alteracoes de configuracao serializadas com `flock` e escritas por troca atomica;
+- bindings incluem conta do bot e chat; a allowlist identifica o remetente;
+- cinco arquivos gerenciados e o adaptador MCP de cada workspace possuem
+  sincronizacao atomica, preservando arquivos desconhecidos, sessao e credencial;
 - metadados guardam somente SHA-256 do token MCP, nunca seu valor.
 - o segredo HMAC do Gateway fica somente no backend e no orquestrador confiavel; nao e montado no container do agente;
 - rotacao cria vinculo, agente, sessao, workspace e credencial novos, e revoga/arquiva integralmente o estado local anterior.
@@ -103,6 +111,9 @@ navegador, nodes, Docker, mensagens externas ou administracao.
 - `modelos/workspace/`: instrucoes copiadas para cada agente;
 - `scripts/inicializar-estado.sh`: cria o estado externo com permissoes restritas;
 - `scripts/provisionar-vinculo.sh`: cria agente, rota, workspace e bundle MCP isolados;
+- `scripts/sincronizar-workspaces.sh`: atualiza arquivos gerenciados, proxy,
+  manifesto/politica MCP, allowlist do plugin e bindings ativos antes de o
+  integrador publicar saude;
 - `scripts/broker-de-credenciais-mcp.mjs`: injeta a credencial do vinculo fora do processo do agente;
 - `scripts/integrador-de-vinculos.mjs`: troca o codigo com HMAC, provisiona e
   registra o vinculo de forma retomavel;

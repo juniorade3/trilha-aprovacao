@@ -118,7 +118,7 @@ logs nem para a conversa.
 
 O procedimento manual a seguir fica disponivel para recuperacao operacional.
 
-O adaptador confiavel troca o codigo de vinculo no backend e recebe o token MCP apenas uma vez. Grave esse token em arquivo temporario `0600`, sem imprimi-lo. Os identificadores de bot, Telegram e chat vem do update validado pelo adaptador. Para DM, chat e Telegram devem ser iguais.
+O adaptador confiavel troca o codigo de vinculo no backend e recebe o token MCP apenas uma vez. Grave esse token em arquivo temporario `0600`, sem imprimi-lo. Os identificadores de conta do bot, bot, Telegram e chat vem do contexto direto validado pelo adaptador. Telegram e chat devem ser positivos; o chat privado pode possuir identificador diferente do remetente.
 
 ```bash
 umask 077
@@ -130,6 +130,7 @@ infraestrutura/openclaw/scripts/provisionar-vinculo.sh \
   --diretorio-credenciais-mcp "$OPENCLAW_DIRETORIO_CREDENCIAIS_MCP" \
   --identificador-vinculo 00000000-0000-4000-8000-000000000000 \
   --identificador-bot 700000001 \
+  --identificador-conta-bot default \
   --identificador-telegram 800000001 \
   --identificador-chat 800000001 \
   --identificador-agente trilha_000000000000 \
@@ -143,6 +144,21 @@ rm -f "$ARQUIVO_TOKEN_MCP"
 Em ambiente distribuido, prefira HTTPS e DNS interno em `--url-mcp`. `host.docker.internal` existe no Compose apenas para desenvolvimento com o backend no host.
 
 O provisionador copia o token para um JSON externo regular `0600` em `OPENCLAW_DIRETORIO_CREDENCIAIS_MCP` e grava no workspace somente `http://broker-credenciais:18890/mcp/{vinculo}`. O Gateway OpenClaw nao monta o diretorio de credenciais. Em cada chamada, o broker le o arquivo pelo UUID, injeta o bearer e os identificadores imutaveis de agente e sessao e encaminha ao backend; o runtime embedded enxerga apenas o MCP autenticado resultante.
+
+O `.mcp.json` tambem contem a allowlist de ferramentas. No OpenClaw `2026.7.1`,
+o adaptador Codex nao projeta `toolFilter` para `enabled_tools`; por isso o
+proxy stdio regular e executavel do plugin aplica a politica
+independentemente: remove ferramentas nao permitidas de `tools/list` e rejeita
+`tools/call` fora da lista antes de acessar o broker. Falha de leitura, formato,
+duplicidade, symlink ou permissao diferente de `0600` encerra o proxy.
+
+`AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `TOOLS.md` e `USER.md` sao arquivos
+gerenciados. `modelos/workspace/manifesto.json` registra a versao; os metadados
+do vinculo registram hashes. Antes de publicar saude, o integrador sincroniza
+atomicamente esses arquivos, o proxy, manifesto/politica MCP, allowlist do
+plugin e o binding de conta e chat. Isso atualiza tambem vinculos provisionados
+antes da versao atual. Outros arquivos, estado de sessao e credenciais
+permanecem intactos. Symlink gerenciado faz a inicializacao falhar fechada.
 
 Depois do provisionamento:
 
@@ -184,6 +200,7 @@ infraestrutura/openclaw/scripts/rotacionar-token-mcp.sh \
   --identificador-vinculo-anterior 00000000-0000-4000-8000-000000000000 \
   --identificador-vinculo-novo 11111111-1111-4111-8111-111111111111 \
   --identificador-bot 700000001 \
+  --identificador-conta-bot default \
   --identificador-telegram 800000001 \
   --identificador-chat 800000001 \
   --identificador-agente trilha_111111111111 \
@@ -235,7 +252,11 @@ Tambem confirme:
 - `docker inspect` nao mostra segredos em variaveis de ambiente;
 - nao ha `ports`, `privileged`, Docker socket ou mounts adicionais;
 - cada agente tem `agentDir`, workspace, binding e plugin proprios;
+- cada binding possui `accountId` e identificador de chat esperado;
+- cada provisionamento ativo registra versao e hashes do modelo de workspace;
 - cada plugin MCP ativo aparece em `plugins.allow` e e removido na revogacao;
+- cada `.mcp.json` e regular `0600`, possui 24 ferramentas unicas e seu proxy
+  regular `0500` recusa chamadas fora da allowlist;
 - `openclaw.json` mantem `mcp.servers` vazio;
 - o servico `gateway` nao monta `/run/secrets/credenciais-mcp` e o broker nao monta o estado;
 - somente o `gateway` monta `OPENCLAW_ARQUIVO_AUTENTICACAO_CODEX`, como arquivo

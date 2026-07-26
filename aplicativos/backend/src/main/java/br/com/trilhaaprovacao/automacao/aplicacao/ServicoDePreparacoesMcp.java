@@ -102,14 +102,17 @@ public class ServicoDePreparacoesMcp {
         dados.put("identificadorDaOperacao",
                 preparada.operacao().identificador());
         dados.put("tipo", preparada.operacao().tipo());
-        dados.put("estado", "AGUARDANDO_CONFIRMACAO");
+        dados.put("estado", preparada.operacao().estado().name());
         dados.put("resumo", preparada.operacao().resumo());
         dados.put("proposta", proposta);
         dados.put("codigoDeConfirmacao",
                 preparada.codigoDeConfirmacao());
-        dados.put("fraseDeConfirmacao", "/confirmar "
-                + preparada.codigoDeConfirmacao());
+        dados.put("fraseDeConfirmacao",
+                preparada.codigoDeConfirmacao() == null ? null
+                        : "/confirmar " + preparada.codigoDeConfirmacao());
         dados.put("expiraEm", preparada.operacao().expiraEm());
+        dados.put("resultado", objetoJsonOpcional(
+                preparada.operacao().resultado()));
         return new ResultadoDaConsultaMcp("1",
                 contexto.identificadorDaCorrelacao(),
                 OffsetDateTime.now(ZoneOffset.UTC), dados, List.of());
@@ -124,7 +127,7 @@ public class ServicoDePreparacoesMcp {
         return switch (tipo) {
             case "REGISTRO_DE_ESTUDO" -> versoesDoTopico(usuario,
                     uuid(proposta, "identificadorDoTopico"),
-                    uuidOpcional(proposta, "identificadorDoMaterial"));
+                    uuidOpcional(proposta, "identificadorDoMaterial"), false);
             case "CONCLUSAO_DO_BLOCO", "INTERRUPCAO_DO_BLOCO" ->
                     versoesDoBloco(usuario, uuid(proposta,
                             "identificadorDoBloco"));
@@ -218,6 +221,11 @@ public class ServicoDePreparacoesMcp {
 
     private Map<String, Object> versoesDoTopico(UUID usuario, UUID topico,
             UUID material) {
+        return versoesDoTopico(usuario, topico, material, true);
+    }
+
+    private Map<String, Object> versoesDoTopico(UUID usuario, UUID topico,
+            UUID material, boolean exigirCobertura) {
         Map<String, Object> versoes = new LinkedHashMap<>(linhaOu404("""
                 SELECT t.identificador, t.versao, t.arquivado,
                        m.versao AS versao_da_materia, m.arquivada
@@ -225,12 +233,41 @@ public class ServicoDePreparacoesMcp {
                   JOIN materias m ON m.identificador = t.materia_id
                  WHERE t.identificador = ? AND m.usuario_id = ?
                 """, "TOPICO_NAO_ENCONTRADO", topico, usuario));
+        if (Boolean.TRUE.equals(versoes.get("arquivado"))
+                || Boolean.TRUE.equals(versoes.get("arquivada"))) {
+            throw new RegraDeDominio("TOPICO_ARQUIVADO",
+                    "Use um topico e uma materia ativos.");
+        }
         if (material != null) {
-            versoes.put("material", linhaOu404("""
+            Map<String, Object> versaoDoMaterial = linhaOu404("""
                     SELECT identificador, versao, arquivado
                       FROM materiais_de_estudo
                      WHERE identificador = ? AND usuario_id = ?
-                    """, "MATERIAL_NAO_ENCONTRADO", material, usuario));
+                    """, "MATERIAL_NAO_ENCONTRADO", material, usuario);
+            if (Boolean.TRUE.equals(versaoDoMaterial.get("arquivado"))) {
+                throw new RegraDeDominio("MATERIAL_ARQUIVADO",
+                        "Use um material ativo.");
+            }
+            versoes.put("material", versaoDoMaterial);
+            List<Map<String, Object>> coberturas = banco.queryForList("""
+                    SELECT identificador, criado_em
+                      FROM coberturas_de_topicos_por_material
+                     WHERE material_id = ? AND topico_id = ?
+                    """, material, topico);
+            if (coberturas.isEmpty()) {
+                if (exigirCobertura) {
+                    throw new RegraDeDominio("MATERIAL_NAO_COBRE_TOPICO",
+                            "O material informado nao cobre o topico.");
+                }
+                versoes.put("coberturaDoTopico",
+                        Map.of("presente", false));
+            } else {
+                Map<String, Object> cobertura = new LinkedHashMap<>();
+                cobertura.put("presente", true);
+                coberturas.getFirst().forEach((chave, valor) ->
+                        cobertura.put(paraCamelCase(chave), valor));
+                versoes.put("coberturaDoTopico", cobertura);
+            }
         }
         return versoes;
     }
@@ -266,6 +303,12 @@ public class ServicoDePreparacoesMcp {
     private String json(Object valor) {
         try { return mapeador.writeValueAsString(valor); }
         catch (Exception excecao) { throw new IllegalArgumentException(excecao); }
+    }
+
+    private Object objetoJsonOpcional(String valor) {
+        if (valor == null) return null;
+        try { return mapeador.readValue(valor, Object.class); }
+        catch (Exception excecao) { throw new IllegalStateException(excecao); }
     }
 
     private void validarEvidencia(String tipo, Map<String, Object> proposta) {

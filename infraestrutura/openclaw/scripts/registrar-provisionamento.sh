@@ -7,6 +7,7 @@ diretorio_de_estado=""
 identificador_do_vinculo=""
 url_do_backend=""
 identificador_da_chave=""
+identificador_da_correlacao=""
 arquivo_do_segredo=""
 
 while [[ $# -gt 0 ]]; do
@@ -15,6 +16,10 @@ while [[ $# -gt 0 ]]; do
     --identificador-vinculo) identificador_do_vinculo="${2:-}"; shift 2 ;;
     --url-backend) url_do_backend="${2:-}"; shift 2 ;;
     --identificador-chave) identificador_da_chave="${2:-}"; shift 2 ;;
+    --identificador-correlacao)
+      identificador_da_correlacao="${2:-}"
+      shift 2
+      ;;
     --segredo-gateway-arquivo) arquivo_do_segredo="${2:-}"; shift 2 ;;
     *) falhar "argumento desconhecido: $1" ;;
   esac
@@ -31,6 +36,11 @@ validar_uuid "${identificador_do_vinculo}" identificador-vinculo
   falhar "url-backend deve conter somente esquema, host e porta, sem credenciais."
 [[ "${identificador_da_chave}" =~ ^[A-Za-z0-9._:-]{1,160}$ ]] ||
   falhar "identificador-chave possui formato invalido."
+if [[ -z "${identificador_da_correlacao}" ]]; then
+  identificador_da_correlacao="$(
+    node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+fi
+validar_uuid "${identificador_da_correlacao}" identificador-correlacao
 validar_arquivo_secreto "${arquivo_do_segredo}" segredo-gateway-arquivo
 quantidade_do_segredo="$(tr -d '\r\n' < "${arquivo_do_segredo}" | wc -c)"
 [[ "${quantidade_do_segredo}" -ge 32 && "${quantidade_do_segredo}" -le 4096 ]] ||
@@ -90,6 +100,7 @@ codigo_http="$(curl --silent --show-error \
   --header "X-Trilha-Nonce: ${nonce}" \
   --header "X-Trilha-Assinatura: ${assinatura}" \
   --header "X-Chave-De-Idempotencia: ${idempotencia}" \
+  --header "X-Identificador-De-Correlacao: ${identificador_da_correlacao}" \
   --data-binary "@${arquivo_do_corpo}" \
   --output "${arquivo_da_resposta}" --write-out '%{http_code}')"
 [[ "${codigo_http}" =~ ^2[0-9][0-9]$ ]] || {

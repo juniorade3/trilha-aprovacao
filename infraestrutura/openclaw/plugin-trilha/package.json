@@ -2,7 +2,7 @@
   "name": "@trilha-aprovacao/openclaw-plugin",
   "version": "2026.7.1",
   "private": true,
-  "description": "Comando confiavel de vinculo entre Telegram e Trilha da Aprovacao.",
+  "description": "Adaptador confiavel de vinculo e confirmacao entre Telegram e Trilha da Aprovacao.",
   "type": "module",
   "scripts": {
     "check": "node --check index.js && node --test"

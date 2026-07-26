@@ -25,6 +25,7 @@ public class SaudeDaAutomacao implements HealthIndicator {
                     SELECT COUNT(*) FROM operacoes_assistidas
                      WHERE estado IN ('PREPARADA', 'AGUARDANDO_CONFIRMACAO',
                                       'CONFIRMADA')
+                       AND expira_em > CURRENT_TIMESTAMP
                     """, Long.class);
             return Health.up().withDetail("vinculosAtivos", vinculos)
                     .withDetail("operacoesPendentes", pendentes).build();

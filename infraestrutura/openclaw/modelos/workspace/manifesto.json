@@ -1,0 +1,10 @@
+{
+  "versao": 1,
+  "arquivosGerenciados": [
+    "AGENTS.md",
+    "SOUL.md",
+    "IDENTITY.md",
+    "TOOLS.md",
+    "USER.md"
+  ]
+}

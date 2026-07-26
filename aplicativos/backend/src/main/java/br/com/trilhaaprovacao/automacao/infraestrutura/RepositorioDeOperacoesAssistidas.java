@@ -3,6 +3,7 @@ package br.com.trilhaaprovacao.automacao.infraestrutura;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,10 +21,38 @@ public interface RepositorioDeOperacoesAssistidas
     Optional<OperacaoAssistidaPersistida>
             findByIdentificadorDoUsuarioAndChaveDeIdempotencia(
                     UUID usuario, String chaveDeIdempotencia);
-    Optional<OperacaoAssistidaPersistida>
-            findFirstByIdentificadorDoVinculoAndCodigoDeConfirmacaoHashAndEstadoInOrderByCriadoEmDesc(
-                    UUID vinculo, String codigoHash,
-                    Collection<br.com.trilhaaprovacao.automacao.dominio.EstadoDaOperacaoAssistida> estados);
+    @Query("""
+            select o from OperacaoAssistidaPersistida o
+            where o.identificadorDoVinculo in :vinculos
+              and o.estado in :estados
+              and (
+                o.codigoDeConfirmacaoHash = :codigoHash
+                or o.codigoDeConfirmacaoAnteriorHash = :codigoHash
+              )
+            order by o.criadoEm desc
+            """)
+    List<OperacaoAssistidaPersistida> encontrarPorVinculosECodigoDeConfirmacao(
+            @Param("vinculos") Collection<UUID> vinculos,
+            @Param("codigoHash") String codigoHash,
+            @Param("estados")
+            Collection<br.com.trilhaaprovacao.automacao.dominio.EstadoDaOperacaoAssistida> estados);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select o from OperacaoAssistidaPersistida o
+            where o.nivelDeConfirmacao = 'REFORCADA'
+              and o.etapaDaConfirmacao = 1
+              and o.codigoDeConfirmacaoAnteriorHash is null
+            order by o.criadoEm asc
+            """)
+    List<OperacaoAssistidaPersistida>
+            encontrarHashesAnterioresAusentes(Pageable limite);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<OperacaoAssistidaPersistida>
+            findTop100ByEstadoInAndExpiraEmLessThanEqualOrderByCriadoEmAsc(
+                    Collection<br.com.trilhaaprovacao.automacao.dominio.EstadoDaOperacaoAssistida> estados,
+                    java.time.OffsetDateTime agora);
 
     @Query(value = """
             select 1

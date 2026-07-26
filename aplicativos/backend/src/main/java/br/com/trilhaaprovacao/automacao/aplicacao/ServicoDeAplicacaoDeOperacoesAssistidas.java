@@ -8,7 +8,9 @@ import br.com.trilhaaprovacao.automacao.infraestrutura.OperacaoAssistidaPersisti
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.infraestrutura.RepositorioDeVinculosDeCanal;
 import br.com.trilhaaprovacao.automacao.infraestrutura.ServicoDeSegredosDaAutomacao;
-import br.com.trilhaaprovacao.automacao.infraestrutura.MetricasDaAutomacao;
+import br.com.trilhaaprovacao.automacao.infraestrutura.VinculoDeCanalPersistido;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeObservabilidadeDeConfirmacoesAssistidas.Contexto;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeObservabilidadeDeConfirmacoesAssistidas.Desfecho;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
 import br.com.trilhaaprovacao.compartilhado.api.RecursoNaoEncontrado;
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
@@ -27,12 +29,16 @@ import br.com.trilhaaprovacao.planejamento.dominio.PrioridadeDaMateriaNoPlano;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +49,9 @@ import tools.jackson.databind.ObjectMapper;
 public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private static final Pattern CODIGO = Pattern.compile(
             "^[23456789A-HJ-NP-Z]{8}$");
+    private static final List<EstadoDaOperacaoAssistida> ESTADOS_CONFIRMAVEIS =
+            List.of(EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO,
+                    EstadoDaOperacaoAssistida.APLICADA);
     private static final TypeReference<Map<String, Object>> MAPA =
             new TypeReference<>() { };
     private final RepositorioDeOperacoesAssistidas operacoes;
@@ -57,7 +66,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ServicoDaEstruturaDeConcursos estruturaDeConcursos;
     private final ObjectMapper mapeador;
-    private final MetricasDaAutomacao metricas;
+    private final ServicoDeObservabilidadeDeConfirmacoesAssistidas observabilidade;
 
     public record ResultadoDaConfirmacao(
             OperacaoAssistida operacao, String proximoCodigo) {
@@ -76,7 +85,8 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             ServicoDeReplanejamento replanejamento,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
             ServicoDaEstruturaDeConcursos estruturaDeConcursos,
-            ObjectMapper mapeador, MetricasDaAutomacao metricas) {
+            ObjectMapper mapeador,
+            ServicoDeObservabilidadeDeConfirmacoesAssistidas observabilidade) {
         this.operacoes = operacoes;
         this.vinculos = vinculos;
         this.servicoDeOperacoes = servicoDeOperacoes;
@@ -89,41 +99,123 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         this.cadastroDeConcursos = cadastroDeConcursos;
         this.estruturaDeConcursos = estruturaDeConcursos;
         this.mapeador = mapeador;
-        this.metricas = metricas;
+        this.observabilidade = observabilidade;
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
     public OperacaoAssistida confirmarEAplicar(String codigo, String metodo,
             long bot, long telegram, long chat, String sessao, String update) {
         return confirmarComResultado(codigo, metodo, bot, telegram, chat,
                 sessao, update).operacao();
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
     public ResultadoDaConfirmacao confirmarComResultado(String codigo,
             String metodo, long bot, long telegram, long chat, String sessao,
             String update) {
-        String normalizado = codigo == null ? "" : codigo.trim().toUpperCase();
-        var vinculo = vinculos
-                .findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatAndEstado(
-                        CanalDeIntegracao.TELEGRAM, bot, telegram, chat,
-                        EstadoDoVinculoDeCanal.ATIVO)
-                .orElseThrow(() -> new RecursoNaoEncontrado(
-                        "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
-                        "Operacao assistida nao encontrada."));
-        var operacao = operacoes
-                .findFirstByIdentificadorDoVinculoAndCodigoDeConfirmacaoHashAndEstadoInOrderByCriadoEmDesc(
-                        vinculo.identificador(), segredos.hash(normalizado),
-                        List.of(EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO,
-                                EstadoDaOperacaoAssistida.APLICADA))
-                .orElseThrow(() -> new RecursoNaoEncontrado(
-                        "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
-                        "Operacao assistida nao encontrada."));
-        return confirmarComResultado(operacao.paraDominio().identificador(),
-                normalizado, metodo, bot, telegram, chat, sessao, update);
+        return confirmarComResultado(codigo, metodo, bot, telegram, chat,
+                sessao, update, UUID.randomUUID());
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
+    public ResultadoDaConfirmacao confirmarComResultado(String codigo,
+            String metodo, long bot, long telegram, long chat, String sessao,
+            String update, UUID correlacao) {
+        UUID correlacaoEfetiva = correlacao == null
+                ? UUID.randomUUID() : correlacao;
+        validarEntrada(codigo, metodo, sessao, update, correlacaoEfetiva);
+        String normalizado = codigo.trim().toUpperCase();
+        var vinculoExato = vinculos
+                .findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatAndEstado(
+                        CanalDeIntegracao.TELEGRAM, bot, telegram, chat,
+                        EstadoDoVinculoDeCanal.ATIVO);
+        if (vinculoExato.isPresent()) {
+            var vinculo = vinculoExato.get();
+            List<OperacaoAssistidaPersistida> correspondentes =
+                    resolverPorCodigo(Set.of(vinculo.identificador()),
+                            normalizado);
+            if (correspondentes.size() == 1) {
+                return confirmarIdentificada(
+                        correspondentes.getFirst().paraDominio()
+                                .identificador(),
+                        normalizado, metodo, bot, telegram, chat, sessao,
+                        update, correlacaoEfetiva);
+            }
+            String motivo = correspondentes.isEmpty()
+                    ? "CODIGO_DE_CONFIRMACAO_DIVERGENTE"
+                    : "CODIGO_DE_CONFIRMACAO_AMBIGUO";
+            observabilidade.registrarDepoisDaConclusao(
+                    new Contexto(vinculo.identificadorDoUsuario(),
+                            vinculo.identificador(), null, null,
+                            correlacaoEfetiva),
+                    Desfecho.DIVERGENCIA, motivo);
+            throw operacaoNaoEncontrada();
+        }
+
+        Map<UUID, VinculoDeCanalPersistido> candidatos =
+                candidatosDoContexto(bot, telegram, chat);
+        List<OperacaoAssistidaPersistida> correspondentes =
+                resolverPorCodigo(candidatos.keySet(), normalizado);
+        if (correspondentes.size() == 1) {
+            return confirmarIdentificada(
+                    correspondentes.getFirst().paraDominio().identificador(),
+                    normalizado, metodo, bot, telegram, chat, sessao, update,
+                    correlacaoEfetiva);
+        }
+        String motivo = correspondentes.isEmpty()
+                ? "VINCULO_AUSENTE" : "CODIGO_DE_CONFIRMACAO_AMBIGUO";
+        observabilidade.registrarDepoisDaConclusao(
+                new Contexto(null, null, null, null, correlacaoEfetiva),
+                correspondentes.isEmpty()
+                        ? Desfecho.REJEITADA : Desfecho.DIVERGENCIA,
+                motivo);
+        throw operacaoNaoEncontrada();
+    }
+
+    private Map<UUID, VinculoDeCanalPersistido> candidatosDoContexto(
+            long bot, long telegram, long chat) {
+        Map<UUID, VinculoDeCanalPersistido> candidatos =
+                new LinkedHashMap<>();
+        adicionar(candidatos, vinculos
+                .findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndIdentificadorDoChatOrderByCriadoEmDesc(
+                        CanalDeIntegracao.TELEGRAM, bot, telegram, chat));
+        vinculos
+                .findByCanalAndIdentificadorDoBotAndIdentificadorExternoAndEstado(
+                        CanalDeIntegracao.TELEGRAM, bot, telegram,
+                        EstadoDoVinculoDeCanal.ATIVO)
+                .ifPresent(vinculo ->
+                        candidatos.put(vinculo.identificador(), vinculo));
+        adicionar(candidatos, vinculos
+                .findByCanalAndIdentificadorDoBotAndIdentificadorDoChatAndEstadoOrderByCriadoEmDesc(
+                        CanalDeIntegracao.TELEGRAM, bot, chat,
+                        EstadoDoVinculoDeCanal.ATIVO));
+        adicionar(candidatos, vinculos
+                .findByCanalAndIdentificadorExternoAndIdentificadorDoChatAndEstadoOrderByCriadoEmDesc(
+                        CanalDeIntegracao.TELEGRAM, telegram, chat,
+                        EstadoDoVinculoDeCanal.ATIVO));
+        return candidatos;
+    }
+
+    private void adicionar(Map<UUID, VinculoDeCanalPersistido> destino,
+            List<VinculoDeCanalPersistido> encontrados) {
+        encontrados.forEach(vinculo ->
+                destino.putIfAbsent(vinculo.identificador(), vinculo));
+    }
+
+    private List<OperacaoAssistidaPersistida> resolverPorCodigo(
+            Set<UUID> identificadoresDosVinculos, String codigo) {
+        if (identificadoresDosVinculos.isEmpty()) return List.of();
+        return operacoes
+                .encontrarPorVinculosECodigoDeConfirmacao(
+                        identificadoresDosVinculos, segredos.hash(codigo),
+                        ESTADOS_CONFIRMAVEIS);
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
     public OperacaoAssistida confirmarEAplicar(UUID identificador,
             String codigo, String metodo, long bot, long telegram, long chat,
             String sessao, String update) {
@@ -131,69 +223,155 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                 telegram, chat, sessao, update).operacao();
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
     public ResultadoDaConfirmacao confirmarComResultado(UUID identificador,
             String codigo, String metodo, long bot, long telegram, long chat,
             String sessao, String update) {
-        if (codigo == null || !CODIGO.matcher(codigo.trim().toUpperCase()).matches()
-                || !List.of("BOTAO", "TEXTO", "VOZ").contains(metodo)
-                || sessao == null || sessao.isBlank() || update == null
-                || update.isBlank()) {
-            throw new RegraDeDominio("CONFIRMACAO_INVALIDA",
-                    "A confirmacao informada e invalida.");
-        }
+        return confirmarComResultado(identificador, codigo, metodo, bot,
+                telegram, chat, sessao, update, UUID.randomUUID());
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
+    public ResultadoDaConfirmacao confirmarComResultado(UUID identificador,
+            String codigo, String metodo, long bot, long telegram, long chat,
+            String sessao, String update, UUID correlacao) {
+        UUID correlacaoEfetiva = correlacao == null
+                ? UUID.randomUUID() : correlacao;
+        validarEntrada(codigo, metodo, sessao, update, correlacaoEfetiva);
         OperacaoAssistidaPersistida encontrada = operacoes.findById(identificador)
-                .orElseThrow(() -> new RecursoNaoEncontrado(
-                        "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
-                        "Operacao assistida nao encontrada."));
+                .orElse(null);
+        if (encontrada == null) {
+            observabilidade.registrarDepoisDaConclusao(
+                    new Contexto(null, null, identificador, null,
+                            correlacaoEfetiva),
+                    Desfecho.REJEITADA,
+                    "OPERACAO_ASSISTIDA_NAO_ENCONTRADA");
+            throw operacaoNaoEncontrada();
+        }
+        return confirmarIdentificada(identificador, codigo, metodo, bot,
+                telegram, chat, sessao, update, correlacaoEfetiva);
+    }
+
+    private ResultadoDaConfirmacao confirmarIdentificada(UUID identificador,
+            String codigo, String metodo, long bot, long telegram, long chat,
+            String sessao, String update, UUID correlacao) {
+        OperacaoAssistidaPersistida encontrada = operacoes.findById(identificador)
+                .orElseThrow(this::operacaoNaoEncontrada);
+        Contexto contexto = Contexto.de(encontrada.paraDominio(), correlacao);
+        EstadoDaAplicacao estadoDaAplicacao = new EstadoDaAplicacao();
+        try {
+            return processarConfirmacao(identificador, codigo, metodo, bot,
+                    telegram, chat, sessao, update, contexto,
+                    estadoDaAplicacao);
+        } catch (ConfirmacaoExpirada excecao) {
+            throw excecao;
+        } catch (RuntimeException excecao) {
+            observabilidade.registrarDepoisDaConclusao(contexto,
+                    classificar(excecao, estadoDaAplicacao.ativa),
+                    codigoDaExcecao(excecao));
+            throw excecao;
+        }
+    }
+
+    private ResultadoDaConfirmacao processarConfirmacao(UUID identificador,
+            String codigo, String metodo, long bot, long telegram, long chat,
+            String sessao, String update, Contexto contexto,
+            EstadoDaAplicacao estadoDaAplicacao) {
         OperacaoAssistidaPersistida persistida = operacoes
                 .encontrarParaAtualizacao(identificador,
-                        encontrada.paraDominio().identificadorDoUsuario())
-                .orElseThrow();
+                        contexto.identificadorDoUsuario())
+                .orElseThrow(this::operacaoNaoEncontrada);
         OperacaoAssistida operacao = persistida.paraDominio();
+        if (operacao.identificadorDoVinculo() == null) {
+            throw contextoDaConfirmacaoInvalido("VINCULO_AUSENTE");
+        }
         var vinculo = vinculos.findByIdentificadorAndIdentificadorDoUsuario(
                         operacao.identificadorDoVinculo(),
                         operacao.identificadorDoUsuario())
-                .orElseThrow(() -> new RecursoNaoEncontrado(
-                        "VINCULO_DO_TELEGRAM_NAO_ENCONTRADO",
-                        "Vinculo do Telegram nao encontrado."));
-        if (vinculo.estado() != EstadoDoVinculoDeCanal.ATIVO
-                || !Long.valueOf(bot).equals(vinculo.identificadorDoBot())
-                || !Long.valueOf(telegram).equals(vinculo.identificadorExterno())
-                || !Long.valueOf(chat).equals(vinculo.identificadorDoChat())
-                || !sessao.equals(vinculo.identificadorDaSessao())) {
-            throw new RecursoNaoEncontrado("OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
-                    "Operacao assistida nao encontrada.");
+                .orElseThrow(() ->
+                        contextoDaConfirmacaoInvalido("VINCULO_AUSENTE"));
+        if (vinculo.estado() != EstadoDoVinculoDeCanal.ATIVO) {
+            throw contextoDaConfirmacaoInvalido("VINCULO_INATIVO");
         }
+        if (!Long.valueOf(bot).equals(vinculo.identificadorDoBot())) {
+            throw contextoDaConfirmacaoInvalido("BOT_DIVERGENTE");
+        }
+        if (!Long.valueOf(telegram).equals(vinculo.identificadorExterno())) {
+            throw contextoDaConfirmacaoInvalido("TELEGRAM_DIVERGENTE");
+        }
+        if (!Long.valueOf(chat).equals(vinculo.identificadorDoChat())) {
+            throw contextoDaConfirmacaoInvalido("CHAT_DIVERGENTE");
+        }
+        if (!sessao.equals(vinculo.identificadorDaSessao())) {
+            throw contextoDaConfirmacaoInvalido("SESSAO_DIVERGENTE");
+        }
+        String informado = codigo.trim().toUpperCase();
+        String hashInformado = segredos.hash(informado);
+        boolean codigoAtual = persistida.codigoDeConfirmacaoHash() != null
+                && segredos.corresponde(
+                        persistida.codigoDeConfirmacaoHash(),
+                        hashInformado);
+        boolean primeiraEtapaRepetida =
+                "REFORCADA".equals(persistida.nivelDeConfirmacao())
+                && persistida.etapaDaConfirmacao() == 1
+                && segredos.corresponde(
+                        persistida.codigoDeConfirmacaoAnteriorHash(),
+                        hashInformado);
         if (operacao.estado() == EstadoDaOperacaoAssistida.APLICADA) {
+            if (!codigoAtual && !primeiraEtapaRepetida) {
+                throw codigoDivergente();
+            }
+            observabilidade.registrarNoFluxo(contexto,
+                    Desfecho.IDEMPOTENTE, "OPERACAO_JA_APLICADA");
             return new ResultadoDaConfirmacao(operacao, null);
         }
+        if (operacao.estado()
+                != EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao nao esta disponivel para confirmacao.");
+        }
         OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
-        String informado = codigo.trim().toUpperCase();
         if (persistida.confirmacaoExpiraEm() == null
-                || !agora.isBefore(persistida.confirmacaoExpiraEm())
-                || !segredos.corresponde(persistida.codigoDeConfirmacaoHash(),
-                        segredos.hash(informado))) {
-            throw new ConflitoDeDominio("CONFIRMACAO_EXPIRADA_OU_INVALIDA",
-                    "A confirmacao expirou ou o codigo divergiu.");
+                || !agora.isBefore(persistida.confirmacaoExpiraEm())) {
+            operacao.expirar(agora);
+            persistida.atualizarDe(operacao);
+            operacoes.saveAndFlush(persistida);
+            observabilidade.registrarNoFluxo(contexto,
+                    Desfecho.EXPIRADA, "CONFIRMACAO_EXPIRADA");
+            throw new ConfirmacaoExpirada();
+        }
+        if (!codigoAtual && !primeiraEtapaRepetida) {
+            throw codigoDivergente();
         }
         Map<String, Object> proposta = mapa(operacao.propostaCanonica());
         Map<String, Object> atuais = preparacoes.versoesAtuais(operacao.tipo(),
                 operacao.identificadorDoUsuario(), proposta);
         servicoDeOperacoes.validarAtualidade(operacao.identificadorDoUsuario(),
                 operacao.identificador(), operacao.assinatura(), json(atuais));
+        if (primeiraEtapaRepetida) {
+            String segundoCodigo = segredos.derivarCodigoDeConfirmacao(
+                    "segunda-etapa:" + operacao.assinatura());
+            observabilidade.registrarNoFluxo(contexto,
+                    Desfecho.REFORCADA_REPETIDA,
+                    "PRIMEIRA_ETAPA_JA_CONFIRMADA");
+            return new ResultadoDaConfirmacao(operacao, segundoCodigo);
+        }
         if ("REFORCADA".equals(persistida.nivelDeConfirmacao())
                 && persistida.etapaDaConfirmacao() == 0) {
             String segundoCodigo = segredos.derivarCodigoDeConfirmacao(
                     "segunda-etapa:" + operacao.assinatura());
             persistida.registrarContextoDaConfirmacao(metodo, bot, telegram,
                     chat, sessao, update);
-            persistida.definirConfirmacao(segredos.hash(segundoCodigo),
+            persistida.definirSegundaEtapaDaConfirmacao(
+                    segredos.hash(segundoCodigo),
                     segundoCodigo.substring(0, 2),
                     segredos.hash("segunda-etapa:nonce:" + operacao.assinatura()),
-                    operacao.expiraEm(), "REFORCADA", 1);
+                    operacao.expiraEm());
             operacoes.saveAndFlush(persistida);
-            metricas.registrarPrimeiraConfirmacaoReforcada();
+            observabilidade.registrarNoFluxo(contexto,
+                    Desfecho.REFORCADA, "SEGUNDA_ETAPA_SOLICITADA");
             return new ResultadoDaConfirmacao(operacao, segundoCodigo);
         }
         operacao.confirmar(operacao.assinatura(), agora);
@@ -201,12 +379,99 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         persistida.registrarContextoDaConfirmacao(metodo, bot, telegram, chat,
                 sessao, update);
         operacoes.saveAndFlush(persistida);
+        estadoDaAplicacao.ativa = true;
         Map<String, Object> resultado = aplicar(operacao, proposta);
         operacao.aplicar(json(resultado), OffsetDateTime.now(ZoneOffset.UTC));
-        metricas.registrarAplicacao();
         persistida.atualizarDe(operacao);
-        return new ResultadoDaConfirmacao(
-                operacoes.saveAndFlush(persistida).paraDominio(), null);
+        OperacaoAssistida aplicada = operacoes.saveAndFlush(
+                persistida).paraDominio();
+        observabilidade.registrarNoFluxo(Contexto.de(aplicada,
+                        contexto.identificadorDeCorrelacao()),
+                Desfecho.APLICADA, "OPERACAO_APLICADA");
+        return new ResultadoDaConfirmacao(aplicada, null);
+    }
+
+    private static final class EstadoDaAplicacao {
+        private boolean ativa;
+    }
+
+    private void validarEntrada(String codigo, String metodo, String sessao,
+            String update, UUID correlacao) {
+        if (codigo == null || !CODIGO.matcher(
+                        codigo.trim().toUpperCase()).matches()
+                || !List.of("BOTAO", "TEXTO", "VOZ").contains(metodo)
+                || sessao == null || sessao.isBlank() || update == null
+                || update.isBlank()) {
+            observabilidade.registrarDepoisDaConclusao(
+                    new Contexto(null, null, null, null, correlacao),
+                    Desfecho.REJEITADA, "CONFIRMACAO_INVALIDA");
+            throw new RegraDeDominio("CONFIRMACAO_INVALIDA",
+                    "A confirmacao informada e invalida.");
+        }
+    }
+
+    private RecursoNaoEncontrado operacaoNaoEncontrada() {
+        return new RecursoNaoEncontrado(
+                "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
+                "Operacao assistida nao encontrada.");
+    }
+
+    private RecursoNaoEncontrado contextoDaConfirmacaoInvalido(String motivo) {
+        return new ContextoDaConfirmacaoInvalido(motivo);
+    }
+
+    private ConflitoDeDominio codigoDivergente() {
+        return new ConflitoDeDominio(
+                "CODIGO_DE_CONFIRMACAO_DIVERGENTE",
+                "O codigo de confirmacao divergiu.");
+    }
+
+    private Desfecho classificar(RuntimeException excecao,
+            boolean aplicando) {
+        if (aplicando) return Desfecho.FALHA;
+        String codigo = codigoDaExcecao(excecao);
+        if (codigo.contains("DIVERGENTE")
+                || codigo.contains("DESATUALIZADA")
+                || codigo.contains("CONCORRENTEMENTE")) {
+            return Desfecho.DIVERGENCIA;
+        }
+        return Desfecho.REJEITADA;
+    }
+
+    private String codigoDaExcecao(RuntimeException excecao) {
+        if (excecao instanceof ContextoDaConfirmacaoInvalido contexto) {
+            return contexto.motivo();
+        }
+        if (excecao instanceof ConflitoDeDominio conflito) {
+            return conflito.codigo();
+        }
+        if (excecao instanceof RegraDeDominio regra) {
+            return regra.codigo();
+        }
+        if (excecao instanceof RecursoNaoEncontrado naoEncontrado) {
+            return naoEncontrado.codigo();
+        }
+        if (excecao instanceof CannotSerializeTransactionException
+                || excecao instanceof PessimisticLockingFailureException
+                || excecao instanceof ObjectOptimisticLockingFailureException) {
+            return "DADO_ALTERADO_CONCORRENTEMENTE";
+        }
+        return "FALHA_INTERNA";
+    }
+
+    private static final class ContextoDaConfirmacaoInvalido
+            extends RecursoNaoEncontrado {
+        private final String motivo;
+
+        private ContextoDaConfirmacaoInvalido(String motivo) {
+            super("OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
+                    "Operacao assistida nao encontrada.");
+            this.motivo = motivo;
+        }
+
+        private String motivo() {
+            return motivo;
+        }
     }
 
     private Map<String, Object> aplicar(OperacaoAssistida operacao,

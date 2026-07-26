@@ -119,18 +119,13 @@ class AutomacaoIntegracaoTest {
     }
 
     @Test
-    void deveAplicarV1AteV17EmPostgresqlVazioComRestricoesEAppendOnly()
+    void deveAplicarMigracaoV17Ponto1EmPostgresqlComRestricoesEAppendOnly()
             throws Exception {
-        assertThat(banco.queryForObject("""
-                SELECT max(version::integer)
-                FROM flyway_schema_history
-                WHERE success = TRUE
-                """, Integer.class)).isEqualTo(17);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
-                WHERE success = TRUE
-                """, Integer.class)).isEqualTo(17);
+                WHERE success = TRUE AND version = '17.1'
+                """, Integer.class)).isEqualTo(1);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM information_schema.tables
@@ -262,24 +257,13 @@ class AutomacaoIntegracaoTest {
                 .andExpect(jsonPath("$.identificadorExterno").value(nullValue()));
 
         String corpoValido = corpoDaTroca(
-                gerado.codigo(), 998877L, 998877L);
+                gerado.codigo(), 998877L, 887766L);
         api.perform(postConfiavel(
                         "/api/v1/integracoes-confiaveis/telegram/vinculos",
                         corpoValido, "chave-incorreta", UUID.randomUUID().toString()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.codigo")
                         .value("ASSINATURA_DO_GATEWAY_INVALIDA"));
-
-        api.perform(postConfiavel(
-                        "/api/v1/integracoes-confiaveis/telegram/vinculos",
-                        corpoDaTroca(gerado.codigo(), 998877L, 887766L)))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.codigo")
-                        .value("VINCULO_DO_TELEGRAM_INVALIDO"));
-        assertThat(banco.queryForObject("""
-                SELECT estado FROM vinculos_de_canal WHERE identificador = ?
-                """, String.class, gerado.identificadorDoVinculo()))
-                .isEqualTo("PENDENTE");
 
         String idempotenciaDaTroca = UUID.randomUUID().toString();
         String resposta = api.perform(postConfiavel(
@@ -290,6 +274,7 @@ class AutomacaoIntegracaoTest {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.vinculo.estado").value("ATIVO"))
                 .andExpect(jsonPath("$.vinculo.identificadorExterno").value(998877L))
+                .andExpect(jsonPath("$.vinculo.identificadorDoChat").value(887766L))
                 .andExpect(jsonPath("$.vinculo.provisionado").value(false))
                 .andExpect(jsonPath("$.token", not(nullValue())))
                 .andExpect(jsonPath("$.prefixo", not(nullValue())))
@@ -329,7 +314,7 @@ class AutomacaoIntegracaoTest {
                         "/api/v1/integracoes-confiaveis/telegram/vinculos/"
                                 + gerado.identificadorDoVinculo()
                                 + "/provisionamento",
-                        corpoDoProvisionamento(998877L, 998877L, agente,
+                        corpoDoProvisionamento(998877L, 887766L, agente,
                                 sessaoDoAgente)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.provisionado").value(true))
@@ -790,7 +775,8 @@ class AutomacaoIntegracaoTest {
                 SET estado = 'REVOGADO', revogado_em = now()
                 WHERE identificador = ?
                 """, primeiro.identificadorDoVinculo());
-        assertThatThrownBy(() -> banco.update("""
+        UUID vinculoComChatDistinto = UUID.randomUUID();
+        assertThat(banco.update("""
                 INSERT INTO vinculos_de_canal (
                     identificador, usuario_id, canal, bot,
                     identificador_externo, identificador_do_chat, estado,
@@ -798,9 +784,13 @@ class AutomacaoIntegracaoTest {
                     codigo_consumido_em, criado_em, atualizado_em, versao)
                 VALUES (?, ?, 'TELEGRAM', ?, 123, 456, 'ATIVO', ?,
                     now() + interval '10 minutes', now(), now(), now(), 0)
-                """, UUID.randomUUID(), usuario, IDENTIFICADOR_DO_BOT,
-                "hash-conversa-em-grupo"))
-                .isInstanceOf(DataAccessException.class);
+                """, vinculoComChatDistinto, usuario, IDENTIFICADOR_DO_BOT,
+                "hash-conversa-privada")).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT identificador_do_chat
+                FROM vinculos_de_canal
+                WHERE identificador = ?
+                """, Long.class, vinculoComChatDistinto)).isEqualTo(456L);
         assertThat(banco.queryForObject("""
                 SELECT is_nullable
                 FROM information_schema.columns

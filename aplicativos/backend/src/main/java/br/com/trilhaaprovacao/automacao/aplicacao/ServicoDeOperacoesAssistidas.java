@@ -142,10 +142,11 @@ public class ServicoDeOperacoesAssistidas {
             String nivel) {
         OperacaoAssistida operacao = preparar(usuario, vinculo, tipo, resumo,
                 propostaCanonica, versoesConsultadas, chaveDeIdempotencia);
-        String codigo = segredos.derivarCodigoDeConfirmacao(
-                operacao.assinatura());
+        String codigo = null;
         if (operacao.estado() == EstadoDaOperacaoAssistida.PREPARADA) {
             OffsetDateTime agora = agora();
+            codigo = segredos.derivarCodigoDeConfirmacao(
+                    operacao.assinatura());
             operacao.aguardarConfirmacao(agora);
             OperacaoAssistidaPersistida persistida = operacoes
                     .encontrarParaAtualizacao(operacao.identificador(), usuario)
@@ -159,6 +160,25 @@ public class ServicoDeOperacoesAssistidas {
             auditar(operacao, "CONFIRMACAO_SOLICITADA",
                     segredos.hash(operacao.identificador().toString()),
                     "SUCESSO", agora);
+        } else if (operacao.estado()
+                == EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO) {
+            OffsetDateTime agora = agora();
+            if (!agora.isBefore(operacao.expiraEm())) {
+                OperacaoAssistidaPersistida persistida = operacoes
+                        .encontrarParaAtualizacao(
+                                operacao.identificador(), usuario)
+                        .orElseThrow();
+                operacao.expirar(agora);
+                persistida.atualizarDe(operacao);
+                operacoes.saveAndFlush(persistida);
+                metricas.registrarConfirmacaoExpirada();
+                auditar(operacao, "CONFIRMACAO_EXPIRADA",
+                        segredos.hash(operacao.identificador().toString()),
+                        "EXPIRADA", agora);
+            } else {
+                codigo = segredos.derivarCodigoDeConfirmacao(
+                        operacao.assinatura());
+            }
         }
         return new OperacaoPreparada(operacao, codigo);
     }

@@ -18,7 +18,10 @@ for script in "${diretorio_do_modulo}"/scripts/*.mjs "${diretorio_do_modulo}"/te
   node --check "${script}"
 done
 jq empty "${diretorio_do_modulo}/modelos/openclaw.json"
-node --test "${diretorio_do_modulo}/testes/integrador-de-vinculos.test.mjs"
+jq empty "${diretorio_do_modulo}/modelos/workspace/manifesto.json"
+node --test \
+  "${diretorio_do_modulo}/testes/integrador-de-vinculos.test.mjs" \
+  "${diretorio_do_modulo}/testes/proxy-mcp-http-stdio.test.mjs"
 npm --prefix "${diretorio_do_modulo}/plugin-trilha" run check
 
 temporario="$(mktemp -d)"
@@ -103,6 +106,13 @@ jq -e '
 "${diretorio_do_modulo}/testes/testar-saida-do-broker.sh"
 
 if [[ "${VALIDAR_COM_IMAGEM_OPENCLAW:-0}" == "1" ]]; then
+  docker run --rm --user 1000:1000 \
+    -e OPENCLAW_DIST_DIR=/app/dist \
+    -v "${diretorio_do_modulo}:/openclaw:ro" \
+    -w /openclaw/plugin-trilha \
+    --entrypoint node \
+    ghcr.io/openclaw/openclaw:2026.7.1@sha256:6a31d44b2944e7adcd2b582bf6fb463111264ebca97a0201795b799135bd102c \
+    --test
   estado_da_imagem="${temporario}/estado-imagem"
   credenciais_da_imagem="${temporario}/credenciais-imagem"
   "${diretorio_do_modulo}/scripts/inicializar-estado.sh" \

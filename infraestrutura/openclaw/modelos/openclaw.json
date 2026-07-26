@@ -39,10 +39,16 @@
   "channels": {
     "telegram": {
       "enabled": true,
-      "botToken": {
-        "source": "file",
-        "provider": "arquivo",
-        "id": "/telegram/tokenDoBot"
+      "defaultAccount": "default",
+      "accounts": {
+        "default": {
+          "enabled": true,
+          "botToken": {
+            "source": "file",
+            "provider": "arquivo",
+            "id": "/telegram/tokenDoBot"
+          }
+        }
       },
       "configWrites": false,
       "dmPolicy": "allowlist",
@@ -164,7 +170,8 @@
         "enabled": true,
         "config": {
           "urlDoIntegrador": "http://integrador:8090",
-          "tempoLimiteEmMs": 5000
+          "tempoLimiteEmMs": 5000,
+          "identificadorDaContaDoBot": "default"
         }
       }
     }

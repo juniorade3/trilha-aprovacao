@@ -70,9 +70,9 @@ class AutomacaoTest {
         assertThatThrownBy(() -> grupo.ativar(10, -100, AGORA.plusSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("positivos");
-        assertThatThrownBy(() -> grupo.ativar(10, 20, AGORA.plusSeconds(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("conversa privada");
+        grupo.ativar(10, 20, AGORA.plusSeconds(1));
+        assertThat(grupo.identificadorExterno()).isEqualTo(10);
+        assertThat(grupo.identificadorDoChat()).isEqualTo(20);
     }
 
     @Test
@@ -83,13 +83,13 @@ class AutomacaoTest {
                 "hash", AGORA.plusMinutes(10), null, AGORA, AGORA, null, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("identidade do Telegram");
-        assertThatThrownBy(() -> VinculoDeCanal.reconstituir(
+        VinculoDeCanal reconstituido = VinculoDeCanal.reconstituir(
                 UUID.randomUUID(), UUID.randomUUID(), CanalDeIntegracao.TELEGRAM,
                 123456L, 111L, 222L, EstadoDoVinculoDeCanal.ATIVO,
                 "hash", AGORA.plusMinutes(10), AGORA.plusMinutes(1),
-                AGORA, AGORA.plusMinutes(1), null, 0))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("conversa privada");
+                AGORA, AGORA.plusMinutes(1), null, 0);
+        assertThat(reconstituido.identificadorExterno()).isEqualTo(111L);
+        assertThat(reconstituido.identificadorDoChat()).isEqualTo(222L);
     }
 
     @Test

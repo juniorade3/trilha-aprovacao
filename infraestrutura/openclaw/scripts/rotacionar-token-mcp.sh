@@ -8,6 +8,7 @@ diretorio_de_credenciais=""
 vinculo_anterior=""
 vinculo_novo=""
 bot=""
+conta_do_bot="default"
 telegram=""
 chat=""
 agente=""
@@ -23,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     --identificador-vinculo-anterior) vinculo_anterior="${2:-}"; shift 2 ;;
     --identificador-vinculo-novo) vinculo_novo="${2:-}"; shift 2 ;;
     --identificador-bot) bot="${2:-}"; shift 2 ;;
+    --identificador-conta-bot) conta_do_bot="${2:-}"; shift 2 ;;
     --identificador-telegram) telegram="${2:-}"; shift 2 ;;
     --identificador-chat) chat="${2:-}"; shift 2 ;;
     --identificador-agente) agente="${2:-}"; shift 2 ;;
@@ -39,6 +41,7 @@ exigir_argumento --diretorio-credenciais-mcp "${diretorio_de_credenciais}"
 exigir_argumento --identificador-vinculo-anterior "${vinculo_anterior}"
 exigir_argumento --identificador-vinculo-novo "${vinculo_novo}"
 exigir_argumento --identificador-bot "${bot}"
+validar_identificador_da_conta_do_bot "${conta_do_bot}"
 exigir_argumento --identificador-telegram "${telegram}"
 exigir_argumento --identificador-chat "${chat}"
 exigir_argumento --identificador-agente "${agente}"
@@ -55,6 +58,7 @@ exec "${diretorio_dos_scripts}/provisionar-vinculo.sh" \
   --identificador-vinculo "${vinculo_novo}" \
   --substituir-vinculo "${vinculo_anterior}" \
   --identificador-bot "${bot}" \
+  --identificador-conta-bot "${conta_do_bot}" \
   --identificador-telegram "${telegram}" \
   --identificador-chat "${chat}" \
   --identificador-agente "${agente}" \

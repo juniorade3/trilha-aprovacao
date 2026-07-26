@@ -23,8 +23,20 @@ const FORMATO_DO_CODIGO = /^[23456789A-HJ-NP-Z]{10}$/;
 const FORMATO_DO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORMATO_DO_TOKEN = /^mcp_[A-Za-z0-9_-]{43}$/;
 const FORMATO_DO_IDENTIFICADOR_NUMERICO = /^[1-9][0-9]{0,18}$/;
-const FORMATO_DA_CONTA = /^[A-Za-z0-9._:-]{1,100}$/;
+const FORMATO_DA_CONTA = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const FORMATO_DA_CHAVE = /^[A-Za-z0-9._-]{1,80}$/;
+const FORMATO_DO_IDENTIFICADOR_DO_AGENTE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const FORMATO_DO_IDENTIFICADOR_DA_SESSAO =
+  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
+const FORMATO_DO_TIPO_DA_OPERACAO = /^[A-Z][A-Z0-9_]{2,79}$/;
+const FORMATO_DO_INSTANTE_UTC =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
+const FORMATO_DO_INSTANTE_APLICADO =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z$/;
+const FORMATO_DO_HASH_SHA256 = /^[0-9a-f]{64}$/;
+const ARQUIVOS_GERENCIADOS_DO_WORKSPACE = [
+  "AGENTS.md", "SOUL.md", "IDENTITY.md", "TOOLS.md", "USER.md",
+];
 const CHAVES_DA_REQUISICAO = [
   "canal",
   "codigoDeVinculo",
@@ -43,10 +55,27 @@ const FORMATO_DO_CODIGO_DE_CONFIRMACAO = /^[23456789A-HJ-NP-Z]{8}$/;
 const FORMATO_DO_CODIGO_DE_ERRO_DO_BACKEND = /^[A-Z][A-Z0-9_]{2,79}$/;
 
 class ErroDoIntegrador extends Error {
-  constructor(codigo, estadoHttp) {
+  constructor(codigo, estadoHttp, etapa = "PROCESSAMENTO") {
     super(codigo);
     this.codigo = codigo;
     this.estadoHttp = estadoHttp;
+    this.etapa = etapa;
+  }
+}
+
+function registrarLogSeguro(evento) {
+  process.stderr.write(`${JSON.stringify({
+    instante: new Date().toISOString(),
+    componente: "integrador-de-vinculos",
+    ...evento,
+  })}\n`);
+}
+
+function registrarSemFalhar(registrar, evento) {
+  try {
+    registrar(evento);
+  } catch {
+    // Observabilidade nunca altera o resultado confiavel.
   }
 }
 
@@ -154,7 +183,10 @@ export function carregarConfiguracaoDoAmbiente(ambiente = process.env) {
     diretorioDosScripts, "provisionar-vinculo.sh");
   const arquivoDeRegistro = path.join(
     diretorioDosScripts, "registrar-provisionamento.sh");
-  for (const arquivo of [arquivoDeProvisionamento, arquivoDeRegistro]) {
+  const arquivoDeSincronizacao = path.join(
+    diretorioDosScripts, "sincronizar-workspaces.sh");
+  for (const arquivo of [arquivoDeProvisionamento, arquivoDeRegistro,
+    arquivoDeSincronizacao]) {
     const estado = statSync(arquivo);
     if (!estado.isFile()) falharConfiguracao("script confiavel ausente.");
   }
@@ -180,6 +212,7 @@ export function carregarConfiguracaoDoAmbiente(ambiente = process.env) {
     modelo,
     arquivoDeProvisionamento,
     arquivoDeRegistro,
+    arquivoDeSincronizacao,
     limitePorTelegram: inteiroDoAmbiente(
       ambiente.LIMITE_DE_VINCULOS_POR_TELEGRAM, 5, 1, 100,
       "LIMITE_DE_VINCULOS_POR_TELEGRAM"),
@@ -227,7 +260,6 @@ function validarRequisicao(valor, configuracao) {
   }
   if (valor.versaoDoContrato !== "1" || valor.canal !== "TELEGRAM"
       || !FORMATO_DO_CODIGO.test(codigo)
-      || valor.identificadorDoTelegram !== valor.identificadorDoChat
       || valor.identificadorDaContaDoBot !== configuracao.identificadorDaContaDoBot) {
     throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
   }
@@ -235,6 +267,7 @@ function validarRequisicao(valor, configuracao) {
     codigo,
     identificadorDoTelegram: valor.identificadorDoTelegram,
     identificadorDoChat: valor.identificadorDoChat,
+    identificadorDaContaDoBot: valor.identificadorDaContaDoBot,
   });
 }
 
@@ -262,31 +295,263 @@ function validarConfirmacao(valor, configuracao) {
       throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
     }
   }
-  if (valor.identificadorDoTelegram !== valor.identificadorDoChat) {
-    throw new ErroDoIntegrador("REQUISICAO_INVALIDA", 400);
-  }
   return Object.freeze({ ...valor });
+}
+
+function lerJsonRegular0600(arquivo, etapa) {
+  try {
+    const estado = lstatSync(arquivo);
+    if (!estado.isFile() || estado.isSymbolicLink()
+        || (estado.mode & 0o777) !== 0o600) {
+      throw new Error("arquivo inseguro");
+    }
+    return JSON.parse(readFileSync(arquivo, "utf8"));
+  } catch {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503, etapa);
+  }
+}
+
+function validarIdentidadeLocal(provisionamento, configuracao) {
+  const credencial = lerJsonRegular0600(path.join(
+    configuracao.diretorioDeCredenciais,
+    `${provisionamento.identificadorDoVinculo}.json`),
+  "CREDENCIAL_DIVERGENTE");
+  if (credencial?.versao !== 1
+      || credencial.identificadorDoVinculo
+        !== provisionamento.identificadorDoVinculo
+      || credencial.identificadorDoAgente
+        !== provisionamento.identificadorDoAgente
+      || credencial.urlMcp !== provisionamento.urlMcp
+      || credencial.urlMcp !== configuracao.urlMcp
+      || !FORMATO_DO_TOKEN.test(credencial.tokenMcp ?? "")
+      || createHash("sha256").update(credencial.tokenMcp).digest("hex")
+        !== provisionamento.hashDoToken) {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+      "CREDENCIAL_DIVERGENTE");
+  }
+  if (credencial.identificadorDaSessao
+      !== provisionamento.identificadorDaSessao) {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+      "SESSAO_DIVERGENTE");
+  }
+
+  const configuracaoDoOpenClaw = lerJsonRegular0600(
+    path.join(configuracao.diretorioDeEstado, "openclaw.json"),
+    "BINDING_DIVERGENTE");
+  const telegram = configuracaoDoOpenClaw?.channels?.telegram;
+  const contas = telegram?.accounts;
+  const conta = contas?.[provisionamento.identificadorDaContaDoBot];
+  const referenciaDoToken = conta?.botToken;
+  if (telegram?.defaultAccount
+        !== provisionamento.identificadorDaContaDoBot
+      || !contas || typeof contas !== "object" || Array.isArray(contas)
+      || Object.keys(contas).join(",")
+        !== provisionamento.identificadorDaContaDoBot
+      || conta?.enabled !== true
+      || !referenciaDoToken || typeof referenciaDoToken !== "object"
+      || Array.isArray(referenciaDoToken)
+      || Object.keys(referenciaDoToken).sort().join(",")
+        !== "id,provider,source"
+      || referenciaDoToken.source !== "file"
+      || referenciaDoToken.provider !== "arquivo"
+      || referenciaDoToken.id !== "/telegram/tokenDoBot"
+      || Object.hasOwn(telegram, "botToken")
+      || configuracaoDoOpenClaw?.plugins?.entries?.["trilha-aprovacao"]
+        ?.config?.identificadorDaContaDoBot
+        !== provisionamento.identificadorDaContaDoBot) {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+      "CONTA_DIVERGENTE");
+  }
+  const agentes = configuracaoDoOpenClaw?.agents?.list
+    ?.filter((item) => item?.id === provisionamento.identificadorDoAgente)
+    ?? [];
+  const bindings = configuracaoDoOpenClaw?.bindings
+    ?.filter((item) => item?.agentId === provisionamento.identificadorDoAgente)
+    ?? [];
+  const binding = bindings[0];
+  const workspaceEsperado =
+    `/home/node/.openclaw/workspaces/${provisionamento.identificadorDoAgente}`;
+  const comentarioEsperado =
+    `vinculo=${provisionamento.identificadorDoVinculo};`
+    + `sessao=${provisionamento.identificadorDaSessao}`;
+  if (agentes.length !== 1 || agentes[0].workspace !== workspaceEsperado
+      || bindings.length !== 1 || binding.type !== "route"
+      || binding.match?.channel !== "telegram"
+      || binding.match?.accountId !== provisionamento.identificadorDaContaDoBot
+      || binding.match?.peer?.kind !== "direct"
+      || String(binding.match.peer.id) !== provisionamento.identificadorDoChat
+      || binding.comment !== comentarioEsperado) {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+      "BINDING_DIVERGENTE");
+  }
 }
 
 function localizarProvisionamento(requisicao, configuracao) {
   const diretorio = path.join(configuracao.diretorioDeEstado, "provisionamentos");
+  const ativos = [];
   for (const nome of readdirSync(diretorio)) {
-    if (!nome.endsWith(".json")) continue;
+    const identificadorPeloNome = nome.endsWith(".json")
+      ? nome.slice(0, -5) : "";
+    if (!FORMATO_DO_UUID.test(identificadorPeloNome)) continue;
     const arquivo = path.join(diretorio, nome);
     const estado = lstatSync(arquivo);
     if (!estado.isFile() || estado.isSymbolicLink()
-        || (estado.mode & 0o777) !== 0o600) continue;
-    const item = JSON.parse(readFileSync(arquivo, "utf8"));
-    if (item.estado === "ATIVO"
-        && item.identificadorDoBot === configuracao.identificadorDoBot
-        && item.identificadorDoTelegram === requisicao.identificadorDoTelegram
-        && item.identificadorDoChat === requisicao.identificadorDoChat
-        && typeof item.identificadorDaSessao === "string") return item;
+        || (estado.mode & 0o777) !== 0o600) {
+      throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+        "VINCULO_NAO_LOCALIZADO");
+    }
+    let item;
+    try {
+      item = JSON.parse(readFileSync(arquivo, "utf8"));
+    } catch {
+      throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+        "VINCULO_NAO_LOCALIZADO");
+    }
+    if (item?.estado !== "ATIVO") continue;
+    const registradoEm = Date.parse(item.registradoNoBackendEm);
+    const modeloDoWorkspace = item.modeloDoWorkspace;
+    if (item.versao !== 3
+        || item.identificadorDoVinculo !== identificadorPeloNome
+        || !FORMATO_DO_IDENTIFICADOR_NUMERICO.test(
+          item.identificadorDoBot ?? "")
+        || !Number.isSafeInteger(Number(item.identificadorDoBot))
+        || !FORMATO_DA_CONTA.test(item.identificadorDaContaDoBot ?? "")
+        || !FORMATO_DO_IDENTIFICADOR_NUMERICO.test(
+          item.identificadorDoTelegram ?? "")
+        || !Number.isSafeInteger(Number(item.identificadorDoTelegram))
+        || !FORMATO_DO_IDENTIFICADOR_DO_AGENTE.test(
+          item.identificadorDoAgente ?? "")
+        || !FORMATO_DO_IDENTIFICADOR_DA_SESSAO.test(
+          item.identificadorDaSessao ?? "")
+        || !FORMATO_DO_IDENTIFICADOR_NUMERICO.test(
+          item.identificadorDoChat ?? "")
+        || !Number.isSafeInteger(Number(item.identificadorDoChat))
+        || !FORMATO_DO_INSTANTE_UTC.test(item.registradoNoBackendEm ?? "")
+        || item.urlMcp !== configuracao.urlMcp
+        || !FORMATO_DO_HASH_SHA256.test(item.hashDoToken ?? "")
+        || !Number.isSafeInteger(modeloDoWorkspace?.versao)
+        || modeloDoWorkspace.versao < 1
+        || !ARQUIVOS_GERENCIADOS_DO_WORKSPACE.every((arquivoGerenciado) =>
+          FORMATO_DO_HASH_SHA256.test(
+            modeloDoWorkspace?.hashes?.[arquivoGerenciado] ?? ""))
+        || !Number.isFinite(registradoEm)) {
+      throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+        "VINCULO_NAO_LOCALIZADO");
+    }
+    ativos.push(item);
   }
-  throw new ErroDoIntegrador("VINCULO_NAO_ENCONTRADO", 404);
+
+  const mesmaIdentidade = ativos.filter((item) =>
+    item.identificadorDoBot === configuracao.identificadorDoBot
+    && item.identificadorDaContaDoBot === requisicao.identificadorDaContaDoBot
+    && item.identificadorDoTelegram === requisicao.identificadorDoTelegram);
+  if (mesmaIdentidade.length > 1) {
+    throw new ErroDoIntegrador("ESTADO_LOCAL_INCONSISTENTE", 503,
+      "PROVISIONAMENTOS_ATIVOS_DUPLICADOS");
+  }
+  if (mesmaIdentidade.length === 1) {
+    if (mesmaIdentidade[0].identificadorDoChat
+        !== requisicao.identificadorDoChat) {
+      throw new ErroDoIntegrador("VINCULO_NAO_ENCONTRADO", 404,
+        "CHAT_DIVERGENTE");
+    }
+    validarIdentidadeLocal(mesmaIdentidade[0], configuracao);
+    return Object.freeze(mesmaIdentidade[0]);
+  }
+
+  const divergencias = [
+    ["BOT_DIVERGENTE", (item) =>
+      item.identificadorDaContaDoBot === requisicao.identificadorDaContaDoBot
+      && item.identificadorDoTelegram === requisicao.identificadorDoTelegram
+      && item.identificadorDoChat === requisicao.identificadorDoChat],
+    ["CONTA_DIVERGENTE", (item) =>
+      item.identificadorDoBot === configuracao.identificadorDoBot
+      && item.identificadorDoTelegram === requisicao.identificadorDoTelegram
+      && item.identificadorDoChat === requisicao.identificadorDoChat],
+    ["TELEGRAM_DIVERGENTE", (item) =>
+      item.identificadorDoBot === configuracao.identificadorDoBot
+      && item.identificadorDaContaDoBot === requisicao.identificadorDaContaDoBot
+      && item.identificadorDoChat === requisicao.identificadorDoChat],
+  ];
+  for (const [etapa, corresponde] of divergencias) {
+    if (ativos.some(corresponde)) {
+      throw new ErroDoIntegrador("VINCULO_NAO_ENCONTRADO", 404, etapa);
+    }
+  }
+  throw new ErroDoIntegrador("VINCULO_NAO_ENCONTRADO", 404,
+    "VINCULO_NAO_LOCALIZADO");
 }
 
-async function confirmarOperacao(requisicao, configuracao, buscar) {
+function respostaDaConfirmacao(bytes) {
+  let dados;
+  try {
+    dados = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new ErroDoIntegrador("RESPOSTA_DO_BACKEND_INVALIDA", 503,
+      "VALIDACAO_DA_RESPOSTA_DO_BACKEND");
+  }
+  const operacao = dados?.operacao;
+  if (!operacao || typeof operacao !== "object" || Array.isArray(operacao)
+      || !FORMATO_DO_UUID.test(operacao.identificador ?? "")
+      || !FORMATO_DO_TIPO_DA_OPERACAO.test(operacao.tipo ?? "")) {
+    throw new ErroDoIntegrador("RESPOSTA_DO_BACKEND_INVALIDA", 503,
+      "VALIDACAO_DA_RESPOSTA_DO_BACKEND");
+  }
+  if (dados.exigeNovaConfirmacao === true
+      && operacao.estado === "AGUARDANDO_CONFIRMACAO"
+      && operacao.aplicadaEm == null
+      && operacao.resultado == null
+      && typeof dados.proximoCodigo === "string"
+      && FORMATO_DO_CODIGO_DE_CONFIRMACAO.test(dados.proximoCodigo)
+      && dados.proximaFrase === `/confirmar ${dados.proximoCodigo}`) {
+    return {
+      codigo: "NOVA_CONFIRMACAO_EXIGIDA",
+      proximoCodigo: dados.proximoCodigo,
+      proximaFrase: dados.proximaFrase,
+      observabilidade: Object.freeze({
+        identificadorDaOperacao: operacao.identificador,
+        tipoDaOperacao: operacao.tipo,
+        estadoDaOperacao: operacao.estado,
+      }),
+    };
+  }
+  const instanteDaAplicacao = Date.parse(operacao.aplicadaEm);
+  const resultado = operacao.resultado;
+  if (dados.exigeNovaConfirmacao === false
+      && dados.proximoCodigo == null
+      && dados.proximaFrase == null
+      && operacao.estado === "APLICADA"
+      && typeof operacao.aplicadaEm === "string"
+      && FORMATO_DO_INSTANTE_APLICADO.test(operacao.aplicadaEm)
+      && Number.isFinite(instanteDaAplicacao)
+      && resultado !== null
+      && typeof resultado === "object"
+      && !Array.isArray(resultado)
+      && Object.keys(resultado).sort().join(",") === "dados,tipo"
+      && resultado.tipo === operacao.tipo
+      && Object.hasOwn(resultado, "dados")) {
+    return {
+      codigo: "OPERACAO_APLICADA",
+      recibo: Object.freeze({
+        identificadorDaOperacao: operacao.identificador,
+        tipo: operacao.tipo,
+        estado: operacao.estado,
+        aplicadaEm: operacao.aplicadaEm,
+        resultado,
+      }),
+      observabilidade: Object.freeze({
+        identificadorDaOperacao: operacao.identificador,
+        tipoDaOperacao: operacao.tipo,
+        estadoDaOperacao: operacao.estado,
+      }),
+    };
+  }
+  throw new ErroDoIntegrador("RESPOSTA_DO_BACKEND_INVALIDA", 503,
+    "VALIDACAO_DA_RESPOSTA_DO_BACKEND");
+}
+
+async function confirmarOperacao(
+    requisicao, configuracao, buscar, correlationId) {
   const provisionamento = localizarProvisionamento(requisicao, configuracao);
   const corpo = JSON.stringify({
     codigo: requisicao.codigo,
@@ -297,29 +562,29 @@ async function confirmarOperacao(requisicao, configuracao, buscar) {
     identificadorDaSessao: provisionamento.identificadorDaSessao,
     identificadorDoUpdate: requisicao.identificadorDoUpdate,
   });
+  const identidadeDoUpdate = JSON.stringify({
+    canal: "TELEGRAM",
+    bot: configuracao.identificadorDoBot,
+    conta: configuracao.identificadorDaContaDoBot,
+    telegram: requisicao.identificadorDoTelegram,
+    chat: requisicao.identificadorDoChat,
+    update: requisicao.identificadorDoUpdate,
+  });
   const idempotencia = `confirmacao-${createHash("sha256")
-    .update(`${requisicao.identificadorDoTelegram}:${requisicao.identificadorDoUpdate}`)
-    .digest("hex")}`;
+    .update(identidadeDoUpdate).digest("hex")}`;
   let retorno;
   try {
     retorno = await chamarBackend({ caminho: CAMINHO_DA_CONFIRMACAO, corpo,
-      idempotencia, configuracao, buscar });
+      idempotencia, correlationId, configuracao, buscar });
   } catch {
     throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
   }
   if (retorno.status >= 200 && retorno.status < 300) {
-    try {
-      const dados = JSON.parse(retorno.bytes.toString("utf8"));
-      if (dados?.exigeNovaConfirmacao === true
-          && typeof dados.proximaFrase === "string"
-          && /^\/confirmar [23456789A-HJ-NP-Z]{8}$/.test(dados.proximaFrase)) {
-        return { estado: 200, codigo: "NOVA_CONFIRMACAO_EXIGIDA",
-          proximaFrase: dados.proximaFrase };
-      }
-    } catch {
-      throw new ErroDoIntegrador("RESPOSTA_DO_BACKEND_INVALIDA", 503);
-    }
-    return { estado: 200, codigo: "OPERACAO_APLICADA" };
+    return {
+      estado: 200,
+      identificadorDoVinculo: provisionamento.identificadorDoVinculo,
+      ...respostaDaConfirmacao(retorno.bytes),
+    };
   }
   if ([404, 409, 410, 422].includes(retorno.status)) {
     let codigo = "CONFIRMACAO_RECUSADA";
@@ -334,18 +599,34 @@ async function confirmarOperacao(requisicao, configuracao, buscar) {
     }
     throw new ErroDoIntegrador(codigo, 409);
   }
+  if (retorno.status === 429) {
+    throw new ErroDoIntegrador("LIMITE_DE_TENTATIVAS_ATINGIDO", 429,
+      "LIMITE_DE_CONFIRMACOES_ATINGIDO");
+  }
   throw new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
 }
 
 function hashDaOperacao(requisicao, configuracao) {
   const canonico = JSON.stringify({
     bot: configuracao.identificadorDoBot,
+    conta: configuracao.identificadorDaContaDoBot,
     telegram: requisicao.identificadorDoTelegram,
     chat: requisicao.identificadorDoChat,
     codigo: requisicao.codigo,
   });
   return createHmac("sha256", configuracao.segredoDoGateway)
     .update(canonico).digest("hex");
+}
+
+function hashDaIdentidade(requisicao, configuracao) {
+  return createHmac("sha256", configuracao.segredoDoGateway)
+    .update(JSON.stringify({
+      bot: configuracao.identificadorDoBot,
+      conta: configuracao.identificadorDaContaDoBot,
+      telegram: requisicao.identificadorDoTelegram,
+      chat: requisicao.identificadorDoChat,
+    }))
+    .digest("hex");
 }
 
 function caminhoDoRecibo(hash, configuracao) {
@@ -392,7 +673,9 @@ function gravarRecibo(hash, estado, identificadorDoVinculo, configuracao) {
   renameSync(temporario, destino);
 }
 
-function cabecalhosHmac({ corpo, caminho, idempotencia, configuracao }) {
+function cabecalhosHmac({
+  corpo, caminho, idempotencia, correlationId, configuracao,
+}) {
   const instante = String(Math.floor(Date.now() / 1_000));
   const nonce = randomBytes(32).toString("base64url");
   const hashDoCorpo = createHash("sha256").update(corpo).digest("hex");
@@ -416,10 +699,13 @@ function cabecalhosHmac({ corpo, caminho, idempotencia, configuracao }) {
     "X-Trilha-Nonce": nonce,
     "X-Trilha-Assinatura": assinatura,
     "X-Chave-De-Idempotencia": idempotencia,
+    "X-Identificador-De-Correlacao": correlationId,
   };
 }
 
-async function chamarBackend({ caminho, corpo, idempotencia, configuracao, buscar }) {
+async function chamarBackend({
+  caminho, corpo, idempotencia, correlationId, configuracao, buscar,
+}) {
   const controlador = new AbortController();
   const temporizador = setTimeout(
     () => controlador.abort(), configuracao.tempoLimiteDoBackendEmMs);
@@ -427,7 +713,9 @@ async function chamarBackend({ caminho, corpo, idempotencia, configuracao, busca
   try {
     const resposta = await buscar(`${configuracao.urlDoBackend}${caminho}`, {
       method: "POST",
-      headers: cabecalhosHmac({ corpo, caminho, idempotencia, configuracao }),
+      headers: cabecalhosHmac({
+        corpo, caminho, idempotencia, correlationId, configuracao,
+      }),
       body: corpo,
       redirect: "error",
       signal: controlador.signal,
@@ -460,7 +748,8 @@ function validarTroca(bytes, requisicao, configuracao) {
   return { identificadorDoVinculo: vinculo.identificador, token: resposta.token };
 }
 
-async function trocarCodigo(requisicao, hash, configuracao, buscar) {
+async function trocarCodigo(
+    requisicao, hash, correlationId, configuracao, buscar) {
   const corpo = JSON.stringify({
     codigo: requisicao.codigo,
     identificadorDoBot: Number(configuracao.identificadorDoBot),
@@ -473,6 +762,7 @@ async function trocarCodigo(requisicao, hash, configuracao, buscar) {
       caminho: CAMINHO_DA_TROCA,
       corpo,
       idempotencia: `vinculo-telegram-${hash}`,
+      correlationId,
       configuracao,
       buscar,
     });
@@ -538,6 +828,7 @@ async function provisionar({ troca, requisicao, configuracao, executar }) {
       "--diretorio-credenciais-mcp", configuracao.diretorioDeCredenciais,
       "--identificador-vinculo", troca.identificadorDoVinculo,
       "--identificador-bot", configuracao.identificadorDoBot,
+      "--identificador-conta-bot", configuracao.identificadorDaContaDoBot,
       "--identificador-telegram", requisicao.identificadorDoTelegram,
       "--identificador-chat", requisicao.identificadorDoChat,
       "--identificador-agente", identificadorDoAgente,
@@ -552,12 +843,14 @@ async function provisionar({ troca, requisicao, configuracao, executar }) {
   return { identificadorDoAgente, identificadorDaSessao };
 }
 
-async function registrarProvisionamento(troca, configuracao, executar) {
+async function registrarProvisionamento(
+    troca, correlationId, configuracao, executar) {
   await executar(configuracao.arquivoDeRegistro, [
     "--diretorio-estado", configuracao.diretorioDeEstado,
     "--identificador-vinculo", troca.identificadorDoVinculo,
     "--url-backend", configuracao.urlDoBackend,
     "--identificador-chave", configuracao.identificadorDaChave,
+    "--identificador-correlacao", correlationId,
     "--segredo-gateway-arquivo", configuracao.arquivoDoSegredoGateway,
   ], configuracao.tempoLimiteDosScriptsEmMs);
 }
@@ -580,32 +873,40 @@ function criarLimitador(configuracao) {
   };
 }
 
-function responder(resposta, estado, codigo, proximaFrase = undefined) {
+function responder(resposta, estado, codigo, proximoCodigo = undefined,
+    proximaFrase = undefined, recibo = undefined) {
   resposta.writeHead(estado, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
   });
-  resposta.end(JSON.stringify({ codigo, ...(proximaFrase
-    ? { proximaFrase } : {}) }));
+  resposta.end(JSON.stringify({
+    codigo,
+    ...(proximoCodigo ? { proximoCodigo } : {}),
+    ...(proximaFrase ? { proximaFrase } : {}),
+    ...(recibo ? { recibo } : {}),
+  }));
 }
 
 export function criarServidorDoIntegrador({
   configuracao,
   buscar = globalThis.fetch,
   executar = executarScript,
+  registrar = registrarLogSeguro,
 } = {}) {
-  if (!configuracao || typeof buscar !== "function" || typeof executar !== "function") {
+  if (!configuracao || typeof buscar !== "function"
+      || typeof executar !== "function" || typeof registrar !== "function") {
     throw new Error("Dependencias do integrador invalidas.");
   }
   const limitar = criarLimitador(configuracao);
   const emAndamento = new Map();
 
-  const processar = async (requisicao) => {
+  const processar = async (requisicao, correlationId) => {
     const hash = hashDaOperacao(requisicao, configuracao);
     const recibo = lerRecibo(hash, configuracao);
     if (recibo?.estado === "APLICADO") {
-      return { estado: 200, codigo: "VINCULO_CONCLUIDO" };
+      return { estado: 200, codigo: "VINCULO_CONCLUIDO",
+        identificadorDoVinculo: recibo.identificadorDoVinculo };
     }
     const existente = emAndamento.get(hash);
     if (existente) return existente;
@@ -614,19 +915,23 @@ export function criarServidorDoIntegrador({
       if (recibo?.estado === "PROVISIONADO_LOCALMENTE") {
         await registrarProvisionamento({
           identificadorDoVinculo: recibo.identificadorDoVinculo,
-        }, configuracao, executar);
+        }, correlationId, configuracao, executar);
         gravarRecibo(hash, "APLICADO", recibo.identificadorDoVinculo,
           configuracao);
-        return { estado: 200, codigo: "VINCULO_CONCLUIDO" };
+        return { estado: 200, codigo: "VINCULO_CONCLUIDO",
+          identificadorDoVinculo: recibo.identificadorDoVinculo };
       }
-      const troca = await trocarCodigo(requisicao, hash, configuracao, buscar);
+      const troca = await trocarCodigo(
+        requisicao, hash, correlationId, configuracao, buscar);
       gravarRecibo(hash, "TROCADO", troca.identificadorDoVinculo, configuracao);
       await provisionar({ troca, requisicao, configuracao, executar });
       gravarRecibo(hash, "PROVISIONADO_LOCALMENTE",
         troca.identificadorDoVinculo, configuracao);
-      await registrarProvisionamento(troca, configuracao, executar);
+      await registrarProvisionamento(
+        troca, correlationId, configuracao, executar);
       gravarRecibo(hash, "APLICADO", troca.identificadorDoVinculo, configuracao);
-      return { estado: 200, codigo: "VINCULO_CONCLUIDO" };
+      return { estado: 200, codigo: "VINCULO_CONCLUIDO",
+        identificadorDoVinculo: troca.identificadorDoVinculo };
     })();
     emAndamento.set(hash, operacao);
     try {
@@ -652,6 +957,9 @@ export function criarServidorDoIntegrador({
       responder(resposta, 415, "TIPO_DE_CONTEUDO_INVALIDO");
       return;
     }
+    const correlationId = randomUUID();
+    const iniciadoEm = Date.now();
+    let requisicaoValidada;
     try {
       const corpo = await lerCorpoLimitado(pedido, LIMITE_DO_CORPO);
       let valor;
@@ -663,14 +971,40 @@ export function criarServidorDoIntegrador({
       const requisicao = rotaDeVinculo
         ? validarRequisicao(valor, configuracao)
         : validarConfirmacao(valor, configuracao);
+      requisicaoValidada = requisicao;
       const resultado = rotaDeVinculo
-        ? await processar(requisicao)
-        : await confirmarOperacao(requisicao, configuracao, buscar);
+        ? await processar(requisicao, correlationId)
+        : await confirmarOperacao(
+          requisicao, configuracao, buscar, correlationId);
+      registrarSemFalhar(registrar, {
+        correlationId,
+        etapa: rotaDeVinculo ? "VINCULO_CONCLUIDO" : "CONFIRMACAO_CONCLUIDA",
+        rota: rotaDeVinculo ? "VINCULO" : "CONFIRMACAO",
+        identidadeHash: hashDaIdentidade(requisicao, configuracao),
+        ...(resultado.identificadorDoVinculo ? {
+          identificadorDoVinculo: resultado.identificadorDoVinculo,
+        } : {}),
+        ...(resultado.observabilidade ?? {}),
+        estadoHttp: resultado.estado,
+        codigo: resultado.codigo,
+        duracaoEmMs: Date.now() - iniciadoEm,
+      });
       responder(resposta, resultado.estado, resultado.codigo,
-        resultado.proximaFrase);
+        resultado.proximoCodigo, resultado.proximaFrase, resultado.recibo);
     } catch (erro) {
       const conhecido = erro instanceof ErroDoIntegrador
         ? erro : new ErroDoIntegrador("INTEGRACAO_INDISPONIVEL", 503);
+      registrarSemFalhar(registrar, {
+        correlationId,
+        etapa: conhecido.etapa,
+        rota: rotaDeVinculo ? "VINCULO" : "CONFIRMACAO",
+        ...(requisicaoValidada ? {
+          identidadeHash: hashDaIdentidade(requisicaoValidada, configuracao),
+        } : {}),
+        estadoHttp: conhecido.estadoHttp,
+        codigo: conhecido.codigo,
+        duracaoEmMs: Date.now() - iniciadoEm,
+      });
       responder(resposta, conhecido.estadoHttp, conhecido.codigo);
     }
   });
@@ -680,10 +1014,20 @@ export function criarServidorDoIntegrador({
   return servidor;
 }
 
-function iniciar() {
+async function iniciar() {
   const configuracao = carregarConfiguracaoDoAmbiente();
   const porta = inteiroDoAmbiente(process.env.PORTA_DO_INTEGRADOR,
     8_090, 1, 65_535, "PORTA_DO_INTEGRADOR");
+  await executarScript(configuracao.arquivoDeSincronizacao, [
+    "--diretorio-estado", configuracao.diretorioDeEstado,
+    "--identificador-conta-bot", configuracao.identificadorDaContaDoBot,
+  ], configuracao.tempoLimiteDosScriptsEmMs);
+  registrarSemFalhar(registrarLogSeguro, {
+    correlationId: randomUUID(),
+    etapa: "WORKSPACES_SINCRONIZADOS",
+    estadoHttp: 200,
+    codigo: "MODELO_DO_WORKSPACE_ATUALIZADO",
+  });
   const servidor = criarServidorDoIntegrador({ configuracao });
   servidor.listen(porta, "0.0.0.0");
   const encerrar = () => {
@@ -696,10 +1040,8 @@ function iniciar() {
 
 if (process.argv[1]
     && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  try {
-    iniciar();
-  } catch {
+  iniciar().catch(() => {
     process.stderr.write("Erro: nao foi possivel iniciar o integrador confiavel.\n");
     process.exit(1);
-  }
+  });
 }

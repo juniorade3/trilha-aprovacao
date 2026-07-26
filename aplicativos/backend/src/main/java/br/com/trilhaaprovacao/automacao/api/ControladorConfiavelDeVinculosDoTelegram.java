@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
@@ -79,28 +80,39 @@ public class ControladorConfiavelDeVinculosDoTelegram {
     @PostMapping("/operacoes/{identificador}/confirmacao")
     public ResponseEntity<RespostaDaConfirmacaoAssistida> confirmarEAplicar(
             @PathVariable UUID identificador,
-            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
+            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao,
+            HttpServletRequest pedido) {
         var resultado = aplicacao.confirmarComResultado(identificador,
                 requisicao.codigo(), requisicao.metodo(),
                 requisicao.identificadorDoBot(),
                 requisicao.identificadorDoTelegram(),
                 requisicao.identificadorDoChat(),
                 requisicao.identificadorDaSessao(),
-                requisicao.identificadorDoUpdate());
+                requisicao.identificadorDoUpdate(), correlacao(pedido));
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(RespostaDaConfirmacaoAssistida.de(resultado, mapeador));
     }
 
     @PostMapping("/operacoes/confirmacao")
     public ResponseEntity<RespostaDaConfirmacaoAssistida> confirmarEAplicar(
-            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao) {
+            @Valid @RequestBody RequisicaoDeConfirmacaoDaOperacao requisicao,
+            HttpServletRequest pedido) {
         var resultado = aplicacao.confirmarComResultado(requisicao.codigo(),
                 requisicao.metodo(), requisicao.identificadorDoBot(),
                 requisicao.identificadorDoTelegram(),
                 requisicao.identificadorDoChat(),
                 requisicao.identificadorDaSessao(),
-                requisicao.identificadorDoUpdate());
+                requisicao.identificadorDoUpdate(), correlacao(pedido));
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(RespostaDaConfirmacaoAssistida.de(resultado, mapeador));
+    }
+
+    private UUID correlacao(HttpServletRequest pedido) {
+        Object valor = pedido.getAttribute("identificadorDeCorrelacao");
+        try {
+            return UUID.fromString(String.valueOf(valor));
+        } catch (IllegalArgumentException excecao) {
+            return UUID.randomUUID();
+        }
     }
 }

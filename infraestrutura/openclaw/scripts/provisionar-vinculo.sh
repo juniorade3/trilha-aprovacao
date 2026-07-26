@@ -8,6 +8,7 @@ diretorio_de_credenciais=""
 identificador_do_vinculo=""
 identificador_do_vinculo_substituido=""
 identificador_do_bot=""
+identificador_da_conta_do_bot="default"
 identificador_do_telegram=""
 identificador_do_chat=""
 identificador_do_agente=""
@@ -21,6 +22,7 @@ uso() {
     'Uso: provisionar-vinculo.sh \' \
     '  --diretorio-estado CAMINHO --diretorio-credenciais-mcp CAMINHO \' \
     '  --identificador-vinculo UUID --identificador-bot NUMERO \' \
+    '  [--identificador-conta-bot CONTA] \' \
     '  --identificador-telegram NUMERO --identificador-chat NUMERO \' \
     '  --identificador-agente ID --identificador-sessao ID \' \
     '  --token-mcp-arquivo CAMINHO --url-mcp URL \' \
@@ -34,6 +36,10 @@ while [[ $# -gt 0 ]]; do
     --identificador-vinculo) identificador_do_vinculo="${2:-}"; shift 2 ;;
     --substituir-vinculo) identificador_do_vinculo_substituido="${2:-}"; shift 2 ;;
     --identificador-bot) identificador_do_bot="${2:-}"; shift 2 ;;
+    --identificador-conta-bot)
+      identificador_da_conta_do_bot="${2:-}"
+      shift 2
+      ;;
     --identificador-telegram) identificador_do_telegram="${2:-}"; shift 2 ;;
     --identificador-chat) identificador_do_chat="${2:-}"; shift 2 ;;
     --identificador-agente) identificador_do_agente="${2:-}"; shift 2 ;;
@@ -65,10 +71,9 @@ if [[ -n "${identificador_do_vinculo_substituido}" ]]; then
     falhar "o novo vinculo deve ser diferente do vinculo substituido."
 fi
 validar_inteiro_positivo "${identificador_do_bot}" identificador-bot
+validar_identificador_da_conta_do_bot "${identificador_da_conta_do_bot}"
 validar_inteiro_positivo "${identificador_do_telegram}" identificador-telegram
 validar_inteiro_positivo "${identificador_do_chat}" identificador-chat
-[[ "${identificador_do_telegram}" == "${identificador_do_chat}" ]] ||
-  falhar "somente conversa privada e aceita; identificador do chat deve ser o Telegram."
 validar_identificador_do_agente "${identificador_do_agente}"
 validar_identificador_da_sessao "${identificador_da_sessao}"
 validar_url_mcp "${url_mcp}"
@@ -92,14 +97,22 @@ nome_do_plugin="trilha-mcp-${identificador_compacto_do_vinculo}"
 caminho_do_workspace_no_container="/home/node/.openclaw/workspaces/${identificador_do_agente}"
 caminho_do_agente_no_container="/home/node/.openclaw/agentes/${identificador_do_agente}"
 hash_token="$(hash_do_token "${arquivo_do_token}")"
+modelo_do_workspace="$(modelo_do_workspace_em_json)"
 
-if [[ -f "${arquivo_do_provisionamento}" ]]; then
+if [[ -e "${arquivo_do_provisionamento}" ||
+  -L "${arquivo_do_provisionamento}" ]]; then
+  [[ -f "${arquivo_do_provisionamento}" &&
+    ! -L "${arquivo_do_provisionamento}" &&
+    "$(stat -c '%a' -- "${arquivo_do_provisionamento}")" == "600" ]] ||
+    falhar "metadados do vinculo devem ser arquivo regular 0600."
   if jq -e \
     --arg vinculo "${identificador_do_vinculo}" --arg bot "${identificador_do_bot}" \
+    --arg conta "${identificador_da_conta_do_bot}" \
     --arg telegram "${identificador_do_telegram}" --arg chat "${identificador_do_chat}" \
     --arg agente "${identificador_do_agente}" --arg sessao "${identificador_da_sessao}" \
     --arg url "${url_mcp}" --arg hash "${hash_token}" \
     '.identificadorDoVinculo == $vinculo and .identificadorDoBot == $bot and
+     (.identificadorDaContaDoBot // $conta) == $conta and
      .identificadorDoTelegram == $telegram and .identificadorDoChat == $chat and
      .identificadorDoAgente == $agente and .identificadorDaSessao == $sessao and
      .urlMcp == $url and .hashDoToken == $hash and .estado == "ATIVO"' \
@@ -113,14 +126,25 @@ if [[ -f "${arquivo_do_provisionamento}" ]]; then
         '.estado == "REVOGADO" and .substituidoPor == $novo' "${arquivo_anterior}" >/dev/null ||
         falhar "o novo vinculo existe, mas o anterior nao foi substituido integralmente."
     fi
+    flock -u 9
+    bash "${diretorio_dos_scripts}/sincronizar-workspaces.sh" \
+      --diretorio-estado "${diretorio_de_estado}" \
+      --identificador-conta-bot "${identificador_da_conta_do_bot}" >/dev/null
     printf 'Vinculo %s ja provisionado com os mesmos dados.\n' "${identificador_do_vinculo}"
     exit 0
   fi
   falhar "a chave do vinculo ja foi usada com dados diferentes."
 fi
 
-if [[ -f "${arquivo_do_bot}" ]]; then
-  [[ "$(jq -r '.identificadorDoBot' "${arquivo_do_bot}")" == "${identificador_do_bot}" ]] ||
+if [[ -e "${arquivo_do_bot}" || -L "${arquivo_do_bot}" ]]; then
+  [[ -f "${arquivo_do_bot}" && ! -L "${arquivo_do_bot}" &&
+    "$(stat -c '%a' -- "${arquivo_do_bot}")" == "600" ]] ||
+    falhar "metadados do bot devem ser arquivo regular 0600."
+  jq -e --arg bot "${identificador_do_bot}" \
+    --arg conta "${identificador_da_conta_do_bot}" \
+    '.identificadorDoBot == $bot and
+     (.identificadorDaContaDoBot // $conta) == $conta' \
+    "${arquivo_do_bot}" >/dev/null ||
     falhar "o estado pertence a outro bot do Telegram."
 fi
 
@@ -131,23 +155,43 @@ arquivo_do_provisionamento_substituido=""
 arquivo_da_credencial_substituida=""
 if [[ -n "${identificador_do_vinculo_substituido}" ]]; then
   arquivo_do_provisionamento_substituido="${diretorio_de_estado}/provisionamentos/${identificador_do_vinculo_substituido}.json"
-  [[ -f "${arquivo_do_provisionamento_substituido}" ]] || falhar "vinculo a substituir nao foi provisionado."
-  jq -e --arg bot "${identificador_do_bot}" --arg telegram "${identificador_do_telegram}" \
+  [[ -f "${arquivo_do_provisionamento_substituido}" &&
+    ! -L "${arquivo_do_provisionamento_substituido}" &&
+    "$(stat -c '%a' -- "${arquivo_do_provisionamento_substituido}")" == "600" ]] ||
+    falhar "metadados do vinculo anterior devem ser arquivo regular 0600."
+  jq empty "${arquivo_do_provisionamento_substituido}" ||
+    falhar "metadados do vinculo anterior possuem JSON invalido."
+  jq -e --arg bot "${identificador_do_bot}" \
+    --arg conta "${identificador_da_conta_do_bot}" \
+    --arg telegram "${identificador_do_telegram}" \
     --arg chat "${identificador_do_chat}" \
     '.estado == "ATIVO" and .identificadorDoBot == $bot and
+     (.identificadorDaContaDoBot // $conta) == $conta and
      .identificadorDoTelegram == $telegram and .identificadorDoChat == $chat' \
     "${arquivo_do_provisionamento_substituido}" >/dev/null ||
     falhar "o vinculo anterior nao esta ativo ou pertence a outra conversa."
   agente_substituido="$(jq -r '.identificadorDoAgente' "${arquivo_do_provisionamento_substituido}")"
   telegram_substituido="$(jq -r '.identificadorDoTelegram' "${arquivo_do_provisionamento_substituido}")"
   plugin_substituido="$(jq -r '.nomeDoPlugin' "${arquivo_do_provisionamento_substituido}")"
+  validar_identificador_do_agente "${agente_substituido}"
+  validar_inteiro_positivo "${telegram_substituido}" identificador-telegram
+  validar_nome_do_plugin_do_vinculo "${identificador_do_vinculo_substituido}" \
+    "${plugin_substituido}"
+  validar_estrutura_local_do_vinculo "${diretorio_de_estado}" \
+    "${agente_substituido}" "${plugin_substituido}"
   [[ "${agente_substituido}" != "${identificador_do_agente}" ]] ||
     falhar "a rotacao exige um novo identificador de agente."
   arquivo_da_credencial_substituida="$(caminho_da_credencial_mcp "${diretorio_de_credenciais}" "${identificador_do_vinculo_substituido}")"
+  validar_arquivo_secreto "${arquivo_da_credencial_substituida}" \
+    credencial-mcp-anterior
 fi
 
-jq -e --arg telegram "${identificador_do_telegram}" --arg antigo "${agente_substituido}" \
-  'all(.bindings[]?; .match.channel != "telegram" or .match.peer.id != $telegram or .agentId == $antigo)' \
+jq -e --arg conta "${identificador_da_conta_do_bot}" \
+  --arg chat "${identificador_do_chat}" --arg antigo "${agente_substituido}" \
+  'all(.bindings[]?;
+    .match.channel != "telegram" or
+    (.match.accountId // $conta) != $conta or
+    .match.peer.id != $chat or .agentId == $antigo)' \
   "${arquivo_da_configuracao}" >/dev/null || falhar "o Telegram ja esta vinculado a outro agente."
 jq -e --arg agente "${identificador_do_agente}" \
   'all(.agents.list[]?; .id != $agente)' "${arquivo_da_configuracao}" >/dev/null ||
@@ -163,9 +207,10 @@ install -d -m 700 -- "${workspace_temporario}" "${agente_temporario}" "${plugin_
 install -m 500 -- "${diretorio_do_modulo}/scripts/proxy-mcp-http-stdio.mjs" \
   "${plugin_temporario}/proxy-mcp-http-stdio.mjs"
 
-for arquivo in AGENTS.md SOUL.md IDENTITY.md TOOLS.md USER.md; do
+while IFS= read -r arquivo; do
   install -m 600 -- "${diretorio_do_modulo}/modelos/workspace/${arquivo}" "${workspace_temporario}/${arquivo}"
-done
+done < <(jq -r '.arquivosGerenciados[]' \
+  "${diretorio_do_modulo}/modelos/workspace/manifesto.json")
 
 jq -n --arg nome "${nome_do_plugin}" '{
   name: $nome, version: "1.0.0",
@@ -189,8 +234,14 @@ jq -n --rawfile token "${arquivo_do_token}" --arg vinculo "${identificador_do_vi
     tokenMcp: ($token | gsub("[\\r\\n]+$"; ""))}' > "${credencial_temporaria}"
 chmod 600 -- "${credencial_temporaria}"
 
+configuracao_da_conta="${diretorio_temporario}/openclaw-conta.json"
+configurar_conta_do_telegram "${arquivo_da_configuracao}" \
+  "${configuracao_da_conta}" "${identificador_da_conta_do_bot}"
+chmod 600 -- "${configuracao_da_conta}"
 configuracao_temporaria="${diretorio_temporario}/openclaw.json"
-jq --arg agente "${identificador_do_agente}" --arg telegram "${identificador_do_telegram}" \
+jq --arg agente "${identificador_do_agente}" \
+  --arg conta "${identificador_da_conta_do_bot}" \
+  --arg telegram "${identificador_do_telegram}" --arg chat "${identificador_do_chat}" \
   --arg vinculo "${identificador_do_vinculo}" --arg sessao "${identificador_da_sessao}" \
   --arg plugin "${nome_do_plugin}" --arg pluginAntigo "${plugin_substituido}" \
   --arg workspace "${caminho_do_workspace_no_container}" --arg diretorioAgente "${caminho_do_agente_no_container}" \
@@ -214,24 +265,29 @@ jq --arg agente "${identificador_do_agente}" --arg telegram "${identificador_do_
     }]
    | .bindings += [{type: "route", agentId: $agente,
       comment: ("vinculo=" + $vinculo + ";sessao=" + $sessao),
-      match: {channel: "telegram", peer: {kind: "direct", id: $telegram}},
+      match: {channel: "telegram", accountId: $conta,
+        peer: {kind: "direct", id: $chat}},
       session: {dmScope: "per-channel-peer"}}]
    | .channels.telegram.allowFrom = ((.channels.telegram.allowFrom + [$telegram]) | unique)' \
-  "${arquivo_da_configuracao}" > "${configuracao_temporaria}"
+  "${configuracao_da_conta}" > "${configuracao_temporaria}"
 jq empty "${configuracao_temporaria}"
 chmod 600 -- "${configuracao_temporaria}"
 
 provisionamento_temporario="${diretorio_temporario}/provisionamento.json"
 jq -n --arg vinculo "${identificador_do_vinculo}" --arg bot "${identificador_do_bot}" \
+  --arg conta "${identificador_da_conta_do_bot}" \
   --arg telegram "${identificador_do_telegram}" --arg chat "${identificador_do_chat}" \
   --arg agente "${identificador_do_agente}" --arg sessao "${identificador_da_sessao}" \
   --arg plugin "${nome_do_plugin}" --arg url "${url_mcp}" --arg hash "${hash_token}" \
   --arg criadoEm "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-  '{versao: 2, estado: "ATIVO", identificadorDoVinculo: $vinculo,
-    identificadorDoBot: $bot, identificadorDoTelegram: $telegram,
+  --argjson modeloDoWorkspace "${modelo_do_workspace}" \
+  '{versao: 3, estado: "ATIVO", identificadorDoVinculo: $vinculo,
+    identificadorDoBot: $bot, identificadorDaContaDoBot: $conta,
+    identificadorDoTelegram: $telegram,
     identificadorDoChat: $chat, identificadorDoAgente: $agente,
     identificadorDaSessao: $sessao, nomeDoPlugin: $plugin, urlMcp: $url,
-    hashDoToken: $hash, criadoEm: $criadoEm}' > "${provisionamento_temporario}"
+    hashDoToken: $hash, modeloDoWorkspace: $modeloDoWorkspace,
+    criadoEm: $criadoEm}' > "${provisionamento_temporario}"
 chmod 600 -- "${provisionamento_temporario}"
 
 destino_do_workspace="${diretorio_de_estado}/workspaces/${identificador_do_agente}"
@@ -243,7 +299,8 @@ destino_revogado=""
 metadados_anteriores_temporarios=""
 if [[ -n "${identificador_do_vinculo_substituido}" ]]; then
   destino_revogado="${diretorio_de_estado}/revogados/${identificador_do_vinculo_substituido}"
-  [[ ! -e "${destino_revogado}" ]] || falhar "o estado revogado do vinculo anterior ja existe."
+  [[ ! -e "${destino_revogado}" && ! -L "${destino_revogado}" ]] ||
+    falhar "o estado revogado do vinculo anterior ja existe ou e inseguro."
   install -d -m 700 -- "${destino_revogado}"
   metadados_anteriores_temporarios="${diretorio_temporario}/provisionamento-anterior.json"
   jq --arg novo "${identificador_do_vinculo}" --arg revogadoEm "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
@@ -267,8 +324,18 @@ if [[ -n "${identificador_do_vinculo_substituido}" ]]; then
   mv -- "${metadados_anteriores_temporarios}" "${arquivo_do_provisionamento_substituido}"
 fi
 if [[ ! -f "${arquivo_do_bot}" ]]; then
-  jq -n --arg bot "${identificador_do_bot}" '{identificadorDoBot: $bot}' > "${arquivo_do_bot}"
+  jq -n --arg bot "${identificador_do_bot}" \
+    --arg conta "${identificador_da_conta_do_bot}" \
+    '{identificadorDoBot: $bot, identificadorDaContaDoBot: $conta}' \
+    > "${arquivo_do_bot}"
   chmod 600 -- "${arquivo_do_bot}"
+else
+  metadados_do_bot_temporarios="${diretorio_temporario}/bot.json"
+  jq --arg conta "${identificador_da_conta_do_bot}" \
+    '.identificadorDaContaDoBot = $conta' "${arquivo_do_bot}" \
+    > "${metadados_do_bot_temporarios}"
+  chmod 600 -- "${metadados_do_bot_temporarios}"
+  mv -- "${metadados_do_bot_temporarios}" "${arquivo_do_bot}"
 fi
 
 trap - EXIT

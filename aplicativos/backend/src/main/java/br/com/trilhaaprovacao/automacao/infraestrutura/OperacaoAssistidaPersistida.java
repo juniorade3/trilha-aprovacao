@@ -41,6 +41,8 @@ public class OperacaoAssistidaPersistida {
     @Column(name = "expira_em", nullable = false) private OffsetDateTime expiraEm;
     @Column(name = "codigo_de_confirmacao_hash", length = 128)
     private String codigoDeConfirmacaoHash;
+    @Column(name = "codigo_de_confirmacao_anterior_hash", length = 128)
+    private String codigoDeConfirmacaoAnteriorHash;
     @Column(name = "codigo_de_confirmacao_prefixo", length = 24)
     private String codigoDeConfirmacaoPrefixo;
     @Column(name = "nonce_da_confirmacao_hash", length = 128)
@@ -114,7 +116,23 @@ public class OperacaoAssistidaPersistida {
         etapaDaConfirmacao = etapa;
     }
 
+    public void definirSegundaEtapaDaConfirmacao(String codigoHash,
+            String prefixo, String nonceHash, OffsetDateTime expiraEm) {
+        codigoDeConfirmacaoAnteriorHash = codigoDeConfirmacaoHash;
+        definirConfirmacao(codigoHash, prefixo, nonceHash, expiraEm,
+                "REFORCADA", 1);
+    }
+
+    public void definirCodigoDeConfirmacaoAnteriorHash(String codigoHash) {
+        if (codigoDeConfirmacaoAnteriorHash == null) {
+            codigoDeConfirmacaoAnteriorHash = codigoHash;
+        }
+    }
+
     public String codigoDeConfirmacaoHash() { return codigoDeConfirmacaoHash; }
+    public String codigoDeConfirmacaoAnteriorHash() {
+        return codigoDeConfirmacaoAnteriorHash;
+    }
     public OffsetDateTime confirmacaoExpiraEm() { return confirmacaoExpiraEm; }
     public String nivelDeConfirmacao() { return nivelDeConfirmacao; }
     public int etapaDaConfirmacao() { return etapaDaConfirmacao; }
