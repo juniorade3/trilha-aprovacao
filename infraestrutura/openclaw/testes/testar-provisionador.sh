@@ -26,6 +26,22 @@ chmod 600 -- "${token_um}" "${token_dois}"
 chmod 644 -- "${token_inseguro}"
 ln -s "${token_um}" "${token_simbolico}"
 
+home_do_runtime="${temporario}/home-node"
+estado_canonico_do_runtime="${home_do_runtime}/.openclaw"
+filho_generico_do_runtime="${home_do_runtime}/estado"
+mkdir -p -- "${estado_canonico_do_runtime}" "${filho_generico_do_runtime}"
+HOME="${home_do_runtime}" bash -c \
+  'source "$1"; normalizar_diretorio_de_estado "$2"' \
+  _ "${diretorio_do_modulo}/scripts/biblioteca.sh" \
+  "${estado_canonico_do_runtime}" >/dev/null
+if HOME="${home_do_runtime}" bash -c \
+  'source "$1"; normalizar_diretorio_de_estado "$2"' \
+  _ "${diretorio_do_modulo}/scripts/biblioteca.sh" \
+  "${filho_generico_do_runtime}" >/dev/null 2>&1; then
+  printf 'Falha: filho generico direto da pasta pessoal foi aceito.\n' >&2
+  exit 1
+fi
+
 vinculo_um="123e4567-e89b-42d3-a456-426614174000"
 vinculo_dois="223e4567-e89b-42d3-a456-426614174001"
 vinculo_tres="323e4567-e89b-42d3-a456-426614174002"

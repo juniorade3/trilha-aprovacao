@@ -43,9 +43,13 @@ normalizar_diretorio_dedicado() {
   if [[ -n "${HOME:-}" ]]; then
     local diretorio_pessoal
     diretorio_pessoal="$(realpath -m -- "${HOME}")"
-    [[ "${absoluto}" != "${diretorio_pessoal}" &&
-      "$(dirname -- "${absoluto}")" != "${diretorio_pessoal}" ]] ||
-      falhar "${nome} deve usar um subdiretorio dedicado, nao a pasta pessoal ou um filho direto."
+    [[ "${absoluto}" != "${diretorio_pessoal}" ]] ||
+      falhar "${nome} nao pode apontar para a pasta pessoal."
+    if [[ "$(dirname -- "${absoluto}")" == "${diretorio_pessoal}" ]]; then
+      [[ "${nome}" == "OPENCLAW_DIRETORIO_ESTADO" &&
+        "$(basename -- "${absoluto}")" == ".openclaw" ]] ||
+        falhar "${nome} deve usar um subdiretorio dedicado."
+    fi
   fi
   [[ "$(dirname -- "${absoluto}")" != "/" ]] ||
     falhar "${nome} deve usar um diretorio dedicado abaixo de um caminho intermediario."
