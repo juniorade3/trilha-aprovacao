@@ -47,6 +47,9 @@ describe('ConcursosPagina', () => {
     await flushPromises()
 
     expect(pagina.text()).toContain('Nenhum concurso encontrado')
+    expect(pagina.get('a[href="/concursos/importar"]').attributes('href')).toBe(
+      '/concursos/importar',
+    )
   })
 
   it('lista e ativa um concurso', async () => {

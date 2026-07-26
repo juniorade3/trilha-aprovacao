@@ -337,9 +337,10 @@ class OpenClawConfirmacaoDeRegistroDeEstudoE2EIntegracaoTest {
         assertThat(allowlist.isArray()).isTrue();
         List<String> ferramentas = new ArrayList<>();
         allowlist.forEach(item -> ferramentas.add(item.asText()));
-        assertThat(ferramentas).hasSize(24).doesNotHaveDuplicates()
+        assertThat(ferramentas).hasSize(25).doesNotHaveDuplicates()
                 .contains("preparar_registro_de_estudo",
-                        "consultar_operacao_assistida")
+                        "consultar_operacao_assistida",
+                        "preparar_importacao_completa_do_edital")
                 .doesNotContain("executar_shell", "filesystem");
         assertThat(mcp.at("/mcpServers/trilha/url").isMissingNode()).isTrue();
         assertThat(mcp.at("/mcpServers/trilha/headers").isMissingNode())

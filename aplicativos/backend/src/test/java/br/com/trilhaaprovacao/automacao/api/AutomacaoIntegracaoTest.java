@@ -229,6 +229,71 @@ class AutomacaoIntegracaoTest {
     }
 
     @Test
+    void deveLimitarEValidarContextoDaSegundaConfirmacaoReforcada()
+            throws Exception {
+        MockHttpSession sessaoWeb = criarContaEEntrar(
+                "contexto.reforcado@example.com");
+        UUID usuario = identificarUsuario("contexto.reforcado@example.com");
+        VinculoCriado vinculo = vincular(sessaoWeb, 686868L, 686868L);
+        var concurso = estruturaDeConcursos.criarConcurso(usuario,
+                "Concurso com contexto reforcado", null, null, null,
+                SituacaoDoConcurso.PLANEJADO, null);
+        Map<String, Object> proposta = Map.of(
+                "identificadorDoConcurso", concurso.identificador().toString(),
+                "impacto", "Ativar concurso");
+        String versoes = json.writeValueAsString(operacoesCriticas.versoesAtuais(
+                usuario, concurso.identificador()));
+        var preparada = operacoes.prepararParaConfirmacaoReforcada(usuario,
+                vinculo.identificadorDoVinculo(), "ATIVACAO_DO_CONCURSO",
+                "Ativar concurso", json.writeValueAsString(proposta), versoes,
+                "teste-contexto-confirmacao-reforcada");
+        assertThatThrownBy(() -> operacoes.validarAtualidade(usuario,
+                preparada.operacao().identificador(),
+                preparada.operacao().assinatura(), versoes))
+                .isInstanceOf(ConflitoDeDominio.class)
+                .satisfies(excecao -> assertThat(
+                        ((ConflitoDeDominio) excecao).codigo())
+                        .isEqualTo("PREVIA_DE_AUTOMACAO_DESATUALIZADA"));
+        assertThat(operacoes.validarAtualidade(usuario,
+                preparada.operacao().identificador(),
+                preparada.operacao().assinatura(), versoes, "REFORCADA")
+                .identificador()).isEqualTo(
+                        preparada.operacao().identificador());
+        OffsetDateTime inicio = OffsetDateTime.now(ZoneOffset.UTC);
+
+        var primeira = aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(),
+                preparada.codigoDeConfirmacao(), "TEXTO", IDENTIFICADOR_DO_BOT,
+                686868L, 686868L, vinculo.identificadorDaSessao(),
+                "update-contexto-1");
+        OffsetDateTime expiracaoDaSegundaEtapa = banco.queryForObject("""
+                SELECT confirmacao_expira_em
+                  FROM operacoes_assistidas WHERE identificador = ?
+                """, OffsetDateTime.class,
+                preparada.operacao().identificador());
+        assertThat(expiracaoDaSegundaEtapa)
+                .isAfter(inicio.plusMinutes(4))
+                .isBeforeOrEqualTo(inicio.plusMinutes(5).plusSeconds(2));
+
+        assertThatThrownBy(() -> aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(), primeira.proximoCodigo(),
+                "VOZ", IDENTIFICADOR_DO_BOT, 686868L, 686868L,
+                vinculo.identificadorDaSessao(), "update-contexto-2"))
+                .isInstanceOf(RecursoNaoEncontrado.class);
+        assertThatThrownBy(() -> aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(), primeira.proximoCodigo(),
+                "TEXTO", IDENTIFICADOR_DO_BOT, 686868L, 686868L,
+                vinculo.identificadorDaSessao(), "update-contexto-1"))
+                .isInstanceOf(RecursoNaoEncontrado.class);
+
+        var segunda = aplicacao.confirmarComResultado(
+                preparada.operacao().identificador(), primeira.proximoCodigo(),
+                "TEXTO", IDENTIFICADOR_DO_BOT, 686868L, 686868L,
+                vinculo.identificadorDaSessao(), "update-contexto-2");
+        assertThat(segunda.operacao().estado().name()).isEqualTo("APLICADA");
+    }
+
+    @Test
     void deveGerarTrocarEConsumirCodigoSemPersistirSegredosPuros()
             throws Exception {
         api.perform(post("/api/v1/integracoes/telegram/codigos-de-vinculo")

@@ -1,0 +1,35 @@
+CONCURSO: Controle Público Federal
+ÓRGÃO: Controladoria Nacional
+BANCA: Instituto Exemplo
+EDITAL: Edital de abertura 2/2026
+NÚMERO: 2
+ANO: 2026
+PUBLICAÇÃO: 21/07/2026
+CARGO: Auditor Federal
+ÁREA: Auditoria
+ESCOLARIDADE: SUPERIOR
+PROVA: Prova de Auditor
+TIPO: OBJETIVA
+CARÁTER: ELIMINATORIO_E_CLASSIFICATORIO
+GRUPO: Conhecimentos de Auditoria
+MATÉRIA: Auditoria Governamental
+PESO: 2
+QUESTÕES: 20
+PONTUAÇÃO MÁXIMA: 40
+TÓPICO: 1 - Planejamento de auditoria
+TÓPICO: 1.1 - Matriz de riscos
+ITEM: 1 - Planejamento de auditoria
+ITEM: 1.1 - Identificação e avaliação de riscos.
+CARGO: Técnico Federal
+ÁREA: Apoio
+ESCOLARIDADE: MEDIO
+PROVA: Prova de Técnico
+TIPO: OBJETIVA
+CARÁTER: CLASSIFICATORIO
+GRUPO: Conhecimentos básicos
+MATÉRIA: Língua Portuguesa
+PESO: 1
+QUESTÕES: 10
+PONTUAÇÃO MÁXIMA: 10
+TÓPICO: 1 - Interpretação de textos
+ITEM: 1 - Compreensão e interpretação de textos.

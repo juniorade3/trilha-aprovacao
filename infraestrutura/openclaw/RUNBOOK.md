@@ -255,7 +255,7 @@ Tambem confirme:
 - cada binding possui `accountId` e identificador de chat esperado;
 - cada provisionamento ativo registra versao e hashes do modelo de workspace;
 - cada plugin MCP ativo aparece em `plugins.allow` e e removido na revogacao;
-- cada `.mcp.json` e regular `0600`, possui 24 ferramentas unicas e seu proxy
+- cada `.mcp.json` e regular `0600`, possui 25 ferramentas unicas e seu proxy
   regular `0500` recusa chamadas fora da allowlist;
 - `openclaw.json` mantem `mcp.servers` vazio;
 - o servico `gateway` nao monta `/run/secrets/credenciais-mcp` e o broker nao monta o estado;
@@ -264,6 +264,14 @@ Tambem confirme:
 - `grep -R 'mcp_' "$OPENCLAW_DIRETORIO_ESTADO"` nao encontra token literal;
 - cada JSON em `OPENCLAW_DIRETORIO_CREDENCIAIS_MCP` e arquivo regular `0600`;
 - o backend continua derivando o usuario exclusivamente da credencial MCP.
+
+No smoke da importacao de edital, use apenas um identificador de staging
+validado e decisoes fechadas; nunca copie o PDF ou a extracao integral para o
+workspace. Confirme que a previa informa `nadaFoiAlterado=true`, exige dois
+codigos e que o segundo vence em ate cinco minutos. Retry identico deve devolver
+a mesma operacao e seu estado real. Depois de expirar, uma nova operacao requer
+nova revisao/tentativa no staging; confirme tambem que mudanca de versao ou hash
+da extracao invalida a previa anterior.
 
 ## 7. Incidentes
 

@@ -112,6 +112,7 @@ class McpIntegracaoTest {
                             "preparar_catalogo_de_conteudos",
                             "preparar_conteudo_programatico",
                             "preparar_mapeamentos_do_edital",
+                            "preparar_importacao_completa_do_edital",
                             "validar_contexto_do_concurso",
                             "preparar_ativacao_do_concurso",
                             "preparar_arquivamento_do_concurso",
@@ -142,6 +143,23 @@ class McpIntegracaoTest {
             assertThat(propriedades(esquemaDosDados(ferramentas.get(4))))
                     .containsKeys("inicio", "fim", "totais", "estudos",
                             "execucoesEmAndamento");
+            McpSchema.Tool importacao = ferramentas.stream()
+                    .filter(ferramenta -> ferramenta.name().equals(
+                            "preparar_importacao_completa_do_edital"))
+                    .findFirst().orElseThrow();
+            assertThat(propriedades(importacao.inputSchema()))
+                    .containsKeys("identificadorDaImportacao",
+                            "chaveDoCargoSelecionado", "modo",
+                            "politicaDeReutilizacao", "decisoes")
+                    .doesNotContainKey("identificadorDoUsuario");
+            assertThat(propriedades(esquemaDosDados(importacao)))
+                    .containsKeys("identificadorDaImportacao",
+                            "identificadorDaOperacao", "nivelDeConfirmacao",
+                            "contagens", "itensACriar", "itensAReutilizar",
+                            "conflitos", "incertezas", "camposAusentes",
+                            "nadaFoiAlterado");
+            assertObjetosFechados(importacao.inputSchema());
+            assertObjetosFechados(importacao.outputSchema());
 
             McpSchema.CallToolResult resultado = cliente.callTool(
                     chamada("obter_agenda_de_estudos_de_hoje", Map.of()));
@@ -411,6 +429,18 @@ class McpIntegracaoTest {
     @SuppressWarnings("unchecked")
     private Map<String, Object> propriedades(Map<String, Object> esquema) {
         return (Map<String, Object>) esquema.get("properties");
+    }
+
+    private void assertObjetosFechados(Object valor) {
+        if (valor instanceof Map<?, ?> mapa) {
+            if ("object".equals(mapa.get("type"))
+                    && mapa.containsKey("properties")) {
+                assertThat(mapa.get("additionalProperties")).isEqualTo(false);
+            }
+            mapa.values().forEach(this::assertObjetosFechados);
+        } else if (valor instanceof Iterable<?> itens) {
+            itens.forEach(this::assertObjetosFechados);
+        }
     }
 
     private void assertResultadoDoUsuarioA(McpSchema.CallToolResult resultado,

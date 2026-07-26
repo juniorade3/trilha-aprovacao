@@ -26,7 +26,10 @@ export async function requisitar<T>(
     await obterCsrf()
   const cabecalhos = new Headers(opcoes.headers)
   cabecalhos.set('Accept', 'application/json')
-  if (opcoes.body) cabecalhos.set('Content-Type', 'application/json')
+  const corpoEhFormulario =
+    typeof FormData !== 'undefined' && opcoes.body instanceof FormData
+  if (opcoes.body && !corpoEhFormulario && !cabecalhos.has('Content-Type'))
+    cabecalhos.set('Content-Type', 'application/json')
   if (tokenCsrf) cabecalhos.set('X-XSRF-TOKEN', tokenCsrf)
   const resposta = await fetch(`/api${caminho}`, {
     ...opcoes,

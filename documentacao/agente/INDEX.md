@@ -148,3 +148,13 @@ Comece por:
 - repositório;
 - teste Testcontainers;
 - validação completa do backend.
+
+## Importação de edital
+
+Comece por:
+
+- módulo `importacaoedital`;
+- `documentacao/decisoes/ADR-001-importacao-segura-de-editais.md`;
+- `documentacao/agente/SEGURANCA-IMPORTACAO-EDITAL.md`;
+- ferramenta MCP `preparar_importacao_completa_do_edital`;
+- testes de staging, seleção de cargo, confirmação e rollback.

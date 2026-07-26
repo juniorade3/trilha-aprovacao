@@ -118,6 +118,10 @@ onBeforeUnmount(() => cancelamento?.abort())
         </p>
       </div>
       <div class="acoes-do-cabecalho">
+        <RouterLink class="btn btn-outline-primary" to="/concursos/importar">
+          <i class="bi bi-file-earmark-arrow-up me-2" aria-hidden="true"></i>
+          Importar edital
+        </RouterLink>
         <RouterLink class="btn btn-primary" to="/concursos/novo">
           <i class="bi bi-plus-lg me-2" aria-hidden="true"></i>
           Novo concurso
@@ -158,6 +162,9 @@ onBeforeUnmount(() => cancelamento?.abort())
       <span>Crie seu primeiro objetivo em quatro etapas guiadas.</span>
       <RouterLink class="btn btn-primary mt-2" to="/concursos/novo">
         Criar meu primeiro concurso
+      </RouterLink>
+      <RouterLink class="btn btn-outline-primary" to="/concursos/importar">
+        Importar um edital
       </RouterLink>
     </section>
     <template v-else>

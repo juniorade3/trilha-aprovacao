@@ -27,6 +27,9 @@ public class TopicoPersistido {
     @Column(name = "nome_normalizado", nullable = false)
     private String nomeNormalizado;
 
+    @Column(name = "numero_oficial", length = 80)
+    private String numeroOficial;
+
     private String descricao;
 
     @Column(nullable = false)
@@ -58,6 +61,7 @@ public class TopicoPersistido {
         this.identificadorDoTopicoPai = topico.identificadorDoTopicoPai();
         this.nome = topico.nome();
         this.nomeNormalizado = topico.nomeNormalizado();
+        this.numeroOficial = topico.numeroOficial();
         this.descricao = topico.descricao();
         this.ordem = topico.ordem();
         this.arquivado = topico.arquivado();
@@ -66,7 +70,8 @@ public class TopicoPersistido {
 
     public TopicoDaMateria paraDominio() {
         return TopicoDaMateria.reconstituir(identificador, identificadorDaMateria,
-                identificadorDoTopicoPai, nome, descricao, ordem, arquivado, criadoEm, atualizadoEm, versao);
+                identificadorDoTopicoPai, numeroOficial, nome, descricao,
+                ordem, arquivado, criadoEm, atualizadoEm, versao);
     }
 
     public UUID identificador() { return identificador; }

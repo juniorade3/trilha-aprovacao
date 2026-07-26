@@ -235,6 +235,15 @@ Responsabilidades:
 
 A preparação não altera o fato de negócio.
 
+### `ServicoDeImportacaoCompletaDoEditalMcp`
+
+Prepara `IMPORTACAO_COMPLETA_DO_EDITAL` por uma porta do módulo de importação.
+O payload compacto contém somente identificador do staging validado, cargo,
+modo, política e decisões; arquivo bruto e extração integral não passam pelo
+MCP. A proposta assinada inclui versão/hash da extração e revisão/tentativa. A
+preparação vincula a operação ao staging na mesma transação, mas não cria a
+estrutura do concurso. A aplicação ocorre apenas depois das duas confirmações.
+
 ### `ServicoDeOperacoesAssistidas`
 
 Responsabilidades:
@@ -435,6 +444,7 @@ A descoberta pode expor o catálogo, mas a execução exige o escopo da ferramen
 | `preparar_conteudo_programatico` | itens oficiais |
 | `preparar_mapeamentos_do_edital` | sugestões pendentes |
 | `validar_contexto_do_concurso` | validação sem persistência |
+| `preparar_importacao_completa_do_edital` | staging validado e decisões compactas |
 
 ### Operações críticas
 
@@ -444,7 +454,7 @@ A descoberta pode expor o catálogo, mas a execução exige o escopo da ferramen
 | `preparar_arquivamento_do_concurso` | reforçada |
 | `preparar_cancelamento_do_concurso` | reforçada |
 
-Total atual: 24 ferramentas.
+Total atual: 25 ferramentas.
 
 ## 11. Identidade e isolamento
 
@@ -505,6 +515,11 @@ A preparação usa uma chave derivada de:
 - correlação ou evento externo;
 - vínculo;
 - proposta canônica.
+
+Na importação completa, a chave não usa correlação aleatória: deriva do vínculo,
+importação, versão/hash da extração, cargo, modo, política, decisões e
+revisão/tentativa. Retry idêntico devolve a operação e o estado reais. Uma nova
+tentativa depois da expiração exige nova revisão/tentativa no staging.
 
 Resultado esperado:
 
@@ -569,9 +584,13 @@ Etapa 1:
 
 Etapa 2:
 
-- exige o mesmo vínculo, bot, Telegram, chat e sessão;
+- exige o mesmo vínculo, método, bot, Telegram, chat e sessão;
+- exige um novo identificador de update;
+- expira em `min(5 minutos, expiração da operação)`;
 - recalcula;
 - aplica somente após validação completa.
+
+O nível `COMUM` ou `REFORCADA` integra a assinatura da operação.
 
 ## 17. Auditoria
 
@@ -713,7 +732,7 @@ O teste de integração MCP cobre:
 - inicialização;
 - nome do servidor;
 - catálogo;
-- 24 ferramentas;
+- 25 ferramentas;
 - schemas fechados;
 - anotações;
 - chamada de consulta;

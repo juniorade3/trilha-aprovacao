@@ -10,6 +10,7 @@ public final class TopicoDaMateria {
     private UUID identificadorDoTopicoPai;
     private String nome;
     private String nomeNormalizado;
+    private String numeroOficial;
     private String descricao;
     private int ordem;
     private boolean arquivado;
@@ -17,28 +18,47 @@ public final class TopicoDaMateria {
     private long versao;
 
     private TopicoDaMateria(UUID identificador, UUID identificadorDaMateria, UUID identificadorDoTopicoPai,
-            String nome, String descricao, int ordem, boolean arquivado, OffsetDateTime criadoEm,
-            OffsetDateTime atualizadoEm, long versao) {
+            String numeroOficial, String nome, String descricao, int ordem, boolean arquivado,
+            OffsetDateTime criadoEm, OffsetDateTime atualizadoEm, long versao) {
         this.identificador = identificador;
         this.identificadorDaMateria = identificadorDaMateria;
         this.criadoEm = criadoEm;
         this.arquivado = arquivado;
         this.versao = versao;
+        this.numeroOficial = numeroOficial(numeroOficial);
         alterarDados(nome, descricao, identificadorDoTopicoPai, ordem, atualizadoEm);
     }
 
     public static TopicoDaMateria criar(UUID identificadorDaMateria, UUID identificadorDoTopicoPai,
             String nome, String descricao, int ordem) {
+        return criar(identificadorDaMateria, identificadorDoTopicoPai, null,
+                nome, descricao, ordem);
+    }
+
+    public static TopicoDaMateria criar(UUID identificadorDaMateria,
+            UUID identificadorDoTopicoPai, String numeroOficial, String nome,
+            String descricao, int ordem) {
         OffsetDateTime agora = OffsetDateTime.now();
         return new TopicoDaMateria(UUID.randomUUID(), identificadorDaMateria, identificadorDoTopicoPai,
-                nome, descricao, ordem, false, agora, agora, 0);
+                numeroOficial, nome, descricao, ordem, false, agora, agora, 0);
     }
 
     public static TopicoDaMateria reconstituir(UUID identificador, UUID identificadorDaMateria,
             UUID identificadorDoTopicoPai, String nome, String descricao, int ordem, boolean arquivado,
             OffsetDateTime criadoEm, OffsetDateTime atualizadoEm, long versao) {
+        return reconstituir(identificador, identificadorDaMateria,
+                identificadorDoTopicoPai, null, nome, descricao, ordem,
+                arquivado, criadoEm, atualizadoEm, versao);
+    }
+
+    public static TopicoDaMateria reconstituir(UUID identificador,
+            UUID identificadorDaMateria, UUID identificadorDoTopicoPai,
+            String numeroOficial, String nome, String descricao, int ordem,
+            boolean arquivado, OffsetDateTime criadoEm,
+            OffsetDateTime atualizadoEm, long versao) {
         return new TopicoDaMateria(identificador, identificadorDaMateria, identificadorDoTopicoPai,
-                nome, descricao, ordem, arquivado, criadoEm, atualizadoEm, versao);
+                numeroOficial, nome, descricao, ordem, arquivado, criadoEm,
+                atualizadoEm, versao);
     }
 
     public void alterar(String nome, String descricao, UUID identificadorDoTopicoPai, int ordem) {
@@ -69,11 +89,21 @@ public final class TopicoDaMateria {
         this.atualizadoEm = atualizadoEm;
     }
 
+    private static String numeroOficial(String valor) {
+        String numero = NormalizacaoDeTexto.opcional(valor);
+        if (numero != null && numero.length() > 80) {
+            throw new IllegalArgumentException(
+                    "Numero oficial deve ter no maximo 80 caracteres.");
+        }
+        return numero;
+    }
+
     public UUID identificador() { return identificador; }
     public UUID identificadorDaMateria() { return identificadorDaMateria; }
     public UUID identificadorDoTopicoPai() { return identificadorDoTopicoPai; }
     public String nome() { return nome; }
     public String nomeNormalizado() { return nomeNormalizado; }
+    public String numeroOficial() { return numeroOficial; }
     public String descricao() { return descricao; }
     public int ordem() { return ordem; }
     public boolean arquivado() { return arquivado; }

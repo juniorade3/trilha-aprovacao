@@ -4,6 +4,7 @@ import br.com.trilhaaprovacao.automacao.aplicacao.ResultadoDaConsultaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAuditoriaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeCadastroAssistidoDeConcursos;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeConsultasMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeImportacaoCompletaDoEditalMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesCriticasMcp;
 import br.com.trilhaaprovacao.compartilhado.api.ConflitoDeDominio;
@@ -38,6 +39,7 @@ public class CatalogoDeFerramentasMcp {
     private final ServicoDePreparacoesMcp preparacoes;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ServicoDeOperacoesCriticasMcp operacoesCriticas;
+    private final ServicoDeImportacaoCompletaDoEditalMcp importacaoDeEdital;
     private final ServicoDeAuditoriaMcp auditoria;
     private final ObjectMapper mapeador;
 
@@ -45,11 +47,13 @@ public class CatalogoDeFerramentasMcp {
             ServicoDePreparacoesMcp preparacoes,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
             ServicoDeOperacoesCriticasMcp operacoesCriticas,
+            ServicoDeImportacaoCompletaDoEditalMcp importacaoDeEdital,
             ServicoDeAuditoriaMcp auditoria, ObjectMapper mapeador) {
         this.consultas = consultas;
         this.preparacoes = preparacoes;
         this.cadastroDeConcursos = cadastroDeConcursos;
         this.operacoesCriticas = operacoesCriticas;
+        this.importacaoDeEdital = importacaoDeEdital;
         this.auditoria = auditoria;
         this.mapeador = mapeador;
     }
@@ -172,6 +176,14 @@ public class CatalogoDeFerramentasMcp {
                 cadastro("preparar_mapeamentos_do_edital",
                         "Prepara sugestoes de mapeamento que permanecem pendentes.",
                         "MAPEAMENTOS_DO_EDITAL"),
+                ferramentaDePreparacao(
+                        "preparar_importacao_completa_do_edital",
+                        "Prepara uma importacao validada usando apenas seu identificador e decisoes.",
+                        esquemaDaImportacaoCompletaDoEdital(),
+                        esquemaDosDadosDaImportacaoCompletaDoEdital(),
+                        "operacoes:preparar",
+                        (contexto, argumentos) -> importacaoDeEdital.preparar(
+                                contexto, argumentos)),
                 ferramenta("validar_contexto_do_concurso",
                         "Valida e classifica um cadastro extraido sem persistir dados.",
                         esquemaDoCadastroAssistido(),
@@ -553,6 +565,30 @@ public class CatalogoDeFerramentasMcp {
                 List.of("concurso", "edital", "cargo", "materias"));
     }
 
+    private Map<String, Object> esquemaDaImportacaoCompletaDoEdital() {
+        Map<String, Object> reutilizacao = objeto(Map.of(
+                "chaveExtraida", texto(160),
+                "identificadorDoRecurso", uuid()),
+                List.of("chaveExtraida", "identificadorDoRecurso"));
+        Map<String, Object> decisoes = objeto(Map.of(
+                "reutilizacoes", lista(reutilizacao, 1_000),
+                "definirEditalComoPrincipal", booleano(),
+                "selecionarCargoCriado", booleano()), List.of());
+        return objeto(Map.ofEntries(
+                Map.entry("identificadorDaImportacao", uuid()),
+                Map.entry("chaveDoCargoSelecionado", texto(160)),
+                Map.entry("modo", enumeracao("CRIAR_NOVO",
+                        "COMPLEMENTAR_EXISTENTE")),
+                Map.entry("identificadorDoConcursoExistente", uuid()),
+                Map.entry("politicaDeReutilizacao", enumeracao(
+                        "REUTILIZAR_COMPATIVEIS", "EXIGIR_DECISAO",
+                        "CRIAR_SEPARADO")),
+                Map.entry("decisoes", decisoes)),
+                List.of("identificadorDaImportacao",
+                        "chaveDoCargoSelecionado", "modo",
+                        "politicaDeReutilizacao"));
+    }
+
     private Map<String, Object> esquemaDosDadosDoCadastroAssistido() {
         return objeto(Map.ofEntries(
                 Map.entry("identificadorDaOperacao", uuid()),
@@ -570,6 +606,54 @@ public class CatalogoDeFerramentasMcp {
                 Map.entry("conflitos", lista(Map.of("type", "object"),
                         100_000)),
                 Map.entry("aviso", texto(1_000))), List.of());
+    }
+
+    private Map<String, Object>
+            esquemaDosDadosDaImportacaoCompletaDoEdital() {
+        Map<String, Object> contagens = objetoComTodas(Map.ofEntries(
+                Map.entry("concursosACriar", inteiroNaoNegativo()),
+                Map.entry("editaisACriar", inteiroNaoNegativo()),
+                Map.entry("cargosACriar", inteiroNaoNegativo()),
+                Map.entry("provasACriar", inteiroNaoNegativo()),
+                Map.entry("gruposACriar", inteiroNaoNegativo()),
+                Map.entry("materiasACriar", inteiroNaoNegativo()),
+                Map.entry("materiasAReutilizar", inteiroNaoNegativo()),
+                Map.entry("topicosACriar", inteiroNaoNegativo()),
+                Map.entry("topicosAReutilizar", inteiroNaoNegativo()),
+                Map.entry("itensDoEditalACriar", inteiroNaoNegativo()),
+                Map.entry("sugestoesDeMapeamentoPendentes",
+                        inteiroNaoNegativo())));
+        Map<String, Object> item = objetoComTodas(Map.of(
+                "tipo", texto(80),
+                "chave", texto(160),
+                "nome", texto(500),
+                "identificadorExistente", nuloOu(uuid())));
+        Map<String, Object> conflito = objetoComTodas(Map.of(
+                "severidade", enumeracao("BLOQUEANTE", "EXIGE_DECISAO",
+                        "AVISO"),
+                "codigo", texto(120),
+                "mensagem", texto(1_000),
+                "caminho", nuloOu(texto(500))));
+        return objetoComTodas(Map.ofEntries(
+                Map.entry("identificadorDaImportacao", uuid()),
+                Map.entry("identificadorDaOperacao", uuid()),
+                Map.entry("tipo", constante(
+                        ServicoDeImportacaoCompletaDoEditalMcp.TIPO)),
+                Map.entry("estado", enumeracao("PREPARADA",
+                        "AGUARDANDO_CONFIRMACAO", "CONFIRMADA", "APLICADA",
+                        "CANCELADA", "EXPIRADA", "FALHOU")),
+                Map.entry("nivelDeConfirmacao", constante("REFORCADA")),
+                Map.entry("resumo", texto(500)),
+                Map.entry("contagens", contagens),
+                Map.entry("itensACriar", lista(item, 200)),
+                Map.entry("itensAReutilizar", lista(item, 200)),
+                Map.entry("conflitos", lista(conflito, 200)),
+                Map.entry("incertezas", lista(texto(1_000), 200)),
+                Map.entry("camposAusentes", lista(texto(500), 200)),
+                Map.entry("codigoDeConfirmacao", nuloOu(texto(8))),
+                Map.entry("fraseDeConfirmacao", nuloOu(texto(30))),
+                Map.entry("expiraEm", dataHora()),
+                Map.entry("nadaFoiAlterado", constanteBooleana(true))));
     }
 
     private Map<String, Object> esquemaDosDadosDaOperacaoCritica() {
@@ -1018,6 +1102,10 @@ public class CatalogoDeFerramentasMcp {
 
     private Map<String, Object> booleano() {
         return Map.of("type", "boolean");
+    }
+
+    private Map<String, Object> constanteBooleana(boolean valor) {
+        return Map.of("type", "boolean", "const", valor);
     }
 
     private Map<String, Object> inteiro() {

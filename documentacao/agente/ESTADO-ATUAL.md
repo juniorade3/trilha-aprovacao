@@ -1,6 +1,6 @@
 # Estado atual do projeto
 
-Data de referência desta análise: 24 de julho de 2026.
+Data de referência desta análise: 26 de julho de 2026.
 
 ## Implementado segundo o repositório
 
@@ -21,6 +21,7 @@ Data de referência desta análise: 24 de julho de 2026.
 - operações assistidas;
 - confirmação comum e reforçada;
 - cadastro assistido de concursos;
+- staging rastreável e importação completa de edital por confirmação reforçada;
 - métricas e saúde da automação;
 - provisionamento OpenClaw.
 
@@ -31,7 +32,7 @@ Data de referência desta análise: 24 de julho de 2026.
 - servidor `trilha-aprovacao`, contrato `1`;
 - transporte stateless;
 - schemas fechados;
-- 24 ferramentas no catálogo;
+- 25 ferramentas no catálogo;
 - escopos separados;
 - autenticação Bearer;
 - agente e sessão vinculados;
@@ -46,7 +47,7 @@ O aceite da Sprint 06 registra:
 
 - 187 testes de backend;
 - 149 testes de frontend;
-- catálogo MCP com 24 ferramentas;
+- catálogo MCP da Sprint 06 com 24 ferramentas; o catálogo atual possui 25;
 - validação do plugin, integrador, provisionador e broker;
 - `docker compose config`;
 - validação da imagem OpenClaw fixada;

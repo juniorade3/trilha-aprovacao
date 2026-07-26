@@ -136,6 +136,20 @@ public class OperacaoAssistidaPersistida {
     public OffsetDateTime confirmacaoExpiraEm() { return confirmacaoExpiraEm; }
     public String nivelDeConfirmacao() { return nivelDeConfirmacao; }
     public int etapaDaConfirmacao() { return etapaDaConfirmacao; }
+    public String metodoDaConfirmacao() { return metodoDaConfirmacao; }
+    public Long botDaConfirmacao() { return botDaConfirmacao; }
+    public Long identificadorExternoDaConfirmacao() {
+        return identificadorExternoDaConfirmacao;
+    }
+    public Long identificadorDoChatDaConfirmacao() {
+        return identificadorDoChatDaConfirmacao;
+    }
+    public String identificadorDaSessaoDaConfirmacao() {
+        return identificadorDaSessaoDaConfirmacao;
+    }
+    public String identificadorDoUpdateDaConfirmacao() {
+        return identificadorDoUpdateDaConfirmacao;
+    }
 
     public void registrarContextoDaConfirmacao(String metodo, long bot,
             long externo, long chat, String sessao, String update) {

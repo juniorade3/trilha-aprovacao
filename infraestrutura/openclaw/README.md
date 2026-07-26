@@ -1,6 +1,8 @@
 # OpenClaw da Trilha
 
-Infraestrutura do Gateway OpenClaw compartilhado para a integracao privada com Telegram. Esta entrega cobre a Sprint 2: isolamento de agente, sessao, workspace e credencial MCP por vinculo, com somente as consultas atuais da Trilha.
+Infraestrutura do Gateway OpenClaw compartilhado para a integracao privada com
+Telegram. Mantem isolamento de agente, sessao, workspace e credencial MCP por
+vinculo e uma allowlist fechada de consultas e preparacoes da Trilha.
 
 ## Versao fixada
 
@@ -131,6 +133,14 @@ O Gateway consulta dados atuais, prepara operacoes de estudo e planejamento,
 valida cadastro estruturado de concursos e encaminha confirmacoes ao adaptador
 confiavel. Ativacao, arquivamento e cancelamento exigem dois codigos no mesmo
 Telegram e sessao. O modelo nunca recebe ferramenta direta de aplicacao.
+
+A allowlist possui 25 ferramentas. A ferramenta compacta
+`trilha__preparar_importacao_completa_do_edital` recebe somente o identificador
+de um staging validado, cargo, modo, politica e decisoes humanas. Arquivo bruto
+e extracao integral nao entram no contexto MCP. A importacao sempre usa dois
+codigos no primeiro corte; o segundo expira em no maximo cinco minutos, exige o
+mesmo bot, Telegram, chat, sessao e metodo, e deve chegar em um update novo. O
+concurso resultante permanece planejado ate uma ativacao separada.
 
 Anexos disponibilizados pelo canal sao tratados como conteudo nao confiavel e
 somente podem originar DTO fechado; o agente nao possui navegador ou filesystem.

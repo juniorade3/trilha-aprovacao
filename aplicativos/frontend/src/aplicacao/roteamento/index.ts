@@ -15,6 +15,7 @@ import CadastroPagina from '@/modulos/autenticacao/CadastroPagina.vue'
 import ConcursoDetalhePagina from '@/modulos/concursos/ConcursoDetalhePagina.vue'
 import ConcursoNovoPagina from '@/modulos/concursos/ConcursoNovoPagina.vue'
 import ConcursosPagina from '@/modulos/concursos/ConcursosPagina.vue'
+import ImportacaoDeEditalPagina from '@/modulos/concursos/ImportacaoDeEditalPagina.vue'
 import MateriasPagina from '@/modulos/materias/MateriasPagina.vue'
 import MateriaisDeEstudoPagina from '@/modulos/estudos/MateriaisDeEstudoPagina.vue'
 import EstudosPagina from '@/modulos/estudos/EstudosPagina.vue'
@@ -60,6 +61,16 @@ const roteador = createRouter({
           path: 'concursos/novo',
           name: 'concurso-novo',
           component: ConcursoNovoPagina,
+        },
+        {
+          path: 'concursos/importar',
+          name: 'importacao-de-edital-nova',
+          component: ImportacaoDeEditalPagina,
+        },
+        {
+          path: 'concursos/importacoes/:identificador',
+          name: 'importacao-de-edital',
+          component: ImportacaoDeEditalPagina,
         },
         {
           path: 'concursos/:identificador',

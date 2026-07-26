@@ -344,7 +344,7 @@ validar_modelo_do_workspace() {
   [[ -f "${manifesto}" && ! -L "${manifesto}" ]] ||
     falhar "manifesto do modelo de workspace deve ser arquivo regular."
   jq -e '
-    .versao == 1 and
+    .versao == 2 and
     .arquivosGerenciados == [
       "AGENTS.md", "SOUL.md", "IDENTITY.md", "TOOLS.md", "USER.md"
     ]
@@ -438,6 +438,7 @@ ferramentas_mcp_em_json() {
     "preparar_catalogo_de_conteudos",
     "preparar_conteudo_programatico",
     "preparar_mapeamentos_do_edital",
+    "preparar_importacao_completa_do_edital",
     "validar_contexto_do_concurso",
     "preparar_ativacao_do_concurso",
     "preparar_arquivamento_do_concurso",

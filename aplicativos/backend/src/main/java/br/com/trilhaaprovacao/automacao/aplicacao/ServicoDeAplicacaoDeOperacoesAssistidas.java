@@ -26,12 +26,14 @@ import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDePlanejamento;
 import br.com.trilhaaprovacao.planejamento.aplicacao.ServicoDeReplanejamento;
 import br.com.trilhaaprovacao.planejamento.dominio.ConfiguracaoDaGeracaoDeterministica;
 import br.com.trilhaaprovacao.planejamento.dominio.PrioridadeDaMateriaNoPlano;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -49,6 +51,8 @@ import tools.jackson.databind.ObjectMapper;
 public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private static final Pattern CODIGO = Pattern.compile(
             "^[23456789A-HJ-NP-Z]{8}$");
+    private static final Duration VALIDADE_DA_SEGUNDA_ETAPA =
+            Duration.ofMinutes(5);
     private static final List<EstadoDaOperacaoAssistida> ESTADOS_CONFIRMAVEIS =
             List.of(EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO,
                     EstadoDaOperacaoAssistida.APLICADA);
@@ -65,6 +69,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
     private final ServicoDeReplanejamento replanejamento;
     private final ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos;
     private final ServicoDaEstruturaDeConcursos estruturaDeConcursos;
+    private final ServicoDeImportacaoCompletaDoEditalMcp importacaoDeEdital;
     private final ObjectMapper mapeador;
     private final ServicoDeObservabilidadeDeConfirmacoesAssistidas observabilidade;
 
@@ -85,6 +90,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             ServicoDeReplanejamento replanejamento,
             ServicoDeCadastroAssistidoDeConcursos cadastroDeConcursos,
             ServicoDaEstruturaDeConcursos estruturaDeConcursos,
+            ServicoDeImportacaoCompletaDoEditalMcp importacaoDeEdital,
             ObjectMapper mapeador,
             ServicoDeObservabilidadeDeConfirmacoesAssistidas observabilidade) {
         this.operacoes = operacoes;
@@ -98,6 +104,7 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         this.replanejamento = replanejamento;
         this.cadastroDeConcursos = cadastroDeConcursos;
         this.estruturaDeConcursos = estruturaDeConcursos;
+        this.importacaoDeEdital = importacaoDeEdital;
         this.mapeador = mapeador;
         this.observabilidade = observabilidade;
     }
@@ -349,7 +356,8 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
         Map<String, Object> atuais = preparacoes.versoesAtuais(operacao.tipo(),
                 operacao.identificadorDoUsuario(), proposta);
         servicoDeOperacoes.validarAtualidade(operacao.identificadorDoUsuario(),
-                operacao.identificador(), operacao.assinatura(), json(atuais));
+                operacao.identificador(), operacao.assinatura(), json(atuais),
+                persistida.nivelDeConfirmacao());
         if (primeiraEtapaRepetida) {
             String segundoCodigo = segredos.derivarCodigoDeConfirmacao(
                     "segunda-etapa:" + operacao.assinatura());
@@ -368,11 +376,17 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                     segredos.hash(segundoCodigo),
                     segundoCodigo.substring(0, 2),
                     segredos.hash("segunda-etapa:nonce:" + operacao.assinatura()),
-                    operacao.expiraEm());
+                    menor(agora.plus(VALIDADE_DA_SEGUNDA_ETAPA),
+                            operacao.expiraEm()));
             operacoes.saveAndFlush(persistida);
             observabilidade.registrarNoFluxo(contexto,
                     Desfecho.REFORCADA, "SEGUNDA_ETAPA_SOLICITADA");
             return new ResultadoDaConfirmacao(operacao, segundoCodigo);
+        }
+        if ("REFORCADA".equals(persistida.nivelDeConfirmacao())
+                && persistida.etapaDaConfirmacao() == 1) {
+            validarContextoDaSegundaEtapa(persistida, metodo, bot, telegram,
+                    chat, sessao, update);
         }
         operacao.confirmar(operacao.assinatura(), agora);
         persistida.atualizarDe(operacao);
@@ -389,6 +403,32 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                         contexto.identificadorDeCorrelacao()),
                 Desfecho.APLICADA, "OPERACAO_APLICADA");
         return new ResultadoDaConfirmacao(aplicada, null);
+    }
+
+    private void validarContextoDaSegundaEtapa(
+            OperacaoAssistidaPersistida persistida, String metodo, long bot,
+            long telegram, long chat, String sessao, String update) {
+        if (!Objects.equals(persistida.metodoDaConfirmacao(), metodo)
+                || !Objects.equals(persistida.botDaConfirmacao(), bot)
+                || !Objects.equals(
+                        persistida.identificadorExternoDaConfirmacao(), telegram)
+                || !Objects.equals(
+                        persistida.identificadorDoChatDaConfirmacao(), chat)
+                || !Objects.equals(
+                        persistida.identificadorDaSessaoDaConfirmacao(), sessao)) {
+            throw contextoDaConfirmacaoInvalido(
+                    "CONTEXTO_DA_SEGUNDA_ETAPA_DIVERGENTE");
+        }
+        if (Objects.equals(
+                persistida.identificadorDoUpdateDaConfirmacao(), update)) {
+            throw contextoDaConfirmacaoInvalido(
+                    "UPDATE_REPETIDO_NA_SEGUNDA_ETAPA");
+        }
+    }
+
+    private static OffsetDateTime menor(OffsetDateTime primeiro,
+            OffsetDateTime segundo) {
+        return primeiro.isBefore(segundo) ? primeiro : segundo;
     }
 
     private static final class EstadoDaAplicacao {
@@ -548,6 +588,9 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
             case "CANCELAMENTO_DO_CONCURSO" ->
                     estruturaDeConcursos.cancelarConcurso(usuario,
                             uuid(proposta, "identificadorDoConcurso"));
+            case ServicoDeImportacaoCompletaDoEditalMcp.TIPO ->
+                    importacaoDeEdital.aplicar(usuario,
+                            operacao.identificador(), proposta);
             default -> throw new IllegalArgumentException("Operacao desconhecida.");
         };
         return Map.of("tipo", operacao.tipo(), "dados",
