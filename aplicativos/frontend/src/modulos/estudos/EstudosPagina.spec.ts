@@ -239,4 +239,36 @@ describe('EstudosPagina', () => {
       'Somente cargo selecionado e edital principal',
     )
   })
+
+  it('exibe o diagnóstico abaixo dos registros e permite ocultá-lo', async () => {
+    const pagina = mount(EstudosPagina)
+    await flushPromises()
+
+    const estrutura = pagina.get('.estrutura-do-historico')
+    const diagnostico = pagina.get('.diagnostico-de-topicos')
+    expect(getComputedStyle(estrutura.element).order).toBe('1')
+    expect(getComputedStyle(diagnostico.element).order).toBe('2')
+
+    const botao = pagina
+      .findAll('button')
+      .find((item) => item.text().includes('Ocultar diagnóstico'))!
+    expect(botao.attributes('aria-expanded')).toBe('true')
+    expect(pagina.get('#conteudo-diagnostico-de-topicos').isVisible()).toBe(
+      true,
+    )
+
+    await botao.trigger('click')
+
+    expect(botao.text()).toContain('Mostrar diagnóstico')
+    expect(botao.attributes('aria-expanded')).toBe('false')
+    expect(
+      pagina.get('#conteudo-diagnostico-de-topicos').attributes('style'),
+    ).toContain('display: none')
+
+    await botao.trigger('click')
+    expect(pagina.get('#conteudo-diagnostico-de-topicos').isVisible()).toBe(
+      true,
+    )
+    pagina.unmount()
+  })
 })

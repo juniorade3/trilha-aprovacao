@@ -55,6 +55,7 @@ const coberturas = ref<CoberturaDeTopico[]>([])
 const diagnosticos = ref<DiagnosticoDeTopico[]>([])
 const carregandoDiagnostico = ref(true)
 const erroDoDiagnostico = ref('')
+const diagnosticoVisivel = ref(true)
 const materiaDoDiagnostico = ref('')
 const somenteExigidos = ref(false)
 const carregando = ref(true)
@@ -489,7 +490,11 @@ onBeforeUnmount(() => {
       </article>
     </section>
 
-    <section class="card mb-4" aria-labelledby="titulo-diagnostico-de-topicos">
+    <section
+      class="card mb-4 diagnostico-de-topicos"
+      style="order: 2"
+      aria-labelledby="titulo-diagnostico-de-topicos"
+    >
       <header class="cabecalho-do-cartao-da-jornada">
         <div>
           <span class="rotulo-discreto">Evidências objetivas</span>
@@ -499,131 +504,155 @@ onBeforeUnmount(() => {
             corrigidos ou cancelados não entram nos indicadores.
           </p>
         </div>
-      </header>
-      <form
-        class="d-flex flex-wrap align-items-end gap-3 mb-3"
-        @submit.prevent="carregarDiagnostico()"
-      >
-        <label class="form-label mb-0">
-          <span>Matéria</span>
-          <select v-model="materiaDoDiagnostico" class="form-select">
-            <option value="">Todas as matérias</option>
-            <option
-              v-for="materia in materias"
-              :key="materia.identificador"
-              :value="materia.identificador"
-            >
-              {{ materia.nome }}
-            </option>
-          </select>
-        </label>
-        <label class="form-check mb-2">
-          <input
-            v-model="somenteExigidos"
-            class="form-check-input"
-            type="checkbox"
-          />
-          <span class="form-check-label">
-            Somente cargo selecionado e edital principal
-          </span>
-        </label>
         <button
-          class="btn btn-outline-primary"
-          :disabled="carregandoDiagnostico"
-        >
-          Aplicar filtros
-        </button>
-      </form>
-      <p v-if="erroDoDiagnostico" class="alert alert-danger" role="alert">
-        {{ erroDoDiagnostico }}
-        <button
-          class="btn btn-sm btn-outline-danger ms-2"
+          class="btn btn-sm btn-outline-secondary"
           type="button"
-          @click="carregarDiagnostico()"
+          aria-controls="conteudo-diagnostico-de-topicos"
+          :aria-expanded="diagnosticoVisivel"
+          @click="diagnosticoVisivel = !diagnosticoVisivel"
         >
-          Tentar novamente
+          <i
+            class="bi me-1"
+            :class="diagnosticoVisivel ? 'bi-eye-slash' : 'bi-eye'"
+            aria-hidden="true"
+          ></i>
+          {{
+            diagnosticoVisivel ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'
+          }}
         </button>
-      </p>
-      <EstadoDaPagina
-        v-else-if="carregandoDiagnostico"
-        titulo="Calculando diagnóstico..."
-        carregando
-      />
-      <EstadoDaPagina
-        v-else-if="diagnosticos.length === 0"
-        titulo="Nenhum tópico neste filtro"
-        :descricao="
-          somenteExigidos
-            ? 'Defina o cargo selecionado e o edital principal, confirme os mapeamentos ou remova este filtro.'
-            : 'Cadastre tópicos pessoais ativos para iniciar o diagnóstico.'
-        "
-        icone="bi-clipboard-data"
-      />
-      <div v-else class="table-responsive">
-        <table class="table align-middle">
-          <caption class="visually-hidden">
-            Indicadores objetivos por tópico
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Tópico</th>
-              <th scope="col">Últimos 30 dias</th>
-              <th scope="col">Recordação / dificuldade</th>
-              <th scope="col">Última revisão</th>
-              <th scope="col">Erros repetidos</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in diagnosticos" :key="item.identificadorDoTopico">
-              <th scope="row">
-                <span class="d-block">{{ item.nomeDoTopico }}</span>
-                <small>{{ item.nomeDaMateria }}</small>
-                <span
-                  v-if="item.exigidoNoConcursoAtivo"
-                  class="badge text-bg-light ms-2"
-                  >Edital</span
-                >
-              </th>
-              <td>
-                <strong v-if="item.percentualRecenteDeAcertos != null"
-                  >{{ item.percentualRecenteDeAcertos }}% de acertos</strong
-                >
-                <span v-else>Sem questões</span>
-                <small class="d-block">
-                  {{ item.totaisDosUltimosTrintaDias.questoes }} questões ·
-                  {{ item.totaisDosUltimosTrintaDias.erros }} erros
-                </small>
-              </td>
-              <td>
-                <span
-                  >{{ item.ultimaRecordacao ?? '—' }} /
-                  {{ item.ultimaDificuldade ?? '—' }}</span
-                >
-                <small class="d-block"
-                  >médias recentes: {{ item.mediaRecenteDeRecordacao ?? '—' }} /
-                  {{ item.mediaRecenteDeDificuldade ?? '—' }}</small
-                >
-              </td>
-              <td>{{ rotuloDaRevisao(item.resultadoDaUltimaRevisao) }}</td>
-              <td>
-                <span v-if="!item.padroesDeErroRepetidos.length">Nenhum</span>
-                <ul v-else class="mb-0 ps-3">
-                  <li
-                    v-for="padrao in item.padroesDeErroRepetidos"
-                    :key="padrao.identificador"
+      </header>
+      <div v-show="diagnosticoVisivel" id="conteudo-diagnostico-de-topicos">
+        <form
+          class="d-flex flex-wrap align-items-end gap-3 mb-3"
+          @submit.prevent="carregarDiagnostico()"
+        >
+          <label class="form-label mb-0">
+            <span>Matéria</span>
+            <select v-model="materiaDoDiagnostico" class="form-select">
+              <option value="">Todas as matérias</option>
+              <option
+                v-for="materia in materias"
+                :key="materia.identificador"
+                :value="materia.identificador"
+              >
+                {{ materia.nome }}
+              </option>
+            </select>
+          </label>
+          <label class="form-check mb-2">
+            <input
+              v-model="somenteExigidos"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <span class="form-check-label">
+              Somente cargo selecionado e edital principal
+            </span>
+          </label>
+          <button
+            class="btn btn-outline-primary"
+            :disabled="carregandoDiagnostico"
+          >
+            Aplicar filtros
+          </button>
+        </form>
+        <p v-if="erroDoDiagnostico" class="alert alert-danger" role="alert">
+          {{ erroDoDiagnostico }}
+          <button
+            class="btn btn-sm btn-outline-danger ms-2"
+            type="button"
+            @click="carregarDiagnostico()"
+          >
+            Tentar novamente
+          </button>
+        </p>
+        <EstadoDaPagina
+          v-else-if="carregandoDiagnostico"
+          titulo="Calculando diagnóstico..."
+          carregando
+        />
+        <EstadoDaPagina
+          v-else-if="diagnosticos.length === 0"
+          titulo="Nenhum tópico neste filtro"
+          :descricao="
+            somenteExigidos
+              ? 'Defina o cargo selecionado e o edital principal, confirme os mapeamentos ou remova este filtro.'
+              : 'Cadastre tópicos pessoais ativos para iniciar o diagnóstico.'
+          "
+          icone="bi-clipboard-data"
+        />
+        <div v-else class="table-responsive">
+          <table class="table align-middle">
+            <caption class="visually-hidden">
+              Indicadores objetivos por tópico
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Tópico</th>
+                <th scope="col">Últimos 30 dias</th>
+                <th scope="col">Recordação / dificuldade</th>
+                <th scope="col">Última revisão</th>
+                <th scope="col">Erros repetidos</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in diagnosticos"
+                :key="item.identificadorDoTopico"
+              >
+                <th scope="row">
+                  <span class="d-block">{{ item.nomeDoTopico }}</span>
+                  <small>{{ item.nomeDaMateria }}</small>
+                  <span
+                    v-if="item.exigidoNoConcursoAtivo"
+                    class="badge text-bg-light ms-2"
+                    >Edital</span
                   >
-                    {{ padrao.descricao }} ({{ padrao.quantidadeDeEvidencias }}
-                    sessões)
-                  </li>
-                </ul>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                </th>
+                <td>
+                  <strong v-if="item.percentualRecenteDeAcertos != null"
+                    >{{ item.percentualRecenteDeAcertos }}% de acertos</strong
+                  >
+                  <span v-else>Sem questões</span>
+                  <small class="d-block">
+                    {{ item.totaisDosUltimosTrintaDias.questoes }} questões ·
+                    {{ item.totaisDosUltimosTrintaDias.erros }} erros
+                  </small>
+                </td>
+                <td>
+                  <span
+                    >{{ item.ultimaRecordacao ?? '—' }} /
+                    {{ item.ultimaDificuldade ?? '—' }}</span
+                  >
+                  <small class="d-block"
+                    >médias recentes:
+                    {{ item.mediaRecenteDeRecordacao ?? '—' }} /
+                    {{ item.mediaRecenteDeDificuldade ?? '—' }}</small
+                  >
+                </td>
+                <td>{{ rotuloDaRevisao(item.resultadoDaUltimaRevisao) }}</td>
+                <td>
+                  <span v-if="!item.padroesDeErroRepetidos.length">Nenhum</span>
+                  <ul v-else class="mb-0 ps-3">
+                    <li
+                      v-for="padrao in item.padroesDeErroRepetidos"
+                      :key="padrao.identificador"
+                    >
+                      {{ padrao.descricao }} ({{
+                        padrao.quantidadeDeEvidencias
+                      }}
+                      sessões)
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <div class="estrutura-do-historico">
+    <div class="estrutura-do-historico" style="order: 1">
       <section
         class="card linha-do-tempo-de-estudos"
         aria-labelledby="titulo-historico"
@@ -892,3 +921,16 @@ onBeforeUnmount(() => {
     </ModalDaAplicacao>
   </main>
 </template>
+
+<style scoped lang="scss">
+.pagina-do-historico {
+  display: flex;
+  flex-direction: column;
+}
+
+.diagnostico-de-topicos {
+  > header {
+    align-items: flex-start;
+  }
+}
+</style>
