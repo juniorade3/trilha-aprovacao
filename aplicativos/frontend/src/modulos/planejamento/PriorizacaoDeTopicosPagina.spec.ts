@@ -195,7 +195,7 @@ describe('PriorizacaoDeTopicosPagina', () => {
 
   it('recalcula no backend ao alterar data e materia', async () => {
     const pagina = await montar()
-    const campos = pagina.findAll('form select, form input')
+    const campos = pagina.findAll('form input, form select')
 
     await campos[0]!.setValue('2026-07-15')
     await campos[1]!.setValue('materia-1')
@@ -207,6 +207,58 @@ describe('PriorizacaoDeTopicosPagina', () => {
       'materia-1',
       expect.any(AbortSignal),
     )
+  })
+
+  it('filtra lacunas, fraquezas, consolidados ou exibe tudo junto', async () => {
+    const pagina = await montar()
+    const filtro = pagina.get('[aria-label="Classificação exibida"]')
+
+    expect(pagina.text()).toContain('Poderes administrativos')
+    expect(pagina.text()).toContain('Licitações')
+    expect(pagina.text()).toContain('Serviços públicos')
+
+    await filtro.setValue('FRAQUEZA')
+    expect(pagina.text()).not.toContain('Poderes administrativos')
+    expect(pagina.text()).toContain('Licitações')
+    expect(pagina.text()).not.toContain('Serviços públicos')
+    expect(pagina.find('.grupo-lacuna').exists()).toBe(false)
+    expect(pagina.find('.grupo-fraqueza').exists()).toBe(true)
+    expect(pagina.find('.grupo-consolidado').exists()).toBe(false)
+    expect(consultarPriorizacaoDeTopicos).toHaveBeenCalledTimes(1)
+
+    await filtro.setValue('LACUNA')
+    expect(pagina.text()).toContain('Poderes administrativos')
+    expect(pagina.text()).not.toContain('Licitações')
+
+    await filtro.setValue('CONSOLIDADO')
+    expect(pagina.text()).toContain('Serviços públicos')
+    expect(pagina.text()).not.toContain('Poderes administrativos')
+
+    await filtro.setValue('TODOS')
+    expect(pagina.text()).toContain('Poderes administrativos')
+    expect(pagina.text()).toContain('Licitações')
+    expect(pagina.text()).toContain('Serviços públicos')
+  })
+
+  it('informa quando a classificação selecionada não possui tópicos', async () => {
+    consultarPriorizacaoDeTopicos.mockResolvedValue({
+      ...resposta,
+      materias: [
+        {
+          ...resposta.materias[0],
+          topicos: resposta.materias[0]!.topicos.filter(
+            (topico) => topico.grupo === 'LACUNA',
+          ),
+        },
+      ],
+    })
+    const pagina = await montar()
+
+    await pagina
+      .get('[aria-label="Classificação exibida"]')
+      .setValue('CONSOLIDADO')
+
+    expect(pagina.text()).toContain('Nenhum tópico nesta classificação')
   })
 
   it('orienta a completar o contexto oficial quando o backend retorna 422', async () => {

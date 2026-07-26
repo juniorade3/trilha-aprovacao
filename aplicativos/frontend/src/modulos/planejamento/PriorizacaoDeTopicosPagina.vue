@@ -21,6 +21,7 @@ const contextoIncompleto = ref(false)
 const sessaoExpirada = ref(false)
 const dataDeReferencia = ref(dataLocalAtual())
 const identificadorDaMateria = ref('')
+const grupoSelecionado = ref<'TODOS' | GrupoDaPriorizacao>('TODOS')
 const opcoesDeMaterias = ref<Array<{ id: string; nome: string }>>([])
 const botaoDeAtualizar = ref<HTMLButtonElement>()
 let cancelamento: AbortController | undefined
@@ -54,6 +55,37 @@ const totalDeTopicos = computed(
       0,
     ) ?? 0,
 )
+
+const gruposVisiveis = computed(() =>
+  grupoSelecionado.value === 'TODOS'
+    ? grupos
+    : grupos.filter((grupo) => grupo.valor === grupoSelecionado.value),
+)
+
+const materiasVisiveis = computed(() => {
+  const materias = resposta.value?.materias ?? []
+  if (grupoSelecionado.value === 'TODOS') return materias
+  return materias.filter((materia) =>
+    materia.topicos.some((topico) => topico.grupo === grupoSelecionado.value),
+  )
+})
+
+const totalDeTopicosVisiveis = computed(() => {
+  if (grupoSelecionado.value === 'TODOS') return totalDeTopicos.value
+  return materiasVisiveis.value.reduce(
+    (total, materia) =>
+      total +
+      materia.topicos.filter(
+        (topico) => topico.grupo === grupoSelecionado.value,
+      ).length,
+    0,
+  )
+})
+
+function quantidadeDeTopicosVisiveis(materia: MateriaPriorizada) {
+  if (grupoSelecionado.value === 'TODOS') return materia.topicos.length
+  return topicosDoGrupo(materia, grupoSelecionado.value).length
+}
 
 function dataLocalAtual() {
   const partes = new Intl.DateTimeFormat('en-US', {
@@ -205,6 +237,19 @@ onBeforeUnmount(() => cancelamento?.abort())
           >
             {{ materia.nome }}
           </option>
+        </select>
+      </label>
+      <label class="form-label mb-0">
+        <span>Exibir</span>
+        <select
+          v-model="grupoSelecionado"
+          class="form-select"
+          aria-label="Classificação exibida"
+        >
+          <option value="TODOS">Tudo junto</option>
+          <option value="LACUNA">Somente lacunas</option>
+          <option value="FRAQUEZA">Somente fraquezas</option>
+          <option value="CONSOLIDADO">Somente consolidados</option>
         </select>
       </label>
       <button
@@ -364,14 +409,14 @@ onBeforeUnmount(() => cancelamento?.abort())
       </section>
 
       <EstadoDaPagina
-        v-if="totalDeTopicos === 0"
-        titulo="Nenhum tópico priorizável neste filtro"
-        descricao="Revise os mapeamentos confirmados do edital ou selecione outra matéria."
+        v-if="totalDeTopicosVisiveis === 0"
+        titulo="Nenhum tópico nesta classificação"
+        descricao="Escolha outra classificação ou selecione uma matéria diferente."
         icone="bi-clipboard-data"
       />
 
       <section
-        v-for="materia in resposta.materias"
+        v-for="materia in materiasVisiveis"
         v-else
         :key="materia.id"
         class="materia-da-priorizacao"
@@ -381,14 +426,16 @@ onBeforeUnmount(() => cancelamento?.abort())
           <span class="rotulo-discreto">Matéria</span>
           <h2 :id="`materia-${materia.id}`">{{ materia.nome }}</h2>
           <span class="badge rounded-pill text-bg-light">
-            {{ materia.topicos.length }}
-            {{ materia.topicos.length === 1 ? 'tópico' : 'tópicos' }}
+            {{ quantidadeDeTopicosVisiveis(materia) }}
+            {{
+              quantidadeDeTopicosVisiveis(materia) === 1 ? 'tópico' : 'tópicos'
+            }}
           </span>
         </header>
 
         <div class="grupos-da-priorizacao">
           <section
-            v-for="grupo in grupos"
+            v-for="grupo in gruposVisiveis"
             :key="grupo.valor"
             class="grupo-da-priorizacao"
             :class="`grupo-${grupo.valor.toLowerCase()}`"
@@ -537,7 +584,9 @@ onBeforeUnmount(() => cancelamento?.abort())
   align-items: end;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(12rem, 0.75fr) minmax(14rem, 1.25fr) auto;
+  grid-template-columns:
+    minmax(12rem, 0.7fr) minmax(14rem, 1.1fr)
+    minmax(12rem, 0.8fr) auto;
   margin-bottom: 1.5rem;
   padding: 1.25rem;
 
