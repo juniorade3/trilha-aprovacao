@@ -228,6 +228,7 @@ public class ImportacaoDeEditalPersistida {
     public OffsetDateTime criadoEm() { return criadoEm; }
     public OffsetDateTime atualizadoEm() { return atualizadoEm; }
     public String codigoDaFalha() { return codigoDaFalha; }
+    public String descricaoDaFalha() { return descricaoDaFalha; }
     public long versao() { return versao; }
 
     private static byte[] copiar(byte[] valor) {

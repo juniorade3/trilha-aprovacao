@@ -26,16 +26,52 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Parser conservador para linhas rotuladas. Campo nao reconhecido fica ausente. */
+/**
+ * Parser conservador para linhas rotuladas e para a estrutura explicita dos
+ * editais Cebraspe. Campo nao reconhecido fica ausente.
+ */
 public class ParserDeterministicoDoEdital {
-    public static final String VERSAO = "deterministico-1";
+    public static final String VERSAO = "deterministico-2";
+    private static final int SEM_DIFERENCA_DE_CAIXA =
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
     private static final Pattern LINHA = Pattern.compile(
             "^\\s*([\\p{L}][\\p{L} \\-/]*?)\\s*:\\s*(.+?)\\s*$");
     private static final Pattern NUMERADO = Pattern.compile(
             "^([0-9]+(?:\\.[0-9]+)*)\\s*(?:[-–—|:]\\s*)?(.+)$");
+    private static final Pattern CONCURSO_CEBRASPE = Pattern.compile(
+            "^CONCURSO\\s+P[ÚU]BLICO\\b.+$", SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern EDITAL_CEBRASPE = Pattern.compile(
+            "^EDITAL\\s+(?:N[º°]\\.?|N[ÚU]MERO)\\s*"
+                    + "([\\p{Alnum}./-]+).*$",
+            SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern ANO_EXPLICITO = Pattern.compile(
+            "\\b(?:19|20)[0-9]{2}\\b");
+    private static final Pattern CARGO_CEBRASPE = Pattern.compile(
+            "^[0-9]+(?:\\.[0-9]+)*\\s+DO\\s+CARGO\\s+DE\\s+(.+)$",
+            SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern SEGMENTO_DO_CARGO = Pattern.compile(
+            "(?:^|\\s+[–—-]\\s*)([ÁA]REA|ESPECIALIDADE|"
+                    + "ORIENTA[ÇC][ÃA]O)\\s*:\\s*",
+            SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern ESPECIALIDADE_COM_ORIENTACAO =
+            Pattern.compile(
+                    "^(.+?)\\s+[–—-]\\s+ORIENTA[ÇC][ÃA]O\\s*:\\s*(.+)$",
+                    SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern OBJETOS_DE_AVALIACAO = Pattern.compile(
+            "^[0-9]+(?:\\.[0-9]+)*\\s+DOS\\s+OBJETOS\\s+DE\\s+"
+                    + "AVALIA[ÇC][ÃA]O\\b(.*)$",
+            SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern GRUPO_CEBRASPE = Pattern.compile(
+            "^[0-9]+(?:\\.[0-9]+)*\\s+(CONHECIMENTOS\\s+"
+                    + "(?:B[ÁA]SICOS|ESPEC[ÍI]FICOS))\\s*$",
+            SEM_DIFERENCA_DE_CAIXA);
+    private static final Pattern INICIO_DE_ITEM_CEBRASPE = Pattern.compile(
+            "(?<![\\p{Alnum}/])([0-9]{1,3}(?:\\.[0-9]{1,3})*)"
+                    + "(?:\\.)?(?:\\s+(?=\\p{Lu})|\\s*$)");
 
     private final NormalizadorDoTextoDoEdital normalizador;
 
@@ -75,6 +111,15 @@ public class ParserDeterministicoDoEdital {
         private Prova prova;
         private Grupo grupo;
         private Materia materia;
+        private Campo areaPendente;
+        private Campo especialidadePendente;
+        private Campo orientacaoPendente;
+        private Campo escolaridadePendente;
+        private Campo provaObjetivaExplicita;
+        private Campo caraterDaProvaObjetivaExplicito;
+        private ItemCebraspe itemCebraspe;
+        private boolean emObjetosDeAvaliacao;
+        private int linhasEmBranco;
 
         private Contexto(FonteDoEdital fonte,
                 NormalizadorDoTextoDoEdital normalizador) {
@@ -86,7 +131,10 @@ public class ParserDeterministicoDoEdital {
 
         private void consumir(String linhaOriginal, int pagina) {
             String linha = linhaOriginal.strip();
-            if (linha.isEmpty()) return;
+            if (linha.isEmpty()) {
+                linhasEmBranco++;
+                return;
+            }
             String normalizada = normalizador.normalizarNome(linha);
             if (normalizada != null && (normalizada.contains(
                     "ignore as instrucoes") || normalizada.contains(
@@ -95,6 +143,17 @@ public class ParserDeterministicoDoEdital {
                 avisos.add("Possivel instrucao maliciosa ignorada na pagina "
                         + pagina + ".");
             }
+            capturarMetadadosExplicitos(linha, pagina, normalizada);
+            if (emObjetosDeAvaliacao && linhasEmBranco >= 2
+                    && pareceAssinatura(linha)) {
+                finalizarItemCebraspe();
+                emObjetosDeAvaliacao = false;
+            }
+            linhasEmBranco = 0;
+
+            if (consumirCabecalhoCebraspe(linha, pagina)) return;
+            if (consumirObjetosDeAvaliacao(linha, pagina)) return;
+
             Matcher correspondencia = LINHA.matcher(linha);
             if (!correspondencia.matches()) return;
             String rotulo = normalizador.normalizarNome(
@@ -108,19 +167,29 @@ public class ParserDeterministicoDoEdital {
                         "publicacao", "data de publicacao" ->
                         campos.put(rotulo, new Campo(valor, origem));
                 case "cargo" -> novoCargo(valor, origem);
-                case "area" -> exigirCargo().area = new Campo(valor, origem);
-                case "especialidade" -> exigirCargo().especialidade =
-                        new Campo(valor, origem);
+                case "area" -> atribuirArea(valor, origem);
+                case "especialidade" ->
+                        atribuirEspecialidadeEOrientacao(valor, origem);
+                case "orientacao" -> atribuirOrientacao(valor, origem);
                 case "escolaridade", "nivel de escolaridade" ->
-                        exigirCargo().escolaridade = new Campo(valor, origem);
+                        atribuirEscolaridade(valor, origem);
+                case "requisito" ->
+                        atribuirEscolaridadeDoRequisito(valor, origem);
                 case "prova" -> novaProva(valor, origem);
-                case "tipo" -> exigirProva().tipo = new Campo(valor, origem);
-                case "carater" -> exigirProva().carater =
-                        new Campo(valor, origem);
-                case "data da prova", "data hora" -> exigirProva().data =
-                        new Campo(valor, origem);
+                case "tipo" -> {
+                    if (prova != null) prova.tipo = new Campo(valor, origem);
+                    else contextoAusente("tipo", "prova", origem);
+                }
+                case "carater" -> {
+                    if (prova != null) prova.carater = new Campo(valor, origem);
+                    else contextoAusente("carater", "prova", origem);
+                }
+                case "data da prova", "data hora" -> {
+                    if (prova != null) prova.data = new Campo(valor, origem);
+                    else contextoAusente("data da prova", "prova", origem);
+                }
                 case "duracao", "duracao em minutos" ->
-                        exigirProva().duracao = new Campo(valor, origem);
+                        atribuirDuracao(valor, origem);
                 case "questoes", "quantidade de questoes" ->
                         atribuirQuestoes(valor, origem);
                 case "pontuacao maxima", "pontos" ->
@@ -129,19 +198,357 @@ public class ParserDeterministicoDoEdital {
                         atribuirPontuacaoMinima(valor, origem);
                 case "grupo", "bloco" -> novoGrupo(valor, origem);
                 case "materia", "disciplina" -> novaMateria(valor, origem);
-                case "peso" -> exigirMateria().peso = new Campo(valor, origem);
-                case "descricao da materia" -> exigirMateria().descricao =
-                        new Campo(valor, origem);
+                case "peso" -> {
+                    if (materia != null) materia.peso = new Campo(valor, origem);
+                    else contextoAusente("peso", "materia", origem);
+                }
+                case "descricao da materia" -> {
+                    if (materia != null) {
+                        materia.descricao = new Campo(valor, origem);
+                    } else {
+                        contextoAusente("descricao da materia", "materia",
+                                origem);
+                    }
+                }
                 case "topico" -> novoTopico(valor, origem);
                 case "item" -> novoItem(valor, origem);
                 default -> { }
             }
         }
 
+        private void capturarMetadadosExplicitos(String linha, int pagina,
+                String normalizada) {
+            ProvenienciaDoDado origem = origem(pagina, "cabecalho", linha);
+            if ("tribunal de contas da uniao".equals(normalizada)) {
+                campos.putIfAbsent("orgao", new Campo(linha, origem));
+            }
+            if (linha.contains("(Cebraspe)")) {
+                campos.putIfAbsent("banca", new Campo("Cebraspe", origem));
+            }
+            if (normalizada == null
+                    || !normalizada.contains("provas objetivas")) {
+                return;
+            }
+            provaObjetivaExplicita = primeiro(provaObjetivaExplicita,
+                    new Campo("Provas objetivas", origem));
+            if (normalizada.contains(
+                    "carater eliminatorio e classificatorio")) {
+                caraterDaProvaObjetivaExplicito = primeiro(
+                        caraterDaProvaObjetivaExplicito,
+                        new Campo("ELIMINATORIO_E_CLASSIFICATORIO", origem));
+            }
+        }
+
+        private boolean consumirCabecalhoCebraspe(String linha, int pagina) {
+            ProvenienciaDoDado origem = origem(pagina, "cabecalho", linha);
+            if (CONCURSO_CEBRASPE.matcher(linha).matches()) {
+                campos.putIfAbsent("concurso", new Campo(linha, origem));
+                return true;
+            }
+            Matcher edital = EDITAL_CEBRASPE.matcher(linha);
+            if (edital.matches()) {
+                campos.putIfAbsent("edital", new Campo(linha, origem));
+                campos.putIfAbsent("numero",
+                        new Campo(edital.group(1), origem));
+                Matcher ano = ANO_EXPLICITO.matcher(linha);
+                if (ano.find()) {
+                    campos.putIfAbsent("ano",
+                            new Campo(ano.group(), origem));
+                }
+                return true;
+            }
+            Matcher cabecalhoDoCargo = CARGO_CEBRASPE.matcher(linha);
+            if (cabecalhoDoCargo.matches()) {
+                consumirCabecalhoDoCargo(
+                        cabecalhoDoCargo.group(1), origem);
+                return true;
+            }
+            return false;
+        }
+
+        private void consumirCabecalhoDoCargo(String cabecalho,
+                ProvenienciaDoDado origem) {
+            Matcher segmento = SEGMENTO_DO_CARGO.matcher(cabecalho);
+            List<SegmentoDoCargo> segmentos = new ArrayList<>();
+            int inicioDoPrimeiroSegmento = -1;
+            while (segmento.find()) {
+                if (inicioDoPrimeiroSegmento < 0) {
+                    inicioDoPrimeiroSegmento = segmento.start();
+                }
+                segmentos.add(new SegmentoDoCargo(
+                        normalizador.normalizarNome(segmento.group(1)),
+                        segmento.end(), -1));
+                if (segmentos.size() > 1) {
+                    SegmentoDoCargo anterior =
+                            segmentos.get(segmentos.size() - 2);
+                    segmentos.set(segmentos.size() - 2,
+                            anterior.comFim(segmento.start()));
+                }
+            }
+            if (!segmentos.isEmpty()) {
+                SegmentoDoCargo ultimo = segmentos.getLast();
+                segmentos.set(segmentos.size() - 1,
+                        ultimo.comFim(cabecalho.length()));
+            }
+            String nome = limparSeparadores(inicioDoPrimeiroSegmento < 0
+                    ? cabecalho : cabecalho.substring(
+                            0, inicioDoPrimeiroSegmento));
+            if (nome.isBlank()) {
+                incertezas.add("Cabecalho de cargo sem nome explicito na "
+                        + "pagina " + origem.pagina() + ".");
+                return;
+            }
+            novoCargo(nome, origem);
+            for (SegmentoDoCargo item : segmentos) {
+                String valor = limparSeparadores(cabecalho.substring(
+                        item.inicio(), item.fim()));
+                if (valor.isBlank()) continue;
+                switch (item.rotulo()) {
+                    case "area" -> atribuirArea(valor, origem);
+                    case "especialidade" ->
+                            atribuirEspecialidadeEOrientacao(valor, origem);
+                    case "orientacao" -> atribuirOrientacao(valor, origem);
+                    default -> { }
+                }
+            }
+        }
+
+        private boolean consumirObjetosDeAvaliacao(String linha, int pagina) {
+            Matcher secao = OBJETOS_DE_AVALIACAO.matcher(linha);
+            if (secao.matches()) {
+                finalizarItemCebraspe();
+                emObjetosDeAvaliacao = true;
+                garantirProvaDosObjetos(linha, pagina);
+                return true;
+            }
+            if (!emObjetosDeAvaliacao) return false;
+            String linhaNormalizada = normalizador.normalizarNome(linha);
+            if (linhaNormalizada != null
+                    && linhaNormalizada.startsWith("anexo ")) {
+                finalizarItemCebraspe();
+                emObjetosDeAvaliacao = false;
+                return true;
+            }
+            Matcher grupoCebraspe = GRUPO_CEBRASPE.matcher(linha);
+            if (grupoCebraspe.matches()) {
+                finalizarItemCebraspe();
+                garantirProvaDosObjetos(linha, pagina);
+                if (prova == null) {
+                    incertezas.add("Grupo sem cargo explicito na pagina "
+                            + pagina + ".");
+                    return true;
+                }
+                novoGrupo(grupoCebraspe.group(1),
+                        origem(pagina, grupoCebraspe.group(1), linha));
+                return true;
+            }
+            MateriaCebraspe materiaCebraspe = materiaCebraspe(linha);
+            if (materiaCebraspe != null && grupo != null) {
+                finalizarItemCebraspe();
+                novaMateria(materiaCebraspe.nome(),
+                        origem(pagina, materiaCebraspe.nome(), linha));
+                consumirItensCebraspe(materiaCebraspe.conteudo(), pagina);
+                return true;
+            }
+            if (materia != null) {
+                consumirItensCebraspe(linha, pagina);
+                return true;
+            }
+            return true;
+        }
+
+        private void garantirProvaDosObjetos(String linha, int pagina) {
+            if (prova != null || cargo == null) return;
+            Matcher secao = OBJETOS_DE_AVALIACAO.matcher(linha);
+            Campo nome = provaObjetivaExplicita;
+            if (nome == null) {
+                String valor = secao.matches()
+                        ? "DOS OBJETOS DE AVALIAÇÃO" + secao.group(1)
+                        : "CONHECIMENTOS";
+                nome = new Campo(valor.strip(), origem(pagina,
+                        "objetos de avaliacao", linha));
+            }
+            novaProva(nome.valor, nome.origem);
+            if (prova != null && provaObjetivaExplicita != null) {
+                prova.tipo = new Campo("OBJETIVA",
+                        provaObjetivaExplicita.origem);
+            }
+            if (prova != null
+                    && caraterDaProvaObjetivaExplicito != null) {
+                prova.carater = caraterDaProvaObjetivaExplicito;
+            }
+        }
+
+        private MateriaCebraspe materiaCebraspe(String linha) {
+            int doisPontos = linha.indexOf(':');
+            if (doisPontos < 4 || doisPontos > 120) return null;
+            String nome = linha.substring(0, doisPontos).strip();
+            if (nome.chars().noneMatch(Character::isLetter)
+                    || nome.chars().anyMatch(Character::isLowerCase)
+                    || nome.indexOf(',') >= 0 || nome.indexOf('.') >= 0) {
+                return null;
+            }
+            String rotulo = normalizador.normalizarNome(nome);
+            if (rotulo == null || rotulo.equals("area")
+                    || rotulo.equals("especialidade")
+                    || rotulo.equals("orientacao")
+                    || rotulo.equals("requisito")) {
+                return null;
+            }
+            return new MateriaCebraspe(nome,
+                    linha.substring(doisPontos + 1).strip());
+        }
+
+        private void consumirItensCebraspe(String conteudo, int pagina) {
+            if (conteudo == null || conteudo.isBlank()) return;
+            Matcher marcador = INICIO_DE_ITEM_CEBRASPE.matcher(conteudo);
+            List<MarcadorDeItem> marcadores = new ArrayList<>();
+            String ultimoNumero = itemCebraspe == null
+                    ? null : itemCebraspe.numero;
+            while (marcador.find()) {
+                String candidato = marcador.group(1);
+                if (!numeroPlausivel(ultimoNumero, candidato)) continue;
+                marcadores.add(new MarcadorDeItem(candidato,
+                        marcador.start(1), marcador.end()));
+                ultimoNumero = candidato;
+            }
+            if (marcadores.isEmpty()) {
+                acrescentarAoItemCebraspe(conteudo);
+                return;
+            }
+            acrescentarAoItemCebraspe(conteudo.substring(
+                    0, marcadores.getFirst().inicio()));
+            for (int indice = 0; indice < marcadores.size(); indice++) {
+                finalizarItemCebraspe();
+                MarcadorDeItem atual = marcadores.get(indice);
+                int fim = indice + 1 < marcadores.size()
+                        ? marcadores.get(indice + 1).inicio()
+                        : conteudo.length();
+                itemCebraspe = new ItemCebraspe(materia, atual.numero(),
+                        pagina);
+                acrescentarAoItemCebraspe(conteudo.substring(
+                        atual.fimDoMarcador(), fim));
+            }
+        }
+
+        private void acrescentarAoItemCebraspe(String trecho) {
+            if (itemCebraspe == null || trecho == null
+                    || trecho.isBlank()) {
+                return;
+            }
+            if (!itemCebraspe.descricao.isEmpty()) {
+                itemCebraspe.descricao.append(' ');
+            }
+            itemCebraspe.descricao.append(trecho.strip());
+        }
+
+        private void finalizarItemCebraspe() {
+            if (itemCebraspe == null) return;
+            String descricao = itemCebraspe.descricao.toString()
+                    .replaceAll("\\s+", " ").strip();
+            if (descricao.isEmpty()) {
+                incertezas.add("Item " + itemCebraspe.numero
+                        + " sem descricao explicita na pagina "
+                        + itemCebraspe.pagina + ".");
+                itemCebraspe = null;
+                return;
+            }
+            Materia destino = itemCebraspe.materia;
+            ProvenienciaDoDado origem = origem(itemCebraspe.pagina,
+                    destino.nome.valor,
+                    itemCebraspe.numero + " " + descricao);
+            String chaveDoTopico = normalizador.criarChave(
+                    "topico-" + destino.chave,
+                    destino.topicos.size() + 1, descricao);
+            destino.topicos.add(new Topico(chaveDoTopico,
+                    pai(itemCebraspe.numero, destino.topicos),
+                    itemCebraspe.numero, nomeDoTopicoCebraspe(descricao),
+                    origem, destino.topicos.size() + 1, true));
+            String chave = normalizador.criarChave("item-" + destino.chave,
+                    destino.itens.size() + 1, descricao);
+            destino.itens.add(new Item(chave,
+                    pai(itemCebraspe.numero, destino.itens),
+                    itemCebraspe.numero, descricao, origem,
+                    destino.itens.size() + 1, chaveDoTopico));
+            itemCebraspe = null;
+        }
+
+        private void atribuirArea(String valor, ProvenienciaDoDado origem) {
+            Campo campo = new Campo(limparSeparadores(valor), origem);
+            if (cargo == null) areaPendente = campo;
+            else cargo.area = campo;
+        }
+
+        private void atribuirEspecialidadeEOrientacao(String valor,
+                ProvenienciaDoDado origem) {
+            Matcher composta = ESPECIALIDADE_COM_ORIENTACAO.matcher(valor);
+            if (composta.matches()) {
+                atribuirEspecialidade(composta.group(1), origem);
+                atribuirOrientacao(composta.group(2), origem);
+                return;
+            }
+            atribuirEspecialidade(valor, origem);
+        }
+
+        private void atribuirEspecialidade(String valor,
+                ProvenienciaDoDado origem) {
+            Campo campo = new Campo(limparSeparadores(valor), origem);
+            if (cargo == null) especialidadePendente = campo;
+            else cargo.especialidade = campo;
+        }
+
+        private void atribuirOrientacao(String valor,
+                ProvenienciaDoDado origem) {
+            Campo campo = new Campo(limparSeparadores(valor), origem);
+            if (cargo == null) orientacaoPendente = campo;
+            else cargo.orientacao = campo;
+        }
+
+        private void atribuirEscolaridade(String valor,
+                ProvenienciaDoDado origem) {
+            Campo campo = new Campo(valor, origem);
+            if (cargo == null) escolaridadePendente = campo;
+            else cargo.escolaridade = campo;
+        }
+
+        private void atribuirEscolaridadeDoRequisito(String valor,
+                ProvenienciaDoDado origem) {
+            String requisito = normalizador.normalizarNome(valor);
+            if (requisito == null) return;
+            String nivel = null;
+            if (requisito.matches(
+                    ".*\\b(?:diploma|certificado|conclusao)\\b.*"
+                            + "\\bnivel superior\\b.*")) {
+                nivel = "SUPERIOR";
+            } else if (requisito.matches(
+                    ".*\\b(?:diploma|certificado|conclusao)\\b.*"
+                            + "\\b(?:nivel medio|ensino medio)\\b.*")) {
+                nivel = "MEDIO";
+            } else if (requisito.matches(
+                    ".*\\b(?:diploma|certificado|conclusao)\\b.*"
+                            + "\\bnivel tecnico\\b.*")) {
+                nivel = "TECNICO";
+            } else if (requisito.matches(
+                    ".*\\b(?:diploma|certificado|conclusao)\\b.*"
+                            + "\\b(?:nivel fundamental|ensino fundamental)"
+                            + "\\b.*")) {
+                nivel = "FUNDAMENTAL";
+            }
+            if (nivel != null) atribuirEscolaridade(nivel, origem);
+        }
+
         private void novoCargo(String nome, ProvenienciaDoDado origem) {
             cargo = new Cargo(normalizador.criarChave("cargo",
                     cargos.size() + 1, nome), new Campo(nome, origem),
                     cargos.size() + 1);
+            cargo.area = areaPendente;
+            cargo.especialidade = especialidadePendente;
+            cargo.orientacao = orientacaoPendente;
+            cargo.escolaridade = escolaridadePendente;
+            areaPendente = null;
+            especialidadePendente = null;
+            orientacaoPendente = null;
+            escolaridadePendente = null;
             cargos.add(cargo);
             prova = null;
             grupo = null;
@@ -149,7 +556,11 @@ public class ParserDeterministicoDoEdital {
         }
 
         private void novaProva(String nome, ProvenienciaDoDado origem) {
-            Cargo atual = exigirCargo();
+            if (cargo == null) {
+                contextoAusente("prova", "cargo", origem);
+                return;
+            }
+            Cargo atual = cargo;
             prova = new Prova(normalizador.criarChave("prova",
                     provas.size() + 1, nome), atual.chave,
                     new Campo(nome, origem), provas.size() + 1);
@@ -159,7 +570,11 @@ public class ParserDeterministicoDoEdital {
         }
 
         private void novoGrupo(String nome, ProvenienciaDoDado origem) {
-            Prova atual = exigirProva();
+            if (prova == null) {
+                contextoAusente("grupo", "prova", origem);
+                return;
+            }
+            Prova atual = prova;
             grupo = new Grupo(normalizador.criarChave(
                     "grupo-" + atual.chave,
                     atual.grupos.size() + 1, nome), new Campo(nome, origem),
@@ -169,9 +584,13 @@ public class ParserDeterministicoDoEdital {
         }
 
         private void novaMateria(String nome, ProvenienciaDoDado origem) {
-            Cargo cargoAtual = exigirCargo();
-            Prova provaAtual = exigirProva();
-            Grupo grupoAtual = exigirGrupo();
+            if (cargo == null || prova == null || grupo == null) {
+                contextoAusente("materia", "cargo, prova e grupo", origem);
+                return;
+            }
+            Cargo cargoAtual = cargo;
+            Prova provaAtual = prova;
+            Grupo grupoAtual = grupo;
             materia = new Materia(normalizador.criarChave("materia",
                     materias.size() + 1, nome), cargoAtual.chave,
                     provaAtual.chave, grupoAtual.chave,
@@ -180,18 +599,26 @@ public class ParserDeterministicoDoEdital {
         }
 
         private void novoTopico(String valor, ProvenienciaDoDado origem) {
-            Materia atual = exigirMateria();
+            if (materia == null) {
+                contextoAusente("topico", "materia", origem);
+                return;
+            }
+            Materia atual = materia;
             Numerado numerado = numerado(valor);
             String chave = normalizador.criarChave(
                     "topico-" + atual.chave,
                     atual.topicos.size() + 1, numerado.texto);
             atual.topicos.add(new Topico(chave,
                     pai(numerado.numero, atual.topicos), numerado.numero,
-                    numerado.texto, origem, atual.topicos.size() + 1));
+                    numerado.texto, origem, atual.topicos.size() + 1, false));
         }
 
         private void novoItem(String valor, ProvenienciaDoDado origem) {
-            Materia atual = exigirMateria();
+            if (materia == null) {
+                contextoAusente("item", "materia", origem);
+                return;
+            }
+            Materia atual = materia;
             Numerado numerado = numerado(valor);
             String chave = normalizador.criarChave("item-" + atual.chave,
                     atual.itens.size() + 1, numerado.texto);
@@ -207,7 +634,8 @@ public class ParserDeterministicoDoEdital {
         private void atribuirQuestoes(String valor, ProvenienciaDoDado origem) {
             if (materia != null) materia.questoes = new Campo(valor, origem);
             else if (grupo != null) grupo.questoes = new Campo(valor, origem);
-            else exigirProva().questoes = new Campo(valor, origem);
+            else if (prova != null) prova.questoes = new Campo(valor, origem);
+            else contextoAusente("quantidade de questoes", "prova", origem);
         }
 
         private void atribuirPontuacaoMaxima(String valor,
@@ -216,45 +644,45 @@ public class ParserDeterministicoDoEdital {
                     new Campo(valor, origem);
             else if (grupo != null) grupo.pontuacaoMaxima =
                     new Campo(valor, origem);
-            else exigirProva().pontuacaoMaxima = new Campo(valor, origem);
+            else if (prova != null) {
+                prova.pontuacaoMaxima = new Campo(valor, origem);
+            } else {
+                contextoAusente("pontuacao maxima", "prova", origem);
+            }
         }
 
         private void atribuirPontuacaoMinima(String valor,
                 ProvenienciaDoDado origem) {
             if (grupo != null) grupo.pontuacaoMinima = new Campo(valor, origem);
-            else exigirProva().pontuacaoMinima = new Campo(valor, origem);
+            else if (prova != null) {
+                prova.pontuacaoMinima = new Campo(valor, origem);
+            } else {
+                contextoAusente("pontuacao minima", "prova", origem);
+            }
         }
 
-        private Cargo exigirCargo() {
-            if (cargo == null) throw estrutura("CARGO_AUSENTE",
-                    "Campo depende de um cargo anterior.");
-            return cargo;
+        private void atribuirDuracao(String valor,
+                ProvenienciaDoDado origem) {
+            if (prova != null) prova.duracao = new Campo(valor, origem);
+            else contextoAusente("duracao", "prova", origem);
         }
 
-        private Prova exigirProva() {
-            if (prova == null) throw estrutura("PROVA_AUSENTE",
-                    "Campo depende de uma prova anterior.");
-            return prova;
-        }
-
-        private Grupo exigirGrupo() {
-            if (grupo == null) throw estrutura("GRUPO_AUSENTE",
-                    "Materia depende de um grupo anterior.");
-            return grupo;
-        }
-
-        private Materia exigirMateria() {
-            if (materia == null) throw estrutura("MATERIA_AUSENTE",
-                    "Campo depende de uma materia anterior.");
-            return materia;
-        }
-
-        private FalhaNaExtracaoDoEdital estrutura(String codigo,
-                String mensagem) {
-            return new FalhaNaExtracaoDoEdital(codigo, mensagem);
+        private void contextoAusente(String rotulo, String dependencia,
+                ProvenienciaDoDado origem) {
+            incertezas.add("Rotulo " + rotulo + " sem " + dependencia
+                    + " anterior na pagina " + origem.pagina()
+                    + "; valor nao associado.");
         }
 
         private ExtracaoEstruturadaDoEdital construir() {
+            finalizarItemCebraspe();
+            if (cargo == null && (areaPendente != null
+                    || especialidadePendente != null
+                    || orientacaoPendente != null
+                    || escolaridadePendente != null)) {
+                incertezas.add("Rotulo dependente encontrado antes de cargo; "
+                        + "associacao exige revisao.");
+            }
             ConcursoExtraido concurso = new ConcursoExtraido(
                     texto(campos.get("concurso")), ausente(),
                     texto(campos.get("orgao")), texto(campos.get("banca")),
@@ -275,6 +703,33 @@ public class ParserDeterministicoDoEdital {
 
     private record Campo(String valor, ProvenienciaDoDado origem) { }
     private record Numerado(String numero, String texto) { }
+    private record MateriaCebraspe(String nome, String conteudo) { }
+    private record MarcadorDeItem(
+            String numero,
+            int inicio,
+            int fimDoMarcador) {
+    }
+    private record SegmentoDoCargo(
+            String rotulo,
+            int inicio,
+            int fim) {
+        private SegmentoDoCargo comFim(int novoFim) {
+            return new SegmentoDoCargo(rotulo, inicio, novoFim);
+        }
+    }
+
+    private static final class ItemCebraspe {
+        private final Materia materia;
+        private final String numero;
+        private final int pagina;
+        private final StringBuilder descricao = new StringBuilder();
+
+        private ItemCebraspe(Materia materia, String numero, int pagina) {
+            this.materia = materia;
+            this.numero = numero;
+            this.pagina = pagina;
+        }
+    }
 
     private static final class Cargo {
         private final String chave;
@@ -282,13 +737,39 @@ public class ParserDeterministicoDoEdital {
         private final int ordem;
         private Campo area;
         private Campo especialidade;
+        private Campo orientacao;
         private Campo escolaridade;
         private Cargo(String chave, Campo nome, int ordem) {
             this.chave = chave; this.nome = nome; this.ordem = ordem;
         }
         private CargoExtraido construir() {
             return new CargoExtraido(chave, texto(nome), texto(area),
-                    texto(especialidade), escolaridade(escolaridade), ordem);
+                    especialidadeComOrientacao(),
+                    escolaridade(escolaridade), ordem);
+        }
+        private ValorExtraido<String> especialidadeComOrientacao() {
+            if (orientacao == null) {
+                return texto(especialidade);
+            }
+            if (especialidade == null) {
+                return ValorExtraido.explicito("ORIENTAÇÃO: "
+                        + orientacao.valor, orientacao.origem);
+            }
+            String valor = especialidade.valor + " – ORIENTAÇÃO: "
+                    + orientacao.valor;
+            if (especialidade.origem.equals(orientacao.origem)) {
+                return ValorExtraido.explicito(valor,
+                        especialidade.origem);
+            }
+            Integer pagina = Objects.equals(especialidade.origem.pagina(),
+                    orientacao.origem.pagina())
+                    ? especialidade.origem.pagina() : null;
+            ProvenienciaDoDado origemCombinada = new ProvenienciaDoDado(
+                    pagina, "Especialidade e orientação",
+                    especialidade.origem.trecho() + " | "
+                            + orientacao.origem.trecho());
+            return new ValorExtraido<>(valor, new BigDecimal("0.9500"),
+                    origemCombinada, true);
         }
     }
 
@@ -351,10 +832,12 @@ public class ParserDeterministicoDoEdital {
     }
 
     private record Topico(String chave, String pai, String numero, String nome,
-            ProvenienciaDoDado origem, int ordem) {
+            ProvenienciaDoDado origem, int ordem, boolean inferido) {
         private TopicoExtraido construir() {
             return new TopicoExtraido(chave, pai, explicito(numero, origem),
-                    explicito(nome, origem), ausente(), ordem);
+                    inferido ? valorInferido(nome, origem)
+                            : explicito(nome, origem),
+                    ausente(), ordem);
         }
     }
 
@@ -373,6 +856,40 @@ public class ParserDeterministicoDoEdital {
                 matcher.group(2).strip()) : new Numerado(null, valor);
     }
 
+    private static boolean numeroPlausivel(String atual, String candidato) {
+        int[] proximo = numero(candidato);
+        if (proximo == null) return false;
+        if (atual == null) return proximo.length == 1 && proximo[0] == 1;
+        int[] anterior = numero(atual);
+        if (anterior == null) return false;
+        if (proximo.length == anterior.length + 1) {
+            for (int indice = 0; indice < anterior.length; indice++) {
+                if (proximo[indice] != anterior[indice]) return false;
+            }
+            return proximo[proximo.length - 1] == 1;
+        }
+        if (proximo.length > anterior.length) return false;
+        for (int indice = 0; indice < proximo.length - 1; indice++) {
+            if (proximo[indice] != anterior[indice]) return false;
+        }
+        return proximo[proximo.length - 1]
+                == anterior[proximo.length - 1] + 1;
+    }
+
+    private static int[] numero(String valor) {
+        String[] partes = valor.split("\\.");
+        int[] resultado = new int[partes.length];
+        try {
+            for (int indice = 0; indice < partes.length; indice++) {
+                resultado[indice] = Integer.parseInt(partes[indice]);
+                if (resultado[indice] < 1) return null;
+            }
+            return resultado;
+        } catch (NumberFormatException excecao) {
+            return null;
+        }
+    }
+
     private static <T> String pai(String numero, List<T> itens) {
         if (numero == null || !numero.contains(".")) return null;
         String numeroDoPai = numero.substring(0, numero.lastIndexOf('.'));
@@ -387,6 +904,32 @@ public class ParserDeterministicoDoEdital {
 
     private static Campo primeiro(Campo primeiro, Campo segundo) {
         return primeiro == null ? segundo : primeiro;
+    }
+
+    private static String limparSeparadores(String valor) {
+        return valor == null ? "" : valor.strip()
+                .replaceAll("^[–—-]+\\s*|\\s*[–—-]+$", "").strip();
+    }
+
+    private static String nomeDoTopicoCebraspe(String descricao) {
+        if (descricao.length() <= 160) return descricao;
+        int corte = descricao.lastIndexOf(' ', 160);
+        if (corte < 80) corte = 160;
+        return descricao.substring(0, corte).strip();
+    }
+
+    private static boolean pareceAssinatura(String linha) {
+        if (linha.indexOf(':') >= 0
+                || linha.chars().anyMatch(Character::isDigit)) {
+            return false;
+        }
+        long letras = linha.chars().filter(Character::isLetter).count();
+        return letras >= 8 && linha.equals(linha.toUpperCase(Locale.ROOT));
+    }
+
+    private static ProvenienciaDoDado origem(int pagina, String secao,
+            String trecho) {
+        return new ProvenienciaDoDado(pagina, secao, trecho);
     }
 
     private static <T> ValorExtraido<T> ausente() {
@@ -488,5 +1031,11 @@ public class ParserDeterministicoDoEdital {
     private static <T> ValorExtraido<T> explicito(T valor,
             ProvenienciaDoDado origem) {
         return valor == null ? ausente() : ValorExtraido.explicito(valor, origem);
+    }
+
+    private static <T> ValorExtraido<T> valorInferido(T valor,
+            ProvenienciaDoDado origem) {
+        return valor == null ? ausente() : new ValorExtraido<>(valor,
+                new BigDecimal("0.8500"), origem, true);
     }
 }

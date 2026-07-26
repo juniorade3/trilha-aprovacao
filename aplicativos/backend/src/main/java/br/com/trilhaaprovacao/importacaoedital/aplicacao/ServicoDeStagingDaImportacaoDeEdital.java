@@ -147,6 +147,8 @@ public class ServicoDeStagingDaImportacaoDeEdital {
                     persistida.conteudoOriginal());
             importacao.classificarFonte(arquivo.tipoDaFonte(),
                     OffsetDateTime.now());
+            persistida.registrarConteudoExtraido(arquivo.tipoDaFonte(),
+                    arquivo.quantidadeDePaginas(), arquivo.texto());
             FonteDoEdital fonte = new FonteDoEdital(
                     importacao.nomeDoArquivo(), importacao.sha256(),
                     arquivo.quantidadeDePaginas());
@@ -168,8 +170,6 @@ public class ServicoDeStagingDaImportacaoDeEdital {
                     problemasJson, hash, OffsetDateTime.now()));
             importacao.registrarExtracao(numero, hash, estado,
                     OffsetDateTime.now());
-            persistida.registrarConteudoExtraido(arquivo.tipoDaFonte(),
-                    arquivo.quantidadeDePaginas(), arquivo.texto());
             persistida.atualizarDe(importacao);
             return new ResultadoDoStagingDaImportacao(importacao, extracao,
                     problemas);
@@ -256,16 +256,35 @@ public class ServicoDeStagingDaImportacaoDeEdital {
     @Transactional(readOnly = true)
     public ResultadoDoStagingDaImportacao obterExtracaoAtual(UUID usuario,
             UUID identificador) {
-        ImportacaoDeEdital importacao = obter(usuario, identificador);
+        ImportacaoDeEditalPersistida persistida = importacoes
+                .findByIdentificadorAndIdentificadorDoUsuario(
+                        identificador, usuario)
+                .orElseThrow(ServicoDeStagingDaImportacaoDeEdital::naoEncontrada);
+        ImportacaoDeEdital importacao = persistida.paraDominio();
         return versoes
                 .findFirstByIdentificadorDaImportacaoAndIdentificadorDoUsuarioOrderByNumeroDaVersaoDesc(
                         identificador, usuario)
                 .map(versao -> new ResultadoDoStagingDaImportacao(importacao,
                         ler(versao.dadosEstruturados(),
                                 ExtracaoEstruturadaDoEdital.class),
-                        lerProblemas(versao.problemas())))
+                        unir(lerProblemas(versao.problemas()),
+                                problemasDaFalha(persistida))))
                 .orElseGet(() -> new ResultadoDoStagingDaImportacao(importacao,
-                        null, List.of()));
+                        null, problemasDaFalha(persistida)));
+    }
+
+    private static List<ProblemaDaImportacao> problemasDaFalha(
+            ImportacaoDeEditalPersistida persistida) {
+        if (persistida.estado() != EstadoDaImportacaoDeEdital.FALHOU
+                || persistida.codigoDaFalha() == null) {
+            return List.of();
+        }
+        String mensagem = persistida.descricaoDaFalha() == null
+                ? "A importacao falhou antes de concluir a extracao."
+                : persistida.descricaoDaFalha();
+        return List.of(new ProblemaDaImportacao(
+                SeveridadeDoProblemaDaImportacao.BLOQUEANTE,
+                persistida.codigoDaFalha(), mensagem, "fonte"));
     }
 
     private EstadoDaImportacaoDeEdital proximoEstado(

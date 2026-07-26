@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
@@ -44,6 +44,7 @@ const alertaDeErro = ref<HTMLElement>()
 let temporizador: number | undefined
 let controleDaConsulta: AbortController | undefined
 let desmontada = false
+let versaoDoContextoDaRota = 0
 
 const identificadorDaRota = computed(() => {
   const valor = rota.params.identificador
@@ -102,20 +103,53 @@ function limparErro() {
 }
 
 async function pesquisarConcursos(pesquisa = '') {
+  const versaoDaConsulta = versaoDoContextoDaRota
   carregandoConcursos.value = true
   try {
     const resposta = await listarConcursos(pesquisa, false, 0)
+    if (
+      desmontada ||
+      versaoDaConsulta !== versaoDoContextoDaRota ||
+      identificadorDaRota.value
+    )
+      return
     concursos.value = resposta.itens
   } catch (causa) {
+    if (versaoDaConsulta !== versaoDoContextoDaRota) return
     registrarErro(causa, 'Não foi possível buscar concursos existentes.')
   } finally {
-    carregandoConcursos.value = false
+    if (versaoDaConsulta === versaoDoContextoDaRota)
+      carregandoConcursos.value = false
   }
 }
 
 function cancelarConsultaAutomatica() {
   if (temporizador !== undefined) window.clearTimeout(temporizador)
   temporizador = undefined
+}
+
+function interromperConsultas() {
+  cancelarConsultaAutomatica()
+  controleDaConsulta?.abort()
+  controleDaConsulta = undefined
+}
+
+function reiniciarEstadoDaImportacao() {
+  importacao.value = undefined
+  previa.value = undefined
+  relatorio.value = undefined
+  concursos.value = []
+  modo.value = 'CRIAR_NOVO'
+  identificadorDoConcursoExistente.value = undefined
+  ultimasDecisoes.value = undefined
+  carregando.value = false
+  carregandoConcursos.value = false
+  enviando.value = false
+  salvandoDecisoes.value = false
+  preparando.value = false
+  retomando.value = false
+  carregandoRelatorio.value = false
+  limparErro()
 }
 
 function agendarConsulta() {
@@ -147,17 +181,28 @@ function atualizarContextoDaImportacao(valor: ImportacaoDeEdital) {
 
 async function carregarRelatorio() {
   if (!importacao.value || relatorio.value) return
+  const identificador = importacao.value.identificador
+  const versaoDaConsulta = versaoDoContextoDaRota
   carregandoRelatorio.value = true
   try {
-    relatorio.value = await obterRelatorioDaImportacao(
-      importacao.value.identificador,
+    const valor = await obterRelatorioDaImportacao(
+      identificador,
       controleDaConsulta?.signal,
     )
+    if (
+      desmontada ||
+      versaoDaConsulta !== versaoDoContextoDaRota ||
+      identificadorDaRota.value !== identificador
+    )
+      return
+    relatorio.value = valor
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
+    if (versaoDaConsulta !== versaoDoContextoDaRota) return
     registrarErro(causa, 'Não foi possível carregar o recibo da importação.')
   } finally {
-    carregandoRelatorio.value = false
+    if (versaoDaConsulta === versaoDoContextoDaRota)
+      carregandoRelatorio.value = false
   }
 }
 
@@ -165,24 +210,36 @@ async function carregarImportacao() {
   const identificador =
     importacao.value?.identificador ?? identificadorDaRota.value
   if (!identificador || desmontada) return
+  const versaoDaConsulta = versaoDoContextoDaRota
   cancelarConsultaAutomatica()
   controleDaConsulta?.abort()
-  controleDaConsulta = new AbortController()
+  const controlador = new AbortController()
+  controleDaConsulta = controlador
   carregando.value = !importacao.value
   limparErro()
   try {
     const valor = await obterImportacaoDeEdital(
       identificador,
-      controleDaConsulta.signal,
+      controlador.signal,
     )
+    if (
+      desmontada ||
+      versaoDaConsulta !== versaoDoContextoDaRota ||
+      identificadorDaRota.value !== identificador
+    )
+      return
     atualizarContextoDaImportacao(valor)
     if (valor.estado === 'APLICADA') await carregarRelatorio()
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
+    if (versaoDaConsulta !== versaoDoContextoDaRota) return
     registrarErro(causa, 'Não foi possível consultar a importação.')
   } finally {
-    carregando.value = false
-    agendarConsulta()
+    if (controleDaConsulta === controlador) controleDaConsulta = undefined
+    if (versaoDaConsulta === versaoDoContextoDaRota) {
+      carregando.value = false
+      agendarConsulta()
+    }
   }
 }
 
@@ -330,15 +387,29 @@ function formatarRotulo(valor: string) {
   return texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1)
 }
 
-onMounted(async () => {
-  if (identificadorDaRota.value) await carregarImportacao()
-  else await pesquisarConcursos()
-})
+watch(
+  identificadorDaRota,
+  async (identificador) => {
+    versaoDoContextoDaRota += 1
+    interromperConsultas()
+    limparErro()
+
+    if (identificador && importacao.value?.identificador === identificador) {
+      agendarConsulta()
+      return
+    }
+
+    reiniciarEstadoDaImportacao()
+    if (identificador) await carregarImportacao()
+    else await pesquisarConcursos()
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   desmontada = true
-  cancelarConsultaAutomatica()
-  controleDaConsulta?.abort()
+  versaoDoContextoDaRota += 1
+  interromperConsultas()
 })
 </script>
 
@@ -581,6 +652,22 @@ onBeforeUnmount(() => {
         }}
       </h2>
       <p>Nenhuma estrutura parcial foi aplicada.</p>
+      <ul
+        v-if="importacao.estado === 'FALHOU' && importacao.problemas.length > 0"
+        class="list-group w-100"
+        aria-label="Problemas encontrados na importação"
+      >
+        <li
+          v-for="problema in importacao.problemas"
+          :key="`${problema.codigo}-${problema.caminho ?? ''}`"
+          class="list-group-item"
+        >
+          <strong
+            ><code>{{ problema.codigo }}</code></strong
+          >
+          <span class="d-block">{{ problema.mensagem }}</span>
+        </li>
+      </ul>
       <RouterLink class="btn btn-primary" to="/concursos/importar">
         Iniciar nova importação
       </RouterLink>

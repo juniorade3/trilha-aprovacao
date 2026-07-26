@@ -236,6 +236,77 @@ describe('ImportacaoDeEditalPagina', () => {
     pagina.unmount()
   })
 
+  it('exibe o codigo e a mensagem devolvidos quando a importacao falha', async () => {
+    const falhou = importacao('FALHOU')
+    falhou.problemas = [
+      {
+        severidade: 'BLOQUEANTE',
+        codigo: 'CARGO_AUSENTE',
+        mensagem: 'Campo depende de um cargo anterior.',
+        caminho: 'cargos',
+      },
+    ]
+    chamadas.obterImportacaoDeEdital.mockResolvedValue(falhou)
+
+    const { pagina } = await montar('/concursos/importacoes/importacao-1')
+
+    expect(pagina.text()).toContain('Importação falhou')
+    expect(pagina.text()).toContain('CARGO_AUSENTE')
+    expect(pagina.text()).toContain('Campo depende de um cargo anterior.')
+    pagina.unmount()
+  })
+
+  it('reinicia o componente ao voltar para uma nova importacao', async () => {
+    const falhou = importacao('FALHOU')
+    falhou.problemas = [
+      {
+        severidade: 'BLOQUEANTE',
+        codigo: 'CARGO_AUSENTE',
+        mensagem: 'Campo depende de um cargo anterior.',
+      },
+    ]
+    chamadas.obterImportacaoDeEdital.mockResolvedValue(falhou)
+    const { pagina, roteador } = await montar(
+      '/concursos/importacoes/importacao-1',
+    )
+
+    await pagina.get('a[href="/concursos/importar"]').trigger('click')
+    await flushPromises()
+
+    expect(roteador.currentRoute.value.fullPath).toBe('/concursos/importar')
+    expect(pagina.text()).toContain('Como deseja enviar o edital?')
+    expect(pagina.text()).not.toContain('Importação falhou')
+    expect(pagina.text()).not.toContain('CARGO_AUSENTE')
+    expect(chamadasDeConcursos.listarConcursos).toHaveBeenCalled()
+    pagina.unmount()
+  })
+
+  it('aborta consulta antiga e ignora sua resposta depois da troca de rota', async () => {
+    let concluirConsulta: ((valor: ImportacaoDeEdital) => void) | undefined
+    let sinalDaConsulta: AbortSignal | undefined
+    chamadas.obterImportacaoDeEdital.mockImplementation(
+      (_identificador: string, sinal: AbortSignal) => {
+        sinalDaConsulta = sinal
+        return new Promise<ImportacaoDeEdital>((resolve) => {
+          concluirConsulta = resolve
+        })
+      },
+    )
+    const { pagina, roteador } = await montar(
+      '/concursos/importacoes/importacao-1',
+    )
+
+    await roteador.push('/concursos/importar')
+    await flushPromises()
+
+    expect(sinalDaConsulta?.aborted).toBe(true)
+    concluirConsulta?.(importacao('EXTRAINDO'))
+    await flushPromises()
+    expect(pagina.text()).toContain('Como deseja enviar o edital?')
+    expect(pagina.text()).not.toContain('Extraindo dados do edital')
+    pagina.unmount()
+  })
+
   it('mostra previa sem aplicar e acompanha confirmacao reforcada', async () => {
     const validada = {
       ...importacao('VALIDADA'),

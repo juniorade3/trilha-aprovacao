@@ -244,6 +244,45 @@ class ServicoDeStagingDaImportacaoDeEditalTest {
     }
 
     @Test
+    void consultaExibeFalhaPersistidaQuandoExtracaoNaoGerouVersao() {
+        var importacoes = mock(RepositorioDeImportacoesDeEdital.class);
+        var versoes = mock(RepositorioDeVersoesDaExtracaoDoEdital.class);
+        UUID usuario = UUID.randomUUID();
+        OffsetDateTime agora = OffsetDateTime.now();
+        ImportacaoDeEdital importacao = ImportacaoDeEdital.receber(usuario,
+                TipoDaFonteDoEdital.PDF_TEXTUAL, "edital.pdf",
+                "application/pdf", "a".repeat(64), 539_435, agora);
+        importacao.iniciarExtracao(agora.plusSeconds(1));
+        importacao.falhar("CARGO_AUSENTE", agora.plusSeconds(2));
+        ImportacaoDeEditalPersistida persistida =
+                new ImportacaoDeEditalPersistida(importacao,
+                        "%PDF".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        agora.plusDays(1));
+        persistida.registrarFalha("CARGO_AUSENTE",
+                "Campo depende de um cargo anterior.");
+        when(importacoes.findByIdentificadorAndIdentificadorDoUsuario(
+                importacao.identificador(), usuario))
+                .thenReturn(Optional.of(persistida));
+        when(versoes
+                .findFirstByIdentificadorDaImportacaoAndIdentificadorDoUsuarioOrderByNumeroDaVersaoDesc(
+                        importacao.identificador(), usuario))
+                .thenReturn(Optional.empty());
+        var servico = servico(importacoes, versoes, 100_000);
+
+        ResultadoDoStagingDaImportacao resultado = servico
+                .obterExtracaoAtual(usuario, importacao.identificador());
+
+        assertThat(resultado.importacao().estado())
+                .isEqualTo(EstadoDaImportacaoDeEdital.FALHOU);
+        assertThat(resultado.extracao()).isNull();
+        assertThat(resultado.problemas()).singleElement().satisfies(problema -> {
+            assertThat(problema.codigo()).isEqualTo("CARGO_AUSENTE");
+            assertThat(problema.mensagem())
+                    .isEqualTo("Campo depende de um cargo anterior.");
+        });
+    }
+
+    @Test
     void correcaoManualIsolaImportacaoPeloUsuarioNoProprioLock() {
         var importacoes = mock(RepositorioDeImportacoesDeEdital.class);
         var versoes = mock(RepositorioDeVersoesDaExtracaoDoEdital.class);

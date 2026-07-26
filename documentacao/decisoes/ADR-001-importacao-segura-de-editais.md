@@ -36,10 +36,16 @@ com o código `OCR_INDISPONIVEL` quando nenhum adaptador de OCR estiver
 configurado. DOCX permanece fora do primeiro corte; portanto, não existe
 processamento ZIP nesta versão.
 
-O parser inicial é determinístico. Linhas do documento são tratadas apenas como
-dados. Frases semelhantes a prompt injection são sinalizadas para revisão e
-nunca executadas. Não há download de URL nem chamada a shell, filesystem
-genérico, modelo ou ferramenta durante a extração.
+O parser inicial é determinístico. Ele reconhece tanto o contrato de linhas
+rotuladas quanto cabeçalhos e objetos de avaliação de editais Cebraspe. Rótulos
+genéricos fora do contexto esperado não abortam todo o documento; ausências e
+associações incompletas seguem para validação e revisão humana. Linhas do
+documento são tratadas apenas como dados. Nos objetos de avaliação Cebraspe, a
+descrição numerada integral permanece como item literal e também origina um
+tópico hierárquico marcado como inferido, com sugestão de mapeamento pendente.
+Frases semelhantes a prompt injection são sinalizadas para revisão e nunca
+executadas. Não há download de URL nem chamada a shell, filesystem genérico,
+modelo ou ferramenta durante a extração.
 
 O MCP recebe somente identificadores, versão da extração, cargo selecionado,
 modo, política e decisões por identificador. O documento e o DTO grande não

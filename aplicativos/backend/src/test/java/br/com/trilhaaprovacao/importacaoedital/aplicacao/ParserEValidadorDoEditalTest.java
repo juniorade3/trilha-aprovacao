@@ -1,11 +1,11 @@
 package br.com.trilhaaprovacao.importacaoedital.aplicacao;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.ConcursoExtraido;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.FonteDoEdital;
+import br.com.trilhaaprovacao.importacaoedital.dominio.SeveridadeDoProblemaDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ValorExtraido;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +74,8 @@ class ParserEValidadorDoEditalTest {
         assertThat(normalizador.normalizarNome(
                 "  Língua   Portuguesa — Gramática! "))
                 .isEqualTo("lingua portuguesa gramatica");
+        assertThat(normalizador.criarChave("prefixo-".repeat(30), 1,
+                "nome muito longo ".repeat(30))).hasSizeLessThanOrEqualTo(160);
     }
 
     @Test
@@ -121,12 +123,151 @@ class ParserEValidadorDoEditalTest {
     }
 
     @Test
-    void rejeitaFixtureComOrdemEstruturalInvalida() throws Exception {
-        assertThatThrownBy(() -> new ParserDeterministicoDoEdital().extrair(
+    void extraiEstruturaCebraspeSemBloquearRotuloAnteriorAoCargo()
+            throws Exception {
+        var extracao = new ParserDeterministicoDoEdital().extrair(
+                fixture("edital-cebraspe-tcu.txt"),
+                new FonteDoEdital("edital-cebraspe-tcu.txt", HASH, 3));
+
+        assertThat(extracao.concurso().nome().valor())
+                .isEqualTo("CONCURSO PÚBLICO PARA O PROVIMENTO DE VAGAS "
+                        + "PARA AUDITORIA");
+        assertThat(extracao.edital().numero().valor()).isEqualTo("1");
+        assertThat(extracao.edital().ano().valor()).isEqualTo(2025);
+        assertThat(extracao.cargos()).singleElement().satisfies(cargo -> {
+            assertThat(cargo.nome().valor())
+                    .isEqualTo("AUDITOR FEDERAL DE CONTROLE EXTERNO");
+            assertThat(cargo.area().valor()).isEqualTo("CONTROLE EXTERNO");
+            assertThat(cargo.especialidade().valor()).isEqualTo(
+                    "CONTROLE EXTERNO – ORIENTAÇÃO: "
+                            + "AUDITORIA DE TECNOLOGIA DA INFORMAÇÃO");
+            assertThat(cargo.nivelDeEscolaridade().valor().name())
+                    .isEqualTo("SUPERIOR");
+        });
+        assertThat(extracao.provas()).singleElement().satisfies(prova -> {
+            assertThat(prova.nome().valor()).isEqualTo("Provas objetivas");
+            assertThat(prova.tipo().valor().name()).isEqualTo("OBJETIVA");
+            assertThat(prova.carater().valor().name())
+                    .isEqualTo("ELIMINATORIO_E_CLASSIFICATORIO");
+            assertThat(prova.grupos()).extracting(
+                                grupo -> grupo.nome().valor())
+                        .containsExactly("CONHECIMENTOS BÁSICOS",
+                                "CONHECIMENTOS ESPECÍFICOS");
+        });
+        assertThat(extracao.materias()).extracting(
+                        materia -> materia.nome().valor())
+                .containsExactly("LÍNGUA PORTUGUESA",
+                        "INFRAESTRUTURA DE TI");
+
+        var linguaPortuguesa = extracao.materias().getFirst();
+        assertThat(linguaPortuguesa.itensDoEdital()).extracting(
+                        item -> item.numeroOficial().valor())
+                .containsExactly("1", "1.1", "2");
+        assertThat(linguaPortuguesa.itensDoEdital().get(1).chaveDoPai())
+                .isEqualTo(linguaPortuguesa.itensDoEdital().getFirst()
+                        .chave());
+        assertThat(linguaPortuguesa.itensDoEdital()).extracting(
+                        item -> item.descricaoLiteral().valor())
+                .containsExactly("Compreensão e interpretação de textos.",
+                        "Estratégias de leitura.", "Coesão textual.");
+        assertThat(linguaPortuguesa.topicos()).hasSize(3)
+                .allSatisfy(topico -> {
+                    assertThat(topico.nome().inferido()).isTrue();
+                    assertThat(topico.nome().valor()).hasSizeLessThanOrEqualTo(
+                            160);
+                });
+        assertThat(linguaPortuguesa.itensDoEdital()).allSatisfy(item ->
+                assertThat(item.chaveDoTopicoSugerido()).isNotNull());
+
+        var infraestrutura = extracao.materias().get(1);
+        assertThat(infraestrutura.itensDoEdital()).extracting(
+                        item -> item.numeroOficial().valor())
+                .containsExactly("1", "1.1", "2");
+        assertThat(infraestrutura.itensDoEdital().getLast()
+                .descricaoLiteral().valor())
+                .isEqualTo("Redes e comunicação de dados.");
+        assertThat(infraestrutura.itensDoEdital().get(1)
+                .descricaoLiteral().fonte().pagina()).isEqualTo(3);
+        assertThat(infraestrutura.itensDoEdital().get(1).chaveDoPai())
+                .isEqualTo(infraestrutura.itensDoEdital().getFirst()
+                        .chave());
+
+        var problemas = new ValidadorDaExtracaoDoEdital().validar(extracao);
+        assertThat(problemas).noneMatch(problema -> problema.severidade()
+                == SeveridadeDoProblemaDaImportacao.BLOQUEANTE);
+        assertThat(problemas).extracting("codigo")
+                .doesNotContain("PROVA_SEM_TIPO", "PROVA_SEM_CARATER");
+    }
+
+    @Test
+    void mantemRotulosForaDeContextoComoIncerteza() throws Exception {
+        var extracao = new ParserDeterministicoDoEdital().extrair(
                 fixture("arquivo-invalido.txt"),
-                new FonteDoEdital("arquivo-invalido.txt", HASH, 1)))
-                .isInstanceOf(FalhaNaExtracaoDoEdital.class)
-                .extracting("codigo").isEqualTo("PROVA_AUSENTE");
+                new FonteDoEdital("arquivo-invalido.txt", HASH, 1));
+
+        assertThat(extracao.provas()).isEmpty();
+        assertThat(extracao.materias()).isEmpty();
+        assertThat(extracao.incertezas())
+                .anyMatch(item -> item.contains("sem prova anterior"))
+                .anyMatch(item -> item.contains(
+                        "sem cargo, prova e grupo anterior"));
+    }
+
+    @Test
+    void toleraSeparadoresDentroDosObjetosDeAvaliacao() {
+        var extracao = new ParserDeterministicoDoEdital().extrair("""
+                CONCURSO: Controle Público
+                CARGO: Auditor
+                PROVA: Prova objetiva
+                TIPO: OBJETIVA
+                CARÁTER: CLASSIFICATORIO
+                18 DOS OBJETOS DE AVALIAÇÃO
+                --------------------
+                18.1 CONHECIMENTOS BÁSICOS
+                LÍNGUA PORTUGUESA: 1 Interpretação de textos.
+                """, new FonteDoEdital("edital.txt", HASH, 1));
+
+        assertThat(extracao.materias()).singleElement().satisfies(materia ->
+                assertThat(materia.itensDoEdital()).singleElement()
+                        .satisfies(item -> assertThat(
+                                item.descricaoLiteral().valor())
+                                .isEqualTo("Interpretação de textos.")));
+    }
+
+    @Test
+    void preservaOrientacaoIsoladaECombinaFontesDistintas() {
+        var apenasOrientacao = new ParserDeterministicoDoEdital().extrair("""
+                CONCURSO: Controle Público
+                ORIENTAÇÃO: Auditoria de TI
+                CARGO: Auditor
+                """, new FonteDoEdital("orientacao.txt", HASH, 1));
+
+        assertThat(apenasOrientacao.cargos().getFirst().especialidade())
+                .satisfies(valor -> {
+                    assertThat(valor.valor())
+                            .isEqualTo("ORIENTAÇÃO: Auditoria de TI");
+                    assertThat(valor.fonte().secao()).isEqualTo("ORIENTAÇÃO");
+                    assertThat(valor.inferido()).isFalse();
+                });
+
+        var camposSeparados = new ParserDeterministicoDoEdital().extrair("""
+                CONCURSO: Controle Público
+                ESPECIALIDADE: Controle Externo
+                \f
+                ORIENTAÇÃO: Auditoria de TI
+                CARGO: Auditor
+                """, new FonteDoEdital("campos-separados.txt", HASH, 2));
+
+        assertThat(camposSeparados.cargos().getFirst().especialidade())
+                .satisfies(valor -> {
+                    assertThat(valor.valor()).isEqualTo(
+                            "Controle Externo – ORIENTAÇÃO: Auditoria de TI");
+                    assertThat(valor.inferido()).isTrue();
+                    assertThat(valor.fonte().pagina()).isNull();
+                    assertThat(valor.fonte().trecho())
+                            .contains("ESPECIALIDADE: Controle Externo",
+                                    "ORIENTAÇÃO: Auditoria de TI");
+                });
     }
 
     private static String fixture(String nome) throws Exception {
