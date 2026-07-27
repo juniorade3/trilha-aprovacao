@@ -19,11 +19,12 @@ const RegistroRapidoStub = defineComponent({
     identificadorDoTopicoInicial: { type: String, default: undefined },
     tipoDeEstudoInicial: { type: String, default: undefined },
   },
+  emits: ['fechar', 'registrado'],
   template: '<div data-testid="registro-rapido" />',
 })
 
 describe('LayoutPrincipal', () => {
-  it('oferece planejamento no menu principal sem duplicar historico', async () => {
+  it('prioriza hoje e historico no menu principal e oferece cinco destinos moveis', async () => {
     const roteador = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }],
@@ -38,8 +39,12 @@ describe('LayoutPrincipal', () => {
     })
 
     expect(layout.get('.navegacao-principal').text()).toContain('Planejamento')
-    expect(layout.get('.navegacao-principal').text()).not.toContain('Histórico')
+    expect(layout.get('.navegacao-principal').text()).toContain('Hoje')
+    expect(layout.get('.navegacao-principal').text()).toContain('Histórico')
     expect(layout.get('.navegacao-movel').text()).toContain('Planejar')
+    expect(layout.get('.navegacao-movel').text()).toContain('Hoje')
+    expect(layout.get('.navegacao-movel').text()).toContain('Mais')
+    expect(layout.findAll('.navegacao-movel > *')).toHaveLength(5)
     expect(
       layout
         .get('a[aria-label="Integração com o Telegram"]')
@@ -78,5 +83,33 @@ describe('LayoutPrincipal', () => {
     expect(registro.props('identificadorDoTopicoInicial')).toBe('topico-1')
     expect(registro.props('tipoDeEstudoInicial')).toBe('REVISAO')
     layout.unmount()
+  })
+
+  it('publica a nova evidência para os consumidores após o registro', async () => {
+    vi.useFakeTimers()
+    const roteador = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await roteador.push('/')
+    await roteador.isReady()
+    const layout = mount(LayoutPrincipal, {
+      global: {
+        plugins: [createPinia(), roteador],
+        stubs: { RegistroRapidoDeEstudo: RegistroRapidoStub },
+      },
+    })
+    const aoRegistrar = vi.fn()
+    window.addEventListener('estudo-registrado', aoRegistrar, { once: true })
+
+    await layout.get('.acao-global-de-estudo').trigger('click')
+    layout.getComponent(RegistroRapidoStub).vm.$emit('registrado')
+    await nextTick()
+
+    expect(aoRegistrar).toHaveBeenCalledTimes(1)
+    expect(layout.findComponent(RegistroRapidoStub).exists()).toBe(false)
+    expect(layout.text()).toContain('Seu progresso foi atualizado')
+    layout.unmount()
+    vi.useRealTimers()
   })
 })

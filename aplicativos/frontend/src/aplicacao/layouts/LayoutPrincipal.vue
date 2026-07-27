@@ -27,6 +27,10 @@ function fecharMenu() {
   menuAberto.value = false
 }
 
+function alternarMenu() {
+  menuAberto.value = !menuAberto.value
+}
+
 async function sair() {
   try {
     await requisitar<void>('/v1/autenticacao/logout', { method: 'POST' })
@@ -72,6 +76,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="aplicacao-autenticada">
+    <a class="atalho-para-conteudo" href="#conteudo-principal">
+      Ir para o conteúdo
+    </a>
     <header class="topo-da-aplicacao">
       <div class="topo-da-aplicacao-interno">
         <RouterLink
@@ -85,14 +92,6 @@ onBeforeUnmount(() => {
           </svg>
           <span>Trilha da Aprovação</span>
         </RouterLink>
-
-        <nav class="navegacao-principal" aria-label="Navegação principal">
-          <RouterLink to="/dashboard">Visão geral</RouterLink>
-          <RouterLink to="/concursos">Meu concurso</RouterLink>
-          <RouterLink to="/materias">Conteúdos</RouterLink>
-          <RouterLink to="/materiais">Materiais</RouterLink>
-          <RouterLink to="/planejamento/semana">Planejamento</RouterLink>
-        </nav>
 
         <button
           class="acao-global-de-estudo"
@@ -130,30 +129,134 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <RouterView />
+    <aside class="barra-lateral-da-aplicacao">
+      <nav class="navegacao-principal" aria-label="Navegação principal">
+        <p class="rotulo-da-navegacao">Sua trilha</p>
+        <RouterLink to="/dashboard">
+          <i class="bi bi-grid-1x2" aria-hidden="true"></i>
+          <span>Visão geral</span>
+        </RouterLink>
+        <RouterLink to="/planejamento/hoje">
+          <i class="bi bi-sun" aria-hidden="true"></i>
+          <span>Hoje</span>
+        </RouterLink>
+        <RouterLink to="/planejamento/semana">
+          <i class="bi bi-calendar-week" aria-hidden="true"></i>
+          <span>Planejamento</span>
+        </RouterLink>
+        <RouterLink to="/planejamento/prioridades">
+          <i class="bi bi-list-ol" aria-hidden="true"></i>
+          <span>Prioridades</span>
+        </RouterLink>
+        <RouterLink to="/estudos">
+          <i class="bi bi-clock-history" aria-hidden="true"></i>
+          <span>Histórico</span>
+        </RouterLink>
+
+        <p class="rotulo-da-navegacao">Organização</p>
+        <RouterLink to="/materias">
+          <i class="bi bi-journal-text" aria-hidden="true"></i>
+          <span>Conteúdos</span>
+        </RouterLink>
+        <RouterLink to="/materiais">
+          <i class="bi bi-collection" aria-hidden="true"></i>
+          <span>Materiais</span>
+        </RouterLink>
+        <RouterLink to="/concursos">
+          <i class="bi bi-bullseye" aria-hidden="true"></i>
+          <span>Meu concurso</span>
+        </RouterLink>
+        <RouterLink
+          v-if="assistenteTelegramHabilitado"
+          to="/integracoes/telegram"
+        >
+          <i class="bi bi-telegram" aria-hidden="true"></i>
+          <span>Integração Telegram</span>
+        </RouterLink>
+      </nav>
+    </aside>
+
+    <div id="conteudo-principal" class="conteudo-principal" tabindex="-1">
+      <RouterView />
+    </div>
 
     <nav class="navegacao-movel" aria-label="Navegação principal">
       <RouterLink to="/dashboard">
         <i class="bi bi-house" aria-hidden="true"></i>
-        <span>Visão</span>
+        <span>Início</span>
       </RouterLink>
-      <RouterLink to="/concursos">
-        <i class="bi bi-bullseye" aria-hidden="true"></i>
-        <span>Concurso</span>
-      </RouterLink>
-      <RouterLink to="/materias">
-        <i class="bi bi-book" aria-hidden="true"></i>
-        <span>Conteúdos</span>
-      </RouterLink>
-      <RouterLink to="/materiais">
-        <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
-        <span>Materiais</span>
+      <RouterLink to="/planejamento/hoje">
+        <i class="bi bi-sun" aria-hidden="true"></i>
+        <span>Hoje</span>
       </RouterLink>
       <RouterLink to="/planejamento/semana">
         <i class="bi bi-calendar-week" aria-hidden="true"></i>
         <span>Planejar</span>
       </RouterLink>
+      <RouterLink to="/materias">
+        <i class="bi bi-book" aria-hidden="true"></i>
+        <span>Conteúdos</span>
+      </RouterLink>
+      <button
+        type="button"
+        :aria-expanded="menuAberto"
+        aria-controls="menu-movel-mais"
+        @click="alternarMenu"
+      >
+        <i class="bi bi-grid" aria-hidden="true"></i>
+        <span>Mais</span>
+      </button>
     </nav>
+
+    <div
+      v-if="menuAberto"
+      id="menu-movel-mais"
+      class="sobreposicao-do-menu-movel"
+      @click.self="fecharMenu"
+    >
+      <aside class="menu-movel-mais" aria-label="Mais destinos">
+        <header>
+          <div>
+            <span class="rotulo-da-navegacao">Navegação</span>
+            <h2>Mais opções</h2>
+          </div>
+          <button
+            class="botao-de-icone"
+            type="button"
+            aria-label="Fechar menu"
+            @click="fecharMenu"
+          >
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </header>
+        <nav @click="fecharMenu">
+          <RouterLink to="/concursos">
+            <i class="bi bi-bullseye" aria-hidden="true"></i>Meu concurso
+          </RouterLink>
+          <RouterLink to="/materiais">
+            <i class="bi bi-collection" aria-hidden="true"></i>Materiais
+          </RouterLink>
+          <RouterLink to="/estudos">
+            <i class="bi bi-clock-history" aria-hidden="true"></i>Histórico
+          </RouterLink>
+          <RouterLink to="/planejamento/prioridades">
+            <i class="bi bi-list-ol" aria-hidden="true"></i>Prioridades
+          </RouterLink>
+          <RouterLink
+            v-if="assistenteTelegramHabilitado"
+            to="/integracoes/telegram"
+          >
+            <i class="bi bi-telegram" aria-hidden="true"></i>Telegram
+          </RouterLink>
+        </nav>
+        <footer>
+          <span>{{ sessao.usuario?.nome }}</span>
+          <button type="button" @click="sair">
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Sair
+          </button>
+        </footer>
+      </aside>
+    </div>
 
     <button
       class="acao-flutuante-de-estudo"
