@@ -261,6 +261,31 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                 telegram, chat, sessao, update, correlacaoEfetiva);
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE,
+            noRollbackFor = ConfirmacaoExpirada.class)
+    public OperacaoAssistida confirmarEAplicarPelaWeb(UUID usuario,
+            UUID identificador, UUID correlacao) {
+        UUID correlacaoEfetiva = correlacao == null
+                ? UUID.randomUUID() : correlacao;
+        OperacaoAssistidaPersistida persistida = operacoes
+                .encontrarParaAtualizacao(identificador, usuario)
+                .orElseThrow(this::operacaoNaoEncontrada);
+        OperacaoAssistida operacao = persistida.paraDominio();
+        Contexto contexto = Contexto.de(operacao, correlacaoEfetiva);
+        EstadoDaAplicacao estadoDaAplicacao = new EstadoDaAplicacao();
+        try {
+            return processarConfirmacaoPelaWeb(persistida, operacao, contexto,
+                    estadoDaAplicacao);
+        } catch (ConfirmacaoExpirada excecao) {
+            throw excecao;
+        } catch (RuntimeException excecao) {
+            observabilidade.registrarPelaWebDepoisDaConclusao(contexto,
+                    classificar(excecao, estadoDaAplicacao.ativa),
+                    codigoDaExcecao(excecao));
+            throw excecao;
+        }
+    }
+
     private ResultadoDaConfirmacao confirmarIdentificada(UUID identificador,
             String codigo, String metodo, long bot, long telegram, long chat,
             String sessao, String update, UUID correlacao) {
@@ -280,6 +305,55 @@ public class ServicoDeAplicacaoDeOperacoesAssistidas {
                     codigoDaExcecao(excecao));
             throw excecao;
         }
+    }
+
+    private OperacaoAssistida processarConfirmacaoPelaWeb(
+            OperacaoAssistidaPersistida persistida, OperacaoAssistida operacao,
+            Contexto contexto, EstadoDaAplicacao estadoDaAplicacao) {
+        if (!"COMUM".equals(persistida.nivelDeConfirmacao())) {
+            throw new RegraDeDominio(
+                    "CONFIRMACAO_REFORCADA_EXIGE_TELEGRAM",
+                    "Esta operacao exige a confirmacao reforcada pelo Telegram.");
+        }
+        if (operacao.estado() == EstadoDaOperacaoAssistida.APLICADA) {
+            observabilidade.registrarPelaWebNoFluxo(contexto,
+                    Desfecho.IDEMPOTENTE, "OPERACAO_JA_APLICADA");
+            return operacao;
+        }
+        if (operacao.estado()
+                != EstadoDaOperacaoAssistida.AGUARDANDO_CONFIRMACAO) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao nao esta disponivel para confirmacao.");
+        }
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        if (persistida.confirmacaoExpiraEm() == null
+                || !agora.isBefore(persistida.confirmacaoExpiraEm())) {
+            operacao.expirar(agora);
+            persistida.atualizarDe(operacao);
+            operacoes.saveAndFlush(persistida);
+            observabilidade.registrarPelaWebNoFluxo(contexto,
+                    Desfecho.EXPIRADA, "CONFIRMACAO_EXPIRADA");
+            throw new ConfirmacaoExpirada();
+        }
+        Map<String, Object> proposta = mapa(operacao.propostaCanonica());
+        Map<String, Object> atuais = preparacoes.versoesAtuais(operacao.tipo(),
+                operacao.identificadorDoUsuario(), proposta);
+        servicoDeOperacoes.validarAtualidade(operacao.identificadorDoUsuario(),
+                operacao.identificador(), operacao.assinatura(), json(atuais),
+                "COMUM");
+        operacao.confirmar(operacao.assinatura(), agora);
+        persistida.atualizarDe(operacao);
+        operacoes.saveAndFlush(persistida);
+        estadoDaAplicacao.ativa = true;
+        Map<String, Object> resultado = aplicar(operacao, proposta);
+        operacao.aplicar(json(resultado), OffsetDateTime.now(ZoneOffset.UTC));
+        persistida.atualizarDe(operacao);
+        OperacaoAssistida aplicada = operacoes.saveAndFlush(persistida)
+                .paraDominio();
+        observabilidade.registrarPelaWebNoFluxo(Contexto.de(aplicada,
+                        contexto.identificadorDeCorrelacao()),
+                Desfecho.APLICADA, "OPERACAO_APLICADA");
+        return aplicada;
     }
 
     private ResultadoDaConfirmacao processarConfirmacao(UUID identificador,

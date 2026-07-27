@@ -444,7 +444,21 @@ test("2xx malformado ou desconhecido nunca afirma aplicacao", async (t) => {
   }
 });
 
-test("mapeia status de confirmacao sem ler corpo", async () => {
+test("informa que o bloco precisa estar em execucao quando o integrador confirma esse motivo", async () => {
+  const registro = registrar(async () => new Response(JSON.stringify({
+    codigo: "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA",
+  }), {
+    status: 409,
+    headers: { "content-type": "application/json" },
+  }));
+
+  assert.deepEqual(await registro.comando("confirmar").handler(
+    contextoPrivado({ args: "2345678A" })), {
+    text: MENSAGENS.execucaoDoBlocoNaoEncontrada,
+  });
+});
+
+test("mapeia recusas desconhecidas de confirmacao sem expor o corpo", async () => {
   for (const [status, mensagem] of [
     [400, MENSAGENS.contextoDaConfirmacaoInvalido],
     [404, MENSAGENS.vinculoDaConfirmacaoNaoEncontrado],
@@ -459,14 +473,31 @@ test("mapeia status de confirmacao sem ler corpo", async () => {
       status,
       json() {
         corpoLido = true;
-        throw new Error("corpo nao deveria ser lido");
+        return { codigo: "CODIGO_NAO_PERMITIDO" };
       },
       body: { async cancel() {} },
     }));
     assert.deepEqual(await registro.comando("confirmar").handler(
       contextoPrivado({ args: "2345678A" })), { text: mensagem });
-    assert.equal(corpoLido, false);
+    assert.equal(corpoLido, [409, 410, 422].includes(status));
   }
+});
+
+test("recusa com corpo malformado continua generica e nao vaza o motivo", async () => {
+  const motivo = "detalhe-interno-nao-exposto";
+  const logs = [];
+  const registro = registrar(async () => new Response(
+    JSON.stringify({ codigo: "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA", motivo }),
+    { status: 409, headers: { "content-type": "application/json" } },
+  ), {}, {
+    warn: (mensagem) => logs.push(mensagem),
+  });
+
+  const resposta = await registro.comando("confirmar").handler(
+    contextoPrivado({ args: "2345678A" }));
+  const textoAuditado = `${resposta.text}\n${logs.join("\n")}`;
+  assert.deepEqual(resposta, { text: MENSAGENS.confirmacaoRecusada });
+  assert.doesNotMatch(textoAuditado, new RegExp(motivo));
 });
 
 test("timeout aborta chamada e retorna estado indeterminado", async () => {

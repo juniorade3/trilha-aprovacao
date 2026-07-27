@@ -108,8 +108,9 @@ navegador, nodes, Docker, mensagens externas ou administracao.
   confiaveis;
 - `modelos/openclaw.json`: configuracao base validada pelo schema oficial;
 - `plugin-trilha/`: comando `/conectar` sem acesso a segredos;
-- operacoes preparadas pelo MCP sao aplicadas somente pelo comando confiavel
-  `/confirmar CODIGO`, depois de nova verificacao de versoes no backend;
+- operacoes preparadas pelo MCP sao aplicadas pelo comando confiavel
+  `/confirmar CODIGO` ou, quando comuns, por uma decisao explicita na sessao
+  web com CSRF; ambos os caminhos revalidam versoes e assinatura no backend;
 - `modelos/workspace/`: instrucoes copiadas para cada agente;
 - `scripts/inicializar-estado.sh`: cria o estado externo com permissoes restritas;
 - `scripts/provisionar-vinculo.sh`: cria agente, rota, workspace e bundle MCP isolados;

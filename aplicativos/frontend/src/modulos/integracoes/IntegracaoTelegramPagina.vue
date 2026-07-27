@@ -6,6 +6,8 @@ import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
 import {
+  cancelarOperacaoAssistida,
+  confirmarOperacaoAssistidaPelaWeb,
   criarCodigoDeVinculo,
   listarOperacoesAssistidas,
   obterOperacaoAssistida,
@@ -39,6 +41,7 @@ const erro = ref('')
 const erroDoHistorico = ref('')
 const erroDoDetalhe = ref('')
 const erroDaRotacao = ref('')
+const erroDaAcao = ref('')
 const aviso = ref('')
 const avisoDaCopia = ref('')
 const botaoDeAtualizar = ref<HTMLButtonElement>()
@@ -47,6 +50,8 @@ const botaoDeRevogar = ref<HTMLButtonElement>()
 const botaoDeRotacionar = ref<HTMLButtonElement>()
 const botaoDeVerificar = ref<HTMLButtonElement>()
 const codigoExibido = ref<HTMLElement>()
+const alertaDaAcao = ref<HTMLElement>()
+const acaoDaOperacao = ref<'confirmacao' | 'cancelamento'>()
 let cancelamento: AbortController | undefined
 let cancelamentoDoHistorico: AbortController | undefined
 let cancelamentoDoDetalhe: AbortController | undefined
@@ -72,6 +77,12 @@ const rotulosDosEstadosDaOperacao: Record<EstadoDaOperacaoAssistida, string> = {
   EXPIRADA: 'Expirada',
   FALHOU: 'Falhou',
 }
+
+const tiposDeConfirmacaoReforcada = new Set([
+  'ATIVACAO_DO_CONCURSO',
+  'ARQUIVAMENTO_DO_CONCURSO',
+  'CANCELAMENTO_DO_CONCURSO',
+])
 
 function mensagemDeErro(causa: unknown, padrao: string) {
   return causa instanceof Error ? causa.message : padrao
@@ -118,6 +129,18 @@ function classeDoEstado(estado: EstadoDaOperacaoAssistida) {
   if (estado === 'EXPIRADA') return 'text-bg-secondary'
   if (estado === 'AGUARDANDO_CONFIRMACAO') return 'text-bg-warning'
   return 'text-bg-light'
+}
+
+function podeSerConfirmadaPelaWeb(operacao: DetalheDaOperacaoAssistida) {
+  return (
+    operacao.estado === 'AGUARDANDO_CONFIRMACAO' &&
+    !tiposDeConfirmacaoReforcada.has(operacao.tipo) &&
+    new Date(operacao.expiraEm).getTime() > Date.now()
+  )
+}
+
+function podeSerCanceladaPelaWeb(operacao: DetalheDaOperacaoAssistida) {
+  return operacao.estado === 'AGUARDANDO_CONFIRMACAO'
 }
 
 async function carregarTudo() {
@@ -330,6 +353,7 @@ async function abrirDetalhe(operacao: ResumoDaOperacaoAssistida) {
   detalheSelecionado.value = operacao
   detalhe.value = undefined
   erroDoDetalhe.value = ''
+  erroDaAcao.value = ''
   carregandoDetalhe.value = true
   try {
     detalhe.value = await obterOperacaoAssistida(
@@ -353,6 +377,101 @@ function fecharDetalhe() {
   detalheSelecionado.value = undefined
   detalhe.value = undefined
   erroDoDetalhe.value = ''
+  erroDaAcao.value = ''
+  acaoDaOperacao.value = undefined
+}
+
+function atualizarOperacaoNoHistorico(atualizada: DetalheDaOperacaoAssistida) {
+  const resumo: ResumoDaOperacaoAssistida = {
+    identificador: atualizada.identificador,
+    tipo: atualizada.tipo,
+    estado: atualizada.estado,
+    resumo: atualizada.resumo,
+    expiraEm: atualizada.expiraEm,
+    criadoEm: atualizada.criadoEm,
+    atualizadoEm: atualizada.atualizadoEm,
+  }
+  operacoes.value = operacoes.value.map((operacao) =>
+    operacao.identificador === atualizada.identificador ? resumo : operacao,
+  )
+  detalheSelecionado.value = resumo
+  detalhe.value = atualizada
+}
+
+async function atualizarDepoisDeConflito() {
+  const selecionada = detalheSelecionado.value
+  await carregarPagina(pagina.value)
+  if (selecionada) await abrirDetalhe(selecionada)
+}
+
+async function confirmarOperacaoPelaWeb() {
+  if (!detalhe.value || !podeSerConfirmadaPelaWeb(detalhe.value)) return
+  if (
+    !window.confirm(
+      'Aplicar esta operação? A Trilha verificará a prévia novamente antes de alterar seus dados.',
+    )
+  )
+    return
+  acaoDaOperacao.value = 'confirmacao'
+  erroDaAcao.value = ''
+  aviso.value = ''
+  try {
+    const atualizada = await confirmarOperacaoAssistidaPelaWeb(
+      detalhe.value.identificador,
+    )
+    atualizarOperacaoNoHistorico(atualizada)
+    aviso.value = 'Operação confirmada e aplicada.'
+  } catch (causa) {
+    if (!tratarSessaoExpirada(causa)) {
+      const mensagem = mensagemDeErro(
+        causa,
+        'Não foi possível confirmar a operação.',
+      )
+      erroDaAcao.value = mensagem
+      if (causa instanceof ErroDaApi && causa.status === 409)
+        await atualizarDepoisDeConflito()
+      erroDaAcao.value = mensagem
+      await nextTick()
+      alertaDaAcao.value?.focus()
+    }
+  } finally {
+    acaoDaOperacao.value = undefined
+  }
+}
+
+async function cancelarOperacaoPelaWeb() {
+  if (!detalhe.value || !podeSerCanceladaPelaWeb(detalhe.value)) return
+  if (
+    !window.confirm(
+      'Cancelar esta operação? A prévia será descartada e nada será aplicado.',
+    )
+  )
+    return
+  acaoDaOperacao.value = 'cancelamento'
+  erroDaAcao.value = ''
+  aviso.value = ''
+  try {
+    const atualizada = await cancelarOperacaoAssistida(
+      detalhe.value.identificador,
+    )
+    atualizarOperacaoNoHistorico(atualizada)
+    aviso.value = 'Operação cancelada. Nenhuma alteração foi aplicada.'
+  } catch (causa) {
+    if (!tratarSessaoExpirada(causa)) {
+      const mensagem = mensagemDeErro(
+        causa,
+        'Não foi possível cancelar a operação.',
+      )
+      erroDaAcao.value = mensagem
+      if (causa instanceof ErroDaApi && causa.status === 409)
+        await atualizarDepoisDeConflito()
+      erroDaAcao.value = mensagem
+      await nextTick()
+      alertaDaAcao.value?.focus()
+    }
+  } finally {
+    acaoDaOperacao.value = undefined
+  }
 }
 
 onMounted(() => void carregarTudo())
@@ -606,7 +725,8 @@ onBeforeUnmount(() => {
             <h2 id="titulo-operacoes">Histórico de operações</h2>
             <p>
               Consulte o que foi preparado, confirmado, aplicado ou recusado
-              pelo assistente.
+              pelo assistente. Abra uma prévia pendente para aceitar ou cancelar
+              a operação.
             </p>
           </div>
           <span
@@ -753,6 +873,69 @@ onBeforeUnmount(() => {
       <p v-if="detalhe.falha" class="alert alert-danger" role="alert">
         {{ detalhe.falha }}
       </p>
+
+      <section
+        v-if="
+          podeSerConfirmadaPelaWeb(detalhe) || podeSerCanceladaPelaWeb(detalhe)
+        "
+        class="acoes-da-operacao-assistida"
+        aria-label="Decisão da operação"
+      >
+        <h3>Decidir esta operação</h3>
+        <p>
+          Revise a proposta antes de decidir. A confirmação pela web verifica
+          novamente se os dados continuam atuais.
+        </p>
+        <p
+          v-if="
+            !podeSerConfirmadaPelaWeb(detalhe) &&
+            tiposDeConfirmacaoReforcada.has(detalhe.tipo)
+          "
+          class="alert alert-warning"
+        >
+          Esta é uma operação crítica e exige a confirmação reforçada pelo
+          Telegram. Você ainda pode cancelá-la por aqui se ela estiver pendente.
+        </p>
+        <p
+          v-if="erroDaAcao"
+          ref="alertaDaAcao"
+          class="alert alert-danger"
+          role="alert"
+          tabindex="-1"
+        >
+          {{ erroDaAcao }}
+        </p>
+        <div>
+          <button
+            v-if="podeSerConfirmadaPelaWeb(detalhe)"
+            class="btn btn-primary"
+            type="button"
+            :disabled="acaoDaOperacao != null"
+            @click="confirmarOperacaoPelaWeb"
+          >
+            <span
+              v-if="acaoDaOperacao === 'confirmacao'"
+              class="spinner-border spinner-border-sm me-2"
+              aria-hidden="true"
+            ></span>
+            Aceitar e aplicar
+          </button>
+          <button
+            v-if="podeSerCanceladaPelaWeb(detalhe)"
+            class="btn btn-outline-danger"
+            type="button"
+            :disabled="acaoDaOperacao != null"
+            @click="cancelarOperacaoPelaWeb"
+          >
+            <span
+              v-if="acaoDaOperacao === 'cancelamento'"
+              class="spinner-border spinner-border-sm me-2"
+              aria-hidden="true"
+            ></span>
+            Cancelar operação
+          </button>
+        </div>
+      </section>
 
       <section class="estrutura-da-operacao-assistida">
         <h3>Proposta registrada</h3>

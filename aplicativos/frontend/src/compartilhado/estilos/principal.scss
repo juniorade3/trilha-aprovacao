@@ -3458,6 +3458,36 @@ h2.titulo-editorial,
   }
 }
 
+.acoes-da-operacao-assistida {
+  background: var(--cor-destaque-clara);
+  border: 1px solid rgba(18, 143, 131, 0.22);
+  border-radius: 0.75rem;
+  margin-top: 1.35rem;
+  padding: 1rem;
+
+  h3 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  > p {
+    color: var(--cor-texto-secundario);
+    font-size: 0.84rem;
+    margin: 0.45rem 0 0;
+  }
+
+  > .alert {
+    margin-top: 0.85rem;
+  }
+
+  > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+}
+
 .assinatura-da-operacao-assistida {
   border-top: 1px solid var(--cor-borda);
   margin-top: 1.25rem;
@@ -3495,7 +3525,8 @@ h2.titulo-editorial,
   }
 
   .acoes-do-vinculo-telegram,
-  .codigo-do-vinculo-telegram > div {
+  .codigo-do-vinculo-telegram > div,
+  .acoes-da-operacao-assistida > div {
     display: grid;
 
     .btn {

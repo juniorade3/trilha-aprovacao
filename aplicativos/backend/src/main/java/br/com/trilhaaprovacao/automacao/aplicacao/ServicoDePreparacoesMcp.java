@@ -202,15 +202,20 @@ public class ServicoDePreparacoesMcp {
     }
 
     private Map<String, Object> versoesDoBloco(UUID usuario, UUID bloco) {
-        return linhaOu404("""
-                SELECT b.identificador, b.versao, b.estado, p.versao AS versao_do_plano,
-                       e.identificador AS identificador_da_execucao,
-                       e.versao AS versao_da_execucao
+        Map<String, Object> versoes = new LinkedHashMap<>(linhaOu404("""
+                SELECT b.identificador, b.versao, b.estado,
+                       p.versao AS versao_do_plano
                   FROM blocos_de_estudo b
                   JOIN planos_semanais p ON p.identificador = b.plano_id
-                  LEFT JOIN execucoes_de_bloco e ON e.bloco_id = b.identificador
                  WHERE b.identificador = ? AND p.usuario_id = ?
-                """, "BLOCO_DE_ESTUDO_NAO_ENCONTRADO", bloco, usuario);
+                """, "BLOCO_DE_ESTUDO_NAO_ENCONTRADO", bloco, usuario));
+        versoes.putAll(linhaOu404("""
+                SELECT e.identificador AS identificador_da_execucao,
+                       e.versao AS versao_da_execucao
+                  FROM execucoes_de_bloco e
+                 WHERE e.bloco_id = ? AND e.usuario_id = ?
+                """, "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA", bloco, usuario));
+        return versoes;
     }
 
     private Map<String, Object> versoesDoEstudo(UUID usuario, UUID estudo) {
