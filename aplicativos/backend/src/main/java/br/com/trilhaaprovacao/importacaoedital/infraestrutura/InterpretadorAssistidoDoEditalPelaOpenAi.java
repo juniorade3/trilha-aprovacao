@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -39,6 +40,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
+@ConditionalOnProperty(
+        prefix = "trilha.importacao-de-edital.interpretacao-assistida",
+        name = "provedor",
+        havingValue = ConfiguracaoDaInterpretacaoAssistidaDoEdital
+                .PROVEDOR_RESPONSES_API,
+        matchIfMissing = true)
 public class InterpretadorAssistidoDoEditalPelaOpenAi
         implements InterpretadorAssistidoDoEdital {
 
@@ -79,7 +86,7 @@ public class InterpretadorAssistidoDoEditalPelaOpenAi
 
     @Override
     public boolean disponivel() {
-        return configuracao.disponivel();
+        return configuracao.respostasApiDisponivel();
     }
 
     @Override
@@ -202,10 +209,9 @@ public class InterpretadorAssistidoDoEditalPelaOpenAi
         }
 
         try {
-            ArvoreInterpretadaDoEdital arvore = json.readValue(
-                    textoEstruturado.toString(),
-                    ArvoreInterpretadaDoEdital.class);
-            validarArvore(arvore);
+            ArvoreInterpretadaDoEdital arvore =
+                    LeitorEstritoDaArvoreInterpretadaDoEdital.ler(
+                            json, textoEstruturado.toString());
             return new ResultadoDaInterpretacaoAssistidaDoEdital(arvore, uso);
         } catch (JacksonException | IllegalArgumentException excecao) {
             throw new FalhaNaInterpretacaoAssistidaDoEdital(
@@ -259,16 +265,6 @@ public class InterpretadorAssistidoDoEditalPelaOpenAi
         arquivo.put("detail", "high");
         conteudo.add(arquivo);
         return conteudo;
-    }
-
-    private void validarArvore(ArvoreInterpretadaDoEdital arvore) {
-        if (arvore == null || arvore.cargo() == null
-                || arvore.cargo().nome() == null
-                || arvore.cargo().nome().valor() == null
-                || arvore.cargo().nome().valor().isBlank()) {
-            throw new IllegalArgumentException(
-                    "A IA nao localizou o cargo alvo.");
-        }
     }
 
     private UsoDaInterpretacaoAssistida lerUso(JsonNode resposta) {

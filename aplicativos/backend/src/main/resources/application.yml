@@ -54,10 +54,15 @@ trilha:
     intervalo-da-limpeza: ${INTERVALO_DA_LIMPEZA_DO_EDITAL:PT1H}
     interpretacao-assistida:
       habilitada: ${INTERPRETACAO_ASSISTIDA_DO_EDITAL_HABILITADA:false}
+      provedor: ${PROVEDOR_DA_INTERPRETACAO_DO_EDITAL:responses-api}
       url-base: ${URL_DA_API_OPENAI:https://api.openai.com/v1}
       chave-da-api: ${CHAVE_DA_API_OPENAI_PARA_EDITAIS:}
       modelo: ${MODELO_DA_INTERPRETACAO_DO_EDITAL:gpt-5.6-sol}
       timeout: ${TIMEOUT_DA_INTERPRETACAO_DO_EDITAL:PT180S}
+      executavel-do-codex: ${EXECUTAVEL_DO_CODEX:}
+      codex-home: ${CODEX_HOME:}
+      limite-de-paginas-renderizadas: ${LIMITE_DE_PAGINAS_RENDERIZADAS_PELA_IA:20}
+      dpi-da-renderizacao: ${DPI_DA_RENDERIZACAO_PARA_IA:144}
   automacao:
     habilitada: ${ASSISTENTE_TELEGRAM_HABILITADO:false}
     identificador-do-bot: ${IDENTIFICADOR_DO_BOT_TELEGRAM:0}

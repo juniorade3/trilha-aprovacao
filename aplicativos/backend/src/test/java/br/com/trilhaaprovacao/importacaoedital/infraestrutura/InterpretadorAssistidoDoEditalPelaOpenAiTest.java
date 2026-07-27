@@ -284,8 +284,9 @@ class InterpretadorAssistidoDoEditalPelaOpenAiTest {
                 + servidor.getAddress().getPort() + "/v1");
         ConfiguracaoDaInterpretacaoAssistidaDoEdital configuracao =
                 new ConfiguracaoDaInterpretacaoAssistidaDoEdital(
-                        habilitada, url, "segredo-de-teste",
-                        "gpt-5.6-sol", timeout);
+                        habilitada, "responses-api", url,
+                        "segredo-de-teste", "gpt-5.6-sol", timeout,
+                        "", "", 20, 144);
         return new InterpretadorAssistidoDoEditalPelaOpenAi(
                 configuracao, json,
                 new MetricasDaInterpretacaoAssistidaDoEdital(registro));
