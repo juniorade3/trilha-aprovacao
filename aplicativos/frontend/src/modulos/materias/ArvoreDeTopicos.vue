@@ -39,7 +39,7 @@ const filhos = computed(() =>
         :class="{ 'opacity-75': topico.arquivado }"
       >
         <div class="d-flex flex-wrap gap-2 align-items-start">
-          <span class="badge text-bg-light">{{ topico.ordem }}</span>
+          <span class="badge etiqueta-neutra">{{ topico.ordem }}</span>
           <div class="flex-grow-1">
             <h3 class="h6 mb-1">
               {{ topico.nome }}

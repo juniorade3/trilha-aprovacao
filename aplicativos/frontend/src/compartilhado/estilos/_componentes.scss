@@ -1,0 +1,310 @@
+[data-bs-theme='dark'] .card,
+[data-bs-theme='dark'] .painel-da-jornada,
+[data-bs-theme='dark'] .painel-mestre-de-materias,
+[data-bs-theme='dark'] .detalhe-da-materia-no-catalogo {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .pagina-da-jornada,
+[data-bs-theme='dark'] .pagina-comum {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cabecalho-da-pagina {
+  border-bottom-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .cabecalho-da-pagina > div > p:last-child,
+[data-bs-theme='dark'] .cabecalho-da-pagina > div:first-child > p:last-child,
+[data-bs-theme='dark'] .rotulo-discreto,
+[data-bs-theme='dark'] .faixa-resumo-de-conteudos,
+[data-bs-theme='dark'] .estado-do-modal,
+[data-bs-theme='dark'] .estado-do-catalogo,
+[data-bs-theme='dark'] .estado-vazio-da-jornada {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] small {
+  font-size: 0.875rem !important;
+}
+
+[data-bs-theme='dark'] time,
+[data-bs-theme='dark'] dt,
+[data-bs-theme='dark'] .badge,
+[data-bs-theme='dark'] .rotulo-da-autenticacao,
+[data-bs-theme='dark'] .rotulo-da-navegacao,
+[data-bs-theme='dark'] .rotulo-discreto,
+[data-bs-theme='dark'] .sobretitulo-da-pagina,
+[data-bs-theme='dark'] .etiqueta-da-materia,
+[data-bs-theme='dark'] .etiqueta-da-materia-no-historico,
+[data-bs-theme='dark'] .situacao-da-revisao {
+  font-size: 0.8125rem !important;
+}
+
+[data-bs-theme='dark'] .acao-global-de-estudo,
+[data-bs-theme='dark'] .rotulo-claro,
+[data-bs-theme='dark'] .rotulo-do-indicador,
+[data-bs-theme='dark'] .subtitulo-do-bloco,
+[data-bs-theme='dark'] .legenda-do-indicador,
+[data-bs-theme='dark'] .duracao-da-atividade,
+[data-bs-theme='dark'] .nota-contextual span,
+[data-bs-theme='dark'] .tempo-da-jornada span,
+[data-bs-theme='dark'] .cabecalho-do-cartao-da-jornada a,
+[data-bs-theme='dark'] .selo-de-objetivo-ativo,
+[data-bs-theme='dark'] .passos-do-assistente b,
+[data-bs-theme='dark'] .passos-do-concurso b,
+[data-bs-theme='dark'] .abas-do-concurso button span,
+[data-bs-theme='dark']
+  .navegador-do-conteudo-programatico
+  > button:not(.btn)
+  em,
+[data-bs-theme='dark'] .estado-do-item-oficial,
+[data-bs-theme='dark'] .mapeamentos-do-item-oficial span,
+[data-bs-theme='dark'] .mapeamentos-do-item-oficial button,
+[data-bs-theme='dark'] .faixa-resumo-de-conteudos,
+[data-bs-theme='dark'] .filtros-do-catalogo button,
+[data-bs-theme='dark'] .estado-do-catalogo span,
+[data-bs-theme='dark'] .paginacao-do-catalogo span,
+[data-bs-theme='dark'] .progresso-da-materia b,
+[data-bs-theme='dark'] .pasta-dos-topicos em,
+[data-bs-theme='dark'] .linha-do-topico-no-catalogo b,
+[data-bs-theme='dark'] .acoes-secundarias-da-materia > a,
+[data-bs-theme='dark'] .filtro-da-biblioteca,
+[data-bs-theme='dark'] .capa-do-material span,
+[data-bs-theme='dark'] .dados-do-material,
+[data-bs-theme='dark'] .link-da-jornada,
+[data-bs-theme='dark'] .menu-de-acoes-do-material button,
+[data-bs-theme='dark'] .topicos-cobertos > div > span,
+[data-bs-theme='dark'] .grupo-da-linha-do-tempo > h3,
+[data-bs-theme='dark'] .registro-na-linha-do-tempo > b,
+[data-bs-theme='dark'] .acoes-do-registro > div button,
+[data-bs-theme='dark'] .grafico-do-ritmo b,
+[data-bs-theme='dark'] .titulo-da-secao-dos-concursos > span,
+[data-bs-theme='dark'] .codigo-do-vinculo-telegram > span,
+[data-bs-theme='dark'] .historico-de-operacoes-assistidas > header > span,
+[data-bs-theme='dark'] .paginacao-das-operacoes-assistidas span,
+[data-bs-theme='dark'] .estrutura-da-operacao-assistida pre,
+[data-bs-theme='dark'] .seletor-da-semana span,
+[data-bs-theme='dark'] .resumo-do-plano-semanal .rotulo-do-resumo,
+[data-bs-theme='dark'] .resumo-da-carga-do-dia,
+[data-bs-theme='dark'] .conteudo-do-bloco-planejado span,
+[data-bs-theme='dark'] .resumo-do-planejamento-de-hoje span {
+  font-size: 0.8125rem !important;
+}
+
+[data-bs-theme='dark'] .corpo-do-cartao-do-material > p,
+[data-bs-theme='dark'] .ritmo-real-da-semana > p {
+  font-size: 0.875rem !important;
+}
+
+[data-bs-theme='dark'] summary {
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .sobretitulo-da-pagina,
+[data-bs-theme='dark'] .rotulo-da-navegacao,
+[data-bs-theme='dark'] .rotulo-discreto {
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .modal-da-aplicacao,
+[data-bs-theme='dark'] .gaveta-da-aplicacao {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-modal,
+[data-bs-theme='dark'] .rodape-do-modal,
+[data-bs-theme='dark'] .cabecalho-da-gaveta {
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .aviso-da-aplicacao {
+  background: var(--cor-superficie-3);
+  border: 1px solid var(--cor-borda-interativa);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .aviso-da-aplicacao > span {
+  background: var(--cor-violeta);
+  color: var(--cor-texto-botao);
+}
+
+[data-bs-theme='dark'] .estado-do-catalogo,
+[data-bs-theme='dark'] .estado-vazio-com-borda,
+[data-bs-theme='dark'] .dia-sem-blocos {
+  background: var(--cor-superficie-1);
+  border-color: var(--cor-borda-interativa);
+}
+
+[data-bs-theme='dark'] .formulario-da-aplicacao label > span,
+[data-bs-theme='dark'] .formulario-da-aplicacao legend,
+[data-bs-theme='dark'] .formulario-da-aplicacao em {
+  color: var(--cor-texto-secundario);
+  font-size: 0.8125rem;
+}
+
+[data-bs-theme='dark'] .formulario-da-aplicacao label > span,
+[data-bs-theme='dark'] .formulario-da-aplicacao legend {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .botao-de-duracao,
+[data-bs-theme='dark'] .campo-de-busca {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda-interativa);
+  color: var(--cor-texto-secundario);
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .botao-de-duracao:hover,
+[data-bs-theme='dark'] .botao-de-duracao.ativo {
+  background: rgb(167 139 250 / 14%);
+  border-color: var(--cor-violeta);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .campo-de-busca input {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .nota-contextual {
+  background: rgb(123 184 255 / 10%);
+  border: 1px solid rgb(123 184 255 / 32%);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .barra-da-jornada,
+[data-bs-theme='dark'] .progress {
+  background: var(--cor-superficie-3);
+}
+
+[data-bs-theme='dark'] .barra-da-jornada i,
+[data-bs-theme='dark'] .progress-bar {
+  background: var(--cor-violeta);
+}
+
+[data-bs-theme='dark'] .etiqueta-neutra {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.6rem;
+}
+
+[data-bs-theme='dark'] .superficie-sutil {
+  border: 1px solid var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .botao-de-contraste {
+  border-radius: var(--raio-md);
+  font-weight: 700;
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .etiqueta-da-materia {
+  align-items: center;
+  background: var(--cor-superficie-3);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+  gap: 0.45rem;
+  min-height: 1.75rem;
+}
+
+[data-bs-theme='dark'] .etiqueta-da-materia::before {
+  background: var(--cor-identificadora-da-materia, var(--cor-violeta));
+  border-radius: 999px;
+  content: '';
+  flex: 0 0 auto;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+[data-bs-theme='dark'] .cor-da-materia,
+[data-bs-theme='dark'] .marca-de-cor,
+[data-bs-theme='dark'] .marca-de-cor-grande {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%);
+}
+
+[data-bs-theme='dark'] .estado-vazio-compacto {
+  background: var(--cor-superficie-3);
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .ramo-da-estrutura,
+[data-bs-theme='dark'] .item-do-edital,
+[data-bs-theme='dark'] .lista-de-topicos .lista-de-topicos {
+  border-color: var(--cor-borda-interativa);
+}
+
+[data-bs-theme='dark'] .item-da-estrutura,
+[data-bs-theme='dark'] .lista-de-mapeamentos,
+[data-bs-theme='dark'] .lista-de-atividade-da-jornada > div,
+[data-bs-theme='dark'] .lista-de-revisoes-de-hoje li,
+[data-bs-theme='dark'] .topicos-cobertos,
+[data-bs-theme='dark'] .topicos-cobertos > div {
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .selo-de-objetivo-ativo,
+[data-bs-theme='dark'] .quantidade-de-revisoes,
+[data-bs-theme='dark'] .ordem-do-bloco,
+[data-bs-theme='dark'] .icone-redondo-da-jornada,
+[data-bs-theme='dark'] .mini-icone-da-jornada,
+[data-bs-theme='dark'] .icone-da-operacao-assistida {
+  background: rgb(167 139 250 / 14%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .estado-do-item-oficial {
+  background: rgb(244 193 93 / 14%);
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .estado-do-item-oficial .mapeado,
+[data-bs-theme='dark'] .mapeado .estado-do-item-oficial {
+  background: rgb(101 214 165 / 14%);
+  color: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .situacao-vencida,
+[data-bs-theme='dark'] .mapeamentos-do-item-oficial button {
+  color: var(--cor-perigo);
+}
+
+[data-bs-theme='dark'] .situacao-futura {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .situacao-ja_planejada {
+  color: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .table-responsive {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+[data-bs-theme='dark'] code,
+[data-bs-theme='dark'] pre,
+[data-bs-theme='dark'] output {
+  color: var(--cor-link);
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .acoes-do-cabecalho {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  [data-bs-theme='dark'] .acoes-do-cabecalho .btn,
+  [data-bs-theme='dark'] .acoes-do-cabecalho > * {
+    width: 100%;
+  }
+}

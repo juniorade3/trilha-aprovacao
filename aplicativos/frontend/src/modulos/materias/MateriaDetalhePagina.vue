@@ -275,7 +275,7 @@ onBeforeUnmount(() => cancelamento.abort())
                     <RouterLink :to="`/materiais/${material.identificador}`">
                       {{ material.titulo }}
                     </RouterLink>
-                    <span class="badge text-bg-light ms-1">{{
+                    <span class="badge etiqueta-neutra ms-1">{{
                       material.tipo
                     }}</span>
                   </li>

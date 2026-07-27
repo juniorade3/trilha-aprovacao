@@ -1,4 +1,13 @@
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+  type WatchStopHandle,
+} from 'vue'
 
 const seletoresFocaveis = [
   'a[href]',
@@ -11,10 +20,15 @@ const seletoresFocaveis = [
 
 const pilhaDeDialogos: symbol[] = []
 
-export function usarDialogoAcessivel(fechar: () => void) {
+export function usarDialogoAcessivel(
+  fechar: () => void,
+  aberto?: MaybeRefOrGetter<boolean>,
+) {
   const raizDoDialogo = ref<HTMLElement>()
   const identificadorDoDialogo = Symbol('dialogo')
   let focoAnterior: HTMLElement | null = null
+  let dialogoAtivo = false
+  let pararDeObservar: WatchStopHandle | undefined
 
   function elementosFocaveis() {
     return Array.from(
@@ -48,7 +62,9 @@ export function usarDialogoAcessivel(fechar: () => void) {
     }
   }
 
-  onMounted(async () => {
+  async function ativarDialogo() {
+    if (dialogoAtivo) return
+    dialogoAtivo = true
     focoAnterior =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -57,19 +73,43 @@ export function usarDialogoAcessivel(fechar: () => void) {
     pilhaDeDialogos.push(identificadorDoDialogo)
     window.addEventListener('keydown', aoPressionarTecla)
     await nextTick()
+    if (!dialogoAtivo) return
     const focoInicial =
       raizDoDialogo.value?.querySelector<HTMLElement>('[autofocus]') ??
       elementosFocaveis()[0]
     focoInicial?.focus()
-  })
+  }
 
-  onBeforeUnmount(() => {
+  function desativarDialogo() {
+    if (!dialogoAtivo) return
+    dialogoAtivo = false
     const indice = pilhaDeDialogos.lastIndexOf(identificadorDoDialogo)
     if (indice >= 0) pilhaDeDialogos.splice(indice, 1)
     if (pilhaDeDialogos.length === 0)
       document.body.classList.remove('modal-aberto')
     window.removeEventListener('keydown', aoPressionarTecla)
     focoAnterior?.focus()
+    focoAnterior = null
+  }
+
+  onMounted(() => {
+    if (aberto === undefined) {
+      void ativarDialogo()
+      return
+    }
+    pararDeObservar = watch(
+      () => toValue(aberto),
+      (deveEstarAtivo) => {
+        if (deveEstarAtivo) void ativarDialogo()
+        else desativarDialogo()
+      },
+      { flush: 'post', immediate: true },
+    )
+  })
+
+  onBeforeUnmount(() => {
+    pararDeObservar?.()
+    desativarDialogo()
   })
 
   return { raizDoDialogo }

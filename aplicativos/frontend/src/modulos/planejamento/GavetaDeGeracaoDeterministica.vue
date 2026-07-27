@@ -582,10 +582,16 @@ onMounted(carregarMaterias)
             >
             <div class="contexto-do-bloco">
               <span v-if="bloco.nomeDaMateria">{{ bloco.nomeDaMateria }}</span>
-              <span v-if="bloco.grupoDaPriorizacao" class="badge text-bg-light">
+              <span
+                v-if="bloco.grupoDaPriorizacao"
+                class="badge etiqueta-neutra"
+              >
                 {{ rotulosDosGrupos[bloco.grupoDaPriorizacao] }}
               </span>
-              <span v-if="bloco.faixaDaPriorizacao" class="badge text-bg-light">
+              <span
+                v-if="bloco.faixaDaPriorizacao"
+                class="badge etiqueta-neutra"
+              >
                 {{ rotulosDasFaixas[bloco.faixaDaPriorizacao] }}
               </span>
             </div>
@@ -673,10 +679,10 @@ onMounted(carregarMaterias)
 }
 .etapa-da-geracao {
   border: 0;
-  border-bottom: 3px solid #dce5e2;
+  border-bottom: 3px solid var(--cor-borda);
   background: transparent;
   padding: 0.75rem 0.4rem;
-  color: #60716c;
+  color: var(--cor-texto-secundario);
   font-weight: 700;
 }
 .etapa-da-geracao.ativa {
@@ -699,7 +705,7 @@ onMounted(carregarMaterias)
   grid-template-columns: 1fr minmax(140px, 190px);
   align-items: center;
   gap: 1rem;
-  border: 1px solid #e0e6e3;
+  border: 1px solid var(--cor-borda);
   border-radius: 0.75rem;
   padding: 0.85rem 1rem;
 }
@@ -725,18 +731,18 @@ onMounted(carregarMaterias)
   margin: 1rem 0;
 }
 .dia-da-previa {
-  border: 1px solid #dfe7e4;
+  border: 1px solid var(--cor-borda);
   border-radius: 1rem;
   padding: 1rem;
-  background: #fff;
+  background: var(--cor-papel);
 }
 .dia-da-previa header span {
-  color: #60716c;
+  color: var(--cor-texto-secundario);
   font-size: 0.875rem;
 }
 .barra-de-capacidade {
   height: 6px;
-  background: #edf2f0;
+  background: var(--cor-superficie-secundaria);
   border-radius: 999px;
   margin: 0.75rem 0;
   overflow: hidden;
@@ -755,14 +761,14 @@ onMounted(carregarMaterias)
   margin-top: 0.5rem;
 }
 .bloco-da-previa.preservado {
-  background: #f1f3f4;
+  background: var(--cor-superficie-secundaria);
 }
 .bloco-da-previa.sugerido {
-  background: #eaf7f3;
+  background: var(--cor-destaque-clara);
 }
 .bloco-da-previa > span {
-  color: #60716c;
-  font-size: 0.75rem;
+  color: var(--cor-texto-secundario);
+  font-size: 0.8125rem;
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -775,17 +781,17 @@ onMounted(carregarMaterias)
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  color: #60716c;
-  font-size: 0.8rem;
+  color: var(--cor-texto-secundario);
+  font-size: 0.8125rem;
 }
 .justificativas-do-bloco {
   margin: 0;
   padding-left: 1rem;
-  color: #60716c;
-  font-size: 0.8rem;
+  color: var(--cor-texto-secundario);
+  font-size: 0.8125rem;
 }
 .aviso-do-dia {
-  color: #725b16;
+  color: var(--cor-ambar);
   font-size: 0.85rem;
   margin: 0.6rem 0 0;
 }
@@ -794,9 +800,9 @@ onMounted(carregarMaterias)
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border: 1px solid #b9ddd3;
+  border: 1px solid var(--cor-borda);
   border-radius: 0.85rem;
-  background: #eef9f6;
+  background: var(--cor-destaque-clara);
   padding: 1rem;
 }
 @media (max-width: 576px) {

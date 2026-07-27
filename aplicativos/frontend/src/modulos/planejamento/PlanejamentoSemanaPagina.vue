@@ -369,7 +369,7 @@ function rotuloDaOrigem(bloco: BlocoDeEstudo) {
 
 function classeDaOrigem(bloco: BlocoDeEstudo) {
   return bloco.origem === 'MANUAL'
-    ? 'text-bg-light'
+    ? 'etiqueta-neutra'
     : bloco.origem === 'GERADO_DETERMINISTICAMENTE'
       ? 'text-bg-primary'
       : bloco.origem === 'GERADO_AJUSTADO_MANUALMENTE'
@@ -803,7 +803,7 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
           <strong
             class="badge"
             :class="
-              plano.estado === 'ATIVO' ? 'text-bg-success' : 'text-bg-light'
+              plano.estado === 'ATIVO' ? 'text-bg-success' : 'etiqueta-neutra'
             "
             >{{
               plano.estado === 'ATIVO'
@@ -1407,11 +1407,11 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
   padding: clamp(1rem, 3vw, 1.5rem);
   border: 1px solid var(--bs-border-color);
   border-radius: 1rem;
-  background: var(--bs-body-bg);
+  background: var(--cor-papel);
 }
 
 .lista-de-blocos-do-dia > li:focus-visible {
-  outline: 3px solid rgba(13, 125, 115, 0.45);
+  outline: 3px solid var(--cor-destaque);
   outline-offset: 3px;
 }
 
@@ -1423,8 +1423,8 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
     transform 0.15s ease;
 
   &:hover {
-    border-color: rgba(13, 125, 115, 0.55);
-    box-shadow: 0 0.45rem 1rem rgba(15, 45, 62, 0.1);
+    border-color: var(--cor-destaque);
+    box-shadow: var(--sombra-suave);
     transform: translateY(-1px);
   }
 }
@@ -1448,7 +1448,7 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
   div {
     padding: 0.75rem;
     border-radius: 0.75rem;
-    background: var(--bs-light);
+    background: var(--cor-superficie-secundaria);
   }
   dt {
     color: var(--bs-secondary-color);

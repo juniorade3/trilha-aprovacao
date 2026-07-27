@@ -21,6 +21,15 @@
       </p>
     </aside>
     <main class="conteudo-da-autenticacao">
+      <RouterLink
+        class="marca-da-autenticacao marca-da-autenticacao-movel"
+        to="/login"
+      >
+        <span class="simbolo-da-marca" aria-hidden="true">
+          <i class="bi bi-check2"></i>
+        </span>
+        <span>Trilha da Aprovação</span>
+      </RouterLink>
       <RouterView />
     </main>
   </div>

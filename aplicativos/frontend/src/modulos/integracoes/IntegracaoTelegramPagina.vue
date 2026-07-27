@@ -117,7 +117,7 @@ function classeDoEstado(estado: EstadoDaOperacaoAssistida) {
   if (estado === 'FALHOU' || estado === 'CANCELADA') return 'text-bg-danger'
   if (estado === 'EXPIRADA') return 'text-bg-secondary'
   if (estado === 'AGUARDANDO_CONFIRMACAO') return 'text-bg-warning'
-  return 'text-bg-light'
+  return 'etiqueta-neutra'
 }
 
 async function carregarTudo() {

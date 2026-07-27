@@ -924,7 +924,7 @@ onBeforeUnmount(() => cancelamento.abort())
         <div>
           <p class="sobretitulo-da-pagina">Seu objetivo ativo</p>
           <div class="d-flex gap-2 my-2">
-            <span class="badge text-bg-light">
+            <span class="badge etiqueta-neutra">
               {{ rotuloDoDominio(concurso.situacao, rotulosDaSituacao) }}
             </span>
             <span v-if="concurso.ativo" class="selo-de-objetivo-ativo">
