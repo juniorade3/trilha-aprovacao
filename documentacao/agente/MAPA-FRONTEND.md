@@ -57,6 +57,19 @@ A aplicação:
 - preserva a rota de retorno;
 - usa sessão e CSRF no backend.
 
+## Tema e sistema visual
+
+- a interface usa exclusivamente o tema escuro, fixado no HTML antes da
+  inicialização do Vue;
+- não existe seletor de tema nem variação clara baseada no sistema operacional;
+- `src/compartilhado/estilos/principal.scss` é a entrada do sistema visual;
+- tokens, base do Bootstrap, shell, componentes e módulos permanecem separados
+  dentro de `src/compartilhado/estilos/`;
+- cores fixas pertencem aos tokens semânticos; cores escolhidas para matérias
+  servem apenas como marcadores decorativos;
+- texto comum deve alcançar contraste WCAG AA e ações de toque devem manter
+  área mínima de 44 por 44 pixels.
+
 ## Integração Telegram
 
 A rota é protegida por feature flag. Não torne a página acessível quando o backend estiver com a automação desativada.

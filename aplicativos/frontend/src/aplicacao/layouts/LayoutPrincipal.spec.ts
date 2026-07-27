@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { defineComponent, nextTick } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+const funcionalidades = vi.hoisted(() => ({
+  assistenteTelegramEstaHabilitado: vi.fn(() => true),
+}))
+
 vi.mock('@/aplicacao/configuracao/funcionalidades', () => ({
-  assistenteTelegramEstaHabilitado: () => true,
+  assistenteTelegramEstaHabilitado:
+    funcionalidades.assistenteTelegramEstaHabilitado,
 }))
 
 import LayoutPrincipal from './LayoutPrincipal.vue'
@@ -21,6 +26,12 @@ const RegistroRapidoStub = defineComponent({
   },
   emits: ['fechar', 'registrado'],
   template: '<div data-testid="registro-rapido" />',
+})
+
+afterEach(() => {
+  funcionalidades.assistenteTelegramEstaHabilitado.mockReturnValue(true)
+  document.body.classList.remove('modal-aberto')
+  document.body.innerHTML = ''
 })
 
 describe('LayoutPrincipal', () => {
@@ -111,5 +122,98 @@ describe('LayoutPrincipal', () => {
     expect(layout.text()).toContain('Seu progresso foi atualizado')
     layout.unmount()
     vi.useRealTimers()
+  })
+
+  it('abre o menu movel como dialogo, contem o foco e restaura o acionador', async () => {
+    const roteador = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await roteador.push('/')
+    await roteador.isReady()
+    const layout = mount(LayoutPrincipal, {
+      attachTo: document.body,
+      global: {
+        plugins: [createPinia(), roteador],
+        stubs: { RegistroRapidoDeEstudo: RegistroRapidoStub },
+      },
+    })
+    const acionador = layout.get('.navegacao-movel button')
+    const elementoAcionador = acionador.element
+
+    expect(document.body.classList.contains('modal-aberto')).toBe(false)
+    await acionador.trigger('click')
+    await flushPromises()
+
+    const dialogo = layout.get('[role="dialog"]')
+    expect(dialogo.attributes('aria-modal')).toBe('true')
+    expect(dialogo.attributes('aria-labelledby')).toBe('titulo-do-menu-movel')
+    expect(acionador.attributes('aria-expanded')).toBe('true')
+    expect(document.body.classList.contains('modal-aberto')).toBe(true)
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(
+      'Fechar menu',
+    )
+
+    const ultimoElemento = layout.get('.menu-movel-mais footer button').element
+    if (ultimoElemento instanceof HTMLElement) ultimoElemento.focus()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(
+      'Fechar menu',
+    )
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(layout.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.body.classList.contains('modal-aberto')).toBe(false)
+    expect(document.activeElement).toBe(elementoAcionador)
+    expect(acionador.attributes('aria-expanded')).toBe('false')
+    layout.unmount()
+  })
+
+  it('fecha o menu movel ao acionar a sobreposicao', async () => {
+    const roteador = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await roteador.push('/')
+    await roteador.isReady()
+    const layout = mount(LayoutPrincipal, {
+      global: {
+        plugins: [createPinia(), roteador],
+        stubs: { RegistroRapidoDeEstudo: RegistroRapidoStub },
+      },
+    })
+
+    await layout.get('.navegacao-movel button').trigger('click')
+    await flushPromises()
+    await layout.get('.sobreposicao-do-menu-movel').trigger('click')
+    await flushPromises()
+
+    expect(layout.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.body.classList.contains('modal-aberto')).toBe(false)
+    layout.unmount()
+  })
+
+  it('remove todos os acessos ao Telegram quando a feature flag esta desligada', async () => {
+    funcionalidades.assistenteTelegramEstaHabilitado.mockReturnValue(false)
+    const roteador = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await roteador.push('/')
+    await roteador.isReady()
+    const layout = mount(LayoutPrincipal, {
+      global: {
+        plugins: [createPinia(), roteador],
+        stubs: { RegistroRapidoDeEstudo: RegistroRapidoStub },
+      },
+    })
+
+    await layout.get('.navegacao-movel button').trigger('click')
+    await flushPromises()
+
+    expect(layout.findAll('a[href="/integracoes/telegram"]')).toHaveLength(0)
+    layout.unmount()
   })
 })

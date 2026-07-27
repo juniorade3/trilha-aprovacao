@@ -425,7 +425,7 @@ onBeforeUnmount(() => cancelamento?.abort())
         <header>
           <span class="rotulo-discreto">Matéria</span>
           <h2 :id="`materia-${materia.id}`">{{ materia.nome }}</h2>
-          <span class="badge rounded-pill text-bg-light">
+          <span class="badge rounded-pill etiqueta-neutra">
             {{ quantidadeDeTopicosVisiveis(materia) }}
             {{
               quantidadeDeTopicosVisiveis(materia) === 1 ? 'tópico' : 'tópicos'
@@ -482,7 +482,7 @@ onBeforeUnmount(() => cancelamento?.abort())
                     <span class="badge acao-da-priorizacao">
                       {{ rotuloDaAcao(topico) }}
                     </span>
-                    <span class="badge text-bg-light">
+                    <span class="badge etiqueta-neutra">
                       {{ topico.quantidadeItensOficiais }}
                       {{
                         topico.quantidadeItensOficiais === 1 ? 'item' : 'itens'
@@ -598,7 +598,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 
 .contexto-da-priorizacao {
   align-items: center;
-  background: linear-gradient(120deg, #f1faf7, #fffefa);
+  background: var(--cor-papel);
   display: flex;
   gap: 2rem;
   justify-content: space-between;
@@ -622,7 +622,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 
   dt {
     color: var(--cor-texto-secundario);
-    font-size: 0.72rem;
+    font-size: 0.8125rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
@@ -640,7 +640,7 @@ onBeforeUnmount(() => cancelamento?.abort())
   margin-bottom: 1.5rem;
 
   article {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--cor-papel);
     border: 1px solid var(--cor-borda);
     border-radius: 0.9rem;
     display: grid;
@@ -655,15 +655,15 @@ onBeforeUnmount(() => cancelamento?.abort())
 
   span {
     color: var(--cor-texto-secundario);
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
   }
 
   .resumo-lacuna {
-    border-top: 3px solid #b7791f;
+    border-top: 3px solid var(--cor-ambar);
   }
 
   .resumo-fraqueza {
-    border-top: 3px solid #b83280;
+    border-top: 3px solid var(--cor-perigo);
   }
 
   .resumo-consolidado {
@@ -716,7 +716,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 
 .grupo-da-priorizacao {
   align-self: start;
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--cor-superficie-secundaria);
   border: 1px solid var(--cor-borda);
   border-radius: 1rem;
   min-width: 0;
@@ -737,22 +737,22 @@ onBeforeUnmount(() => cancelamento?.abort())
 
   > header p {
     color: var(--cor-texto-secundario);
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
     margin: 0;
   }
 
   > header .badge {
     background: var(--cor-destaque-clara);
-    color: #075f58;
+    color: var(--cor-destaque);
   }
 }
 
 .grupo-lacuna {
-  border-top: 4px solid #b7791f;
+  border-top: 4px solid var(--cor-ambar);
 }
 
 .grupo-fraqueza {
-  border-top: 4px solid #b83280;
+  border-top: 4px solid var(--cor-perigo);
 }
 
 .grupo-consolidado {
@@ -770,10 +770,10 @@ onBeforeUnmount(() => cancelamento?.abort())
 }
 
 .cartao-do-topico-priorizado {
-  background: #fff;
+  background: var(--cor-papel);
   border: 1px solid var(--cor-borda);
   border-radius: 0.85rem;
-  box-shadow: 0 0.45rem 1.2rem rgba(16, 42, 67, 0.05);
+  box-shadow: var(--sombra-suave);
   margin-top: 0.75rem;
   overflow: hidden;
   padding: 1rem;
@@ -794,7 +794,7 @@ onBeforeUnmount(() => cancelamento?.abort())
   align-items: center;
   background: var(--cor-destaque-clara);
   border-radius: 50%;
-  color: #075f58;
+  color: var(--cor-destaque);
   display: inline-flex;
   flex: none;
   font-weight: 800;
@@ -804,22 +804,22 @@ onBeforeUnmount(() => cancelamento?.abort())
 }
 
 .faixa-da-priorizacao {
-  background: #edf1f4;
-  color: var(--cor-primaria);
+  background: var(--cor-superficie-secundaria);
+  color: var(--cor-tinta);
 }
 
 .acao-da-priorizacao {
   background: var(--cor-destaque-clara);
-  color: #075f58;
+  color: var(--cor-destaque);
 }
 
 .alerta-sem-material {
   align-items: flex-start;
   background: var(--cor-ambar-clara);
   border-radius: 0.65rem;
-  color: #725b16;
+  color: var(--cor-ambar);
   display: flex;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   gap: 0.5rem;
   margin: 0.85rem 0;
   padding: 0.65rem;
@@ -832,7 +832,7 @@ onBeforeUnmount(() => cancelamento?.abort())
   margin: 0.9rem 0;
 
   div {
-    border-bottom: 1px solid #edf0ef;
+    border-bottom: 1px solid var(--cor-borda);
     display: grid;
     gap: 0.1rem;
     min-width: 0;
@@ -841,7 +841,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 
   dt {
     color: var(--cor-texto-secundario);
-    font-size: 0.65rem;
+    font-size: 0.8125rem;
     text-transform: uppercase;
   }
 
@@ -855,7 +855,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 
 .justificativas-da-priorizacao {
   border-top: 1px solid var(--cor-borda);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   padding-top: 0.8rem;
 
   ul {

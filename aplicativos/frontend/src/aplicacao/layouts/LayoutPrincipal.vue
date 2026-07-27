@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { usarSessao } from '@/aplicacao/estado/sessao'
 import { assistenteTelegramEstaHabilitado } from '@/aplicacao/configuracao/funcionalidades'
 import { requisitar } from '@/compartilhado/api/clienteHttp'
+import { usarDialogoAcessivel } from '@/compartilhado/componentes/usarDialogoAcessivel'
 import RegistroRapidoDeEstudo from '@/modulos/estudos/RegistroRapidoDeEstudo.vue'
 import type { TipoDeEstudo } from '@/modulos/estudos/apiDeEstudos'
 
@@ -18,16 +19,23 @@ const sessao = usarSessao()
 const roteador = useRouter()
 const assistenteTelegramHabilitado = assistenteTelegramEstaHabilitado()
 const menuAberto = ref(false)
+const botaoDoMenu = ref<HTMLButtonElement>()
 const registroRapidoAberto = ref(false)
 const dadosIniciaisDoRegistroRapido = ref<DadosIniciaisDoRegistroRapido>()
 const aviso = ref('')
 let temporizadorDoAviso: number | undefined
+
+const { raizDoDialogo: raizDoMenu } = usarDialogoAcessivel(
+  fecharMenu,
+  menuAberto,
+)
 
 function fecharMenu() {
   menuAberto.value = false
 }
 
 function alternarMenu() {
+  if (!menuAberto.value) botaoDoMenu.value?.focus()
   menuAberto.value = !menuAberto.value
 }
 
@@ -79,57 +87,16 @@ onBeforeUnmount(() => {
     <a class="atalho-para-conteudo" href="#conteudo-principal">
       Ir para o conteúdo
     </a>
-    <header class="topo-da-aplicacao">
-      <div class="topo-da-aplicacao-interno">
-        <RouterLink
-          class="marca-da-aplicacao"
-          to="/dashboard"
-          @click="fecharMenu"
-        >
-          <svg class="simbolo-da-marca" viewBox="0 0 48 36" aria-hidden="true">
-            <path d="M4 28 14 19l7 5L34 8" />
-            <path d="M8 10c5 3 9 3 13-1M27 28c6 0 11-3 17-9" />
-          </svg>
-          <span>Trilha da Aprovação</span>
-        </RouterLink>
 
-        <button
-          class="acao-global-de-estudo"
-          type="button"
-          @click="abrirRegistroRapido()"
-        >
-          <i class="bi bi-pencil-square" aria-hidden="true"></i>
-          Registrar estudo
-        </button>
+    <aside class="barra-lateral-da-aplicacao" aria-label="Menu da aplicação">
+      <RouterLink class="marca-da-aplicacao" to="/dashboard">
+        <svg class="simbolo-da-marca" viewBox="0 0 48 36" aria-hidden="true">
+          <path d="M4 28 14 19l7 5L34 8" />
+          <path d="M8 10c5 3 9 3 13-1M27 28c6 0 11-3 17-9" />
+        </svg>
+        <span>Trilha da Aprovação</span>
+      </RouterLink>
 
-        <div class="perfil-da-aplicacao">
-          <span class="avatar-do-usuario" aria-hidden="true">
-            {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
-          </span>
-          <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
-          <RouterLink
-            v-if="assistenteTelegramHabilitado"
-            class="botao-de-icone"
-            to="/integracoes/telegram"
-            aria-label="Integração com o Telegram"
-            title="Integração com o Telegram"
-          >
-            <i class="bi bi-robot" aria-hidden="true"></i>
-          </RouterLink>
-          <button
-            class="botao-de-icone"
-            type="button"
-            aria-label="Sair da conta"
-            title="Sair"
-            @click="sair"
-          >
-            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <aside class="barra-lateral-da-aplicacao">
       <nav class="navegacao-principal" aria-label="Navegação principal">
         <p class="rotulo-da-navegacao">Sua trilha</p>
         <RouterLink to="/dashboard">
@@ -176,6 +143,59 @@ onBeforeUnmount(() => {
       </nav>
     </aside>
 
+    <header class="topo-da-aplicacao" aria-label="Ações da conta">
+      <div class="topo-da-aplicacao-interno">
+        <RouterLink
+          class="marca-da-aplicacao d-lg-none"
+          to="/dashboard"
+          aria-label="Trilha da Aprovação — início"
+          @click="fecharMenu"
+        >
+          <svg class="simbolo-da-marca" viewBox="0 0 48 36" aria-hidden="true">
+            <path d="M4 28 14 19l7 5L34 8" />
+            <path d="M8 10c5 3 9 3 13-1M27 28c6 0 11-3 17-9" />
+          </svg>
+          <span>Trilha da Aprovação</span>
+        </RouterLink>
+
+        <div class="acoes-do-topo d-flex align-items-center gap-3 ms-auto">
+          <button
+            class="acao-global-de-estudo"
+            type="button"
+            @click="abrirRegistroRapido()"
+          >
+            <i class="bi bi-pencil-square" aria-hidden="true"></i>
+            Registrar estudo
+          </button>
+
+          <div class="perfil-da-aplicacao">
+            <span class="avatar-do-usuario" aria-hidden="true">
+              {{ sessao.usuario?.nome?.charAt(0).toUpperCase() || 'U' }}
+            </span>
+            <span class="nome-do-usuario">{{ sessao.usuario?.nome }}</span>
+            <RouterLink
+              v-if="assistenteTelegramHabilitado"
+              class="botao-de-icone"
+              to="/integracoes/telegram"
+              aria-label="Integração com o Telegram"
+              title="Integração com o Telegram"
+            >
+              <i class="bi bi-robot" aria-hidden="true"></i>
+            </RouterLink>
+            <button
+              class="botao-de-icone"
+              type="button"
+              aria-label="Sair da conta"
+              title="Sair"
+              @click="sair"
+            >
+              <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
     <div id="conteudo-principal" class="conteudo-principal" tabindex="-1">
       <RouterView />
     </div>
@@ -198,8 +218,10 @@ onBeforeUnmount(() => {
         <span>Conteúdos</span>
       </RouterLink>
       <button
+        ref="botaoDoMenu"
         type="button"
         :aria-expanded="menuAberto"
+        aria-haspopup="dialog"
         aria-controls="menu-movel-mais"
         @click="alternarMenu"
       >
@@ -211,25 +233,32 @@ onBeforeUnmount(() => {
     <div
       v-if="menuAberto"
       id="menu-movel-mais"
+      ref="raizDoMenu"
       class="sobreposicao-do-menu-movel"
       @click.self="fecharMenu"
     >
-      <aside class="menu-movel-mais" aria-label="Mais destinos">
+      <aside
+        class="menu-movel-mais"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-do-menu-movel"
+      >
         <header>
           <div>
             <span class="rotulo-da-navegacao">Navegação</span>
-            <h2>Mais opções</h2>
+            <h2 id="titulo-do-menu-movel">Mais opções</h2>
           </div>
           <button
             class="botao-de-icone"
             type="button"
             aria-label="Fechar menu"
+            autofocus
             @click="fecharMenu"
           >
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </header>
-        <nav @click="fecharMenu">
+        <nav aria-label="Outros destinos" @click="fecharMenu">
           <RouterLink to="/concursos">
             <i class="bi bi-bullseye" aria-hidden="true"></i>Meu concurso
           </RouterLink>

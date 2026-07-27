@@ -936,7 +936,7 @@ onBeforeUnmount(() => {
         <span v-if="pausado" class="mt-2">Cronômetro pausado</span>
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button
-            class="btn btn-outline-light"
+            class="btn botao-de-contraste"
             type="button"
             :disabled="processando"
             @click="alternarPausa"

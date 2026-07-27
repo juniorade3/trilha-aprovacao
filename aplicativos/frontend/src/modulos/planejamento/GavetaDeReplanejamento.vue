@@ -277,7 +277,7 @@ onMounted(() => recalcular())
   div {
     padding: 0.75rem;
     border-radius: 0.75rem;
-    background: var(--bs-light);
+    background: var(--cor-superficie-secundaria);
   }
   dt {
     color: var(--bs-secondary-color);

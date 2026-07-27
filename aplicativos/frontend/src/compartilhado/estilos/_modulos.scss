@@ -1,0 +1,570 @@
+/* Dashboard */
+[data-bs-theme='dark'] .painel-dashboard,
+[data-bs-theme='dark'] .estado-de-dashboard {
+  background: var(--cor-canvas);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .estado-sem-concurso {
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .icone-de-estado {
+  background: var(--cor-superficie-3);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .icone-de-estado-erro {
+  background: rgb(255 132 146 / 12%);
+  color: var(--cor-perigo);
+}
+
+[data-bs-theme='dark'] .circulo-decorativo,
+[data-bs-theme='dark'] .orbita-decorativa {
+  border-color: rgb(167 139 250 / 18%);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-dashboard {
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-dashboard h1,
+[data-bs-theme='dark'] .cabecalho-do-dashboard h2,
+[data-bs-theme='dark'] .cabecalho-do-dashboard p,
+[data-bs-theme='dark'] .cabecalho-do-dashboard a {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .informacao-do-concurso,
+[data-bs-theme='dark'] .selo-do-dashboard,
+[data-bs-theme='dark'] .cartao-da-prova {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .ponto-ativo {
+  background: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .rotulo-claro,
+[data-bs-theme='dark'] .data-da-prova {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .atalhos-do-dashboard {
+  background: transparent;
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .cartao-de-indicador,
+[data-bs-theme='dark'] .bloco-do-dashboard,
+[data-bs-theme='dark'] .atalho-do-dashboard {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cartao-de-indicador:hover,
+[data-bs-theme='dark'] .atalho-do-dashboard:hover {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda-interativa);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .icone-do-indicador,
+[data-bs-theme='dark'] .icone-do-atalho,
+[data-bs-theme='dark'] .marcador-da-linha,
+[data-bs-theme='dark'] .icone-vazio-menor,
+[data-bs-theme='dark'] .icone-pronto {
+  background: rgb(167 139 250 / 14%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .icone-do-indicador-verde {
+  background: rgb(101 214 165 / 14%);
+  color: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .icone-do-indicador-azul {
+  background: rgb(123 184 255 / 14%);
+  color: var(--cor-informacao);
+}
+
+[data-bs-theme='dark'] .icone-do-indicador-roxo {
+  background: rgb(167 139 250 / 14%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .icone-do-indicador-ambar,
+[data-bs-theme='dark'] .contador-de-alertas {
+  background: rgb(244 193 93 / 14%);
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .subtitulo-do-bloco,
+[data-bs-theme='dark'] .rotulo-do-indicador,
+[data-bs-theme='dark'] .legenda-do-indicador,
+[data-bs-theme='dark'] .duracao-da-atividade,
+[data-bs-theme='dark'] .estado-vazio-do-bloco {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .valor-do-indicador {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .valor-do-indicador small,
+[data-bs-theme='dark'] .atalho-do-dashboard small {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .duracao-da-atividade {
+  background: var(--cor-superficie-3);
+}
+
+[data-bs-theme='dark'] .progresso-objetivo {
+  background: var(--cor-superficie-3);
+}
+
+[data-bs-theme='dark'] .progresso-objetivo > span {
+  background: var(--cor-violeta);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-bloco,
+[data-bs-theme='dark'] .item-da-linha-do-tempo {
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .cartao-de-alerta {
+  background: rgb(244 193 93 / 9%);
+  border-color: rgb(244 193 93 / 34%);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .icone-do-alerta {
+  color: var(--cor-aviso);
+}
+
+/* Jornada, concursos e assistentes */
+[data-bs-theme='dark'] .painel-da-jornada {
+  background: var(--cor-canvas);
+}
+
+[data-bs-theme='dark'] .resumo-principal-da-jornada,
+[data-bs-theme='dark'] .passos-do-assistente,
+[data-bs-theme='dark'] .passos-do-concurso,
+[data-bs-theme='dark'] .etapas-da-jornada {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .objetivo-da-jornada,
+[data-bs-theme='dark'] .tempo-da-jornada,
+[data-bs-theme='dark'] .etapas-da-jornada,
+[data-bs-theme='dark'] .passos-do-assistente li,
+[data-bs-theme='dark'] .passos-do-concurso > * {
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .objetivo-da-jornada p,
+[data-bs-theme='dark'] .objetivo-da-jornada small,
+[data-bs-theme='dark'] .medidor-da-jornada p,
+[data-bs-theme='dark'] .medidor-da-jornada > small,
+[data-bs-theme='dark'] .tempo-da-jornada span,
+[data-bs-theme='dark'] .etapas-da-jornada > div,
+[data-bs-theme='dark'] .passos-do-assistente li,
+[data-bs-theme='dark'] .passos-do-concurso button,
+[data-bs-theme='dark'] .passos-do-concurso a {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .etapas-da-jornada > div::before {
+  background: var(--cor-borda-interativa);
+}
+
+[data-bs-theme='dark'] .etapas-da-jornada > div > i,
+[data-bs-theme='dark'] .passos-do-assistente li > i,
+[data-bs-theme='dark'] .passos-do-concurso button > i,
+[data-bs-theme='dark'] .passos-do-concurso a > i {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda-interativa);
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .etapas-da-jornada .concluida > i,
+[data-bs-theme='dark'] .passos-do-assistente .concluido > i,
+[data-bs-theme='dark'] .passos-do-concurso .concluido > i {
+  background: var(--cor-violeta);
+  border-color: var(--cor-violeta);
+  color: var(--cor-texto-botao);
+}
+
+[data-bs-theme='dark'] .etapas-da-jornada .atual > i,
+[data-bs-theme='dark'] .passos-do-assistente .atual > i,
+[data-bs-theme='dark'] .passos-do-concurso .atual > i {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-violeta);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .passos-do-assistente .atual,
+[data-bs-theme='dark'] .passos-do-concurso .atual,
+[data-bs-theme='dark'] .passos-do-concurso button:hover,
+[data-bs-theme='dark'] .passos-do-concurso a:hover {
+  background: rgb(167 139 250 / 12%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .alerta-de-lacunas {
+  background: rgb(244 193 93 / 9%);
+  border-color: var(--cor-aviso);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .alerta-de-lacunas:hover {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .alerta-de-lacunas strong,
+[data-bs-theme='dark'] .alerta-de-lacunas small,
+[data-bs-theme='dark'] .icone-do-alerta-de-lacuna {
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .icone-do-alerta-de-lacuna {
+  background: rgb(244 193 93 / 14%);
+}
+
+[data-bs-theme='dark'] .cartao-de-contexto-do-assistente,
+[data-bs-theme='dark'] .proximo-passo-do-concurso,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque,
+[data-bs-theme='dark'] .proximo-bloco-do-dia {
+  background: var(--cor-superficie-3);
+  border: 1px solid rgb(167 139 250 / 38%);
+  box-shadow: inset 0.25rem 0 0 var(--cor-violeta);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cartao-de-contexto-do-assistente h2,
+[data-bs-theme='dark'] .cartao-de-contexto-do-assistente p,
+[data-bs-theme='dark'] .proximo-passo-do-concurso h2,
+[data-bs-theme='dark'] .proximo-passo-do-concurso p,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque h2,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque > div > p,
+[data-bs-theme='dark'] .proximo-bloco-do-dia h2,
+[data-bs-theme='dark'] .proximo-bloco-do-dia p {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cartao-de-contexto-do-assistente .sobretitulo-da-pagina,
+[data-bs-theme='dark'] .proximo-passo-do-concurso .sobretitulo-da-pagina,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque .sobretitulo-da-pagina,
+[data-bs-theme='dark'] .proximo-bloco-do-dia .sobretitulo-da-pagina {
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark']
+  .cartao-de-contexto-do-assistente
+  .icone-redondo-da-jornada,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque .selo-de-objetivo-ativo,
+[data-bs-theme='dark'] .icone-do-objetivo-ativo {
+  background: rgb(167 139 250 / 14%);
+  border-color: rgb(167 139 250 / 30%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .proximo-passo-do-concurso .btn,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque .btn,
+[data-bs-theme='dark'] .proximo-bloco-do-dia .btn {
+  background: var(--cor-violeta);
+  border-color: var(--cor-violeta);
+  color: var(--cor-texto-botao);
+}
+
+[data-bs-theme='dark'] .proximo-passo-do-concurso .btn:hover,
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque .btn:hover,
+[data-bs-theme='dark'] .proximo-bloco-do-dia .btn:hover {
+  background: var(--cor-link);
+  border-color: var(--cor-link);
+  color: var(--cor-texto-botao);
+}
+
+[data-bs-theme='dark'] .revisao-do-assistente dl > div,
+[data-bs-theme='dark'] .dados-do-vinculo-telegram div,
+[data-bs-theme='dark'] .detalhes-da-operacao-assistida div {
+  background: var(--cor-superficie-3);
+  border: 1px solid var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .abas-do-concurso button {
+  color: var(--cor-texto-secundario);
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .abas-do-concurso button.ativo {
+  border-bottom-color: var(--cor-violeta);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .abas-do-concurso button span {
+  background: rgb(244 193 93 / 14%);
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .anel-de-mapeamento {
+  background: conic-gradient(
+    var(--cor-violeta) var(--valor-do-anel),
+    var(--cor-superficie-3) 0
+  );
+}
+
+[data-bs-theme='dark'] .anel-de-mapeamento::before {
+  background: var(--cor-superficie-2);
+}
+
+[data-bs-theme='dark']
+  .navegador-do-conteudo-programatico
+  > button:not(.btn).ativo {
+  background: rgb(167 139 250 / 10%);
+  border-left-color: var(--cor-violeta);
+}
+
+[data-bs-theme='dark']
+  .navegador-do-conteudo-programatico
+  > button:not(.btn)
+  em {
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .lista-de-itens-oficiais > article.pendente {
+  background: rgb(244 193 93 / 7%);
+}
+
+[data-bs-theme='dark'] .pagina-do-concurso .accordion-button:not(.collapsed) {
+  background: rgb(167 139 250 / 12%);
+  color: var(--cor-link);
+}
+
+/* Catálogo de conteúdos e biblioteca */
+[data-bs-theme='dark'] .lista-mestre-de-materias > button {
+  color: var(--cor-texto);
+  min-height: 3.25rem;
+}
+
+[data-bs-theme='dark'] .lista-mestre-de-materias > button:hover,
+[data-bs-theme='dark'] .lista-mestre-de-materias > button.ativo {
+  background: var(--cor-superficie-3);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .lista-mestre-de-materias em,
+[data-bs-theme='dark'] .campo-de-busca,
+[data-bs-theme='dark'] .filtros-do-catalogo button {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .filtros-do-catalogo button {
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .filtros-do-catalogo button.ativo {
+  background: rgb(167 139 250 / 14%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .progresso-da-materia,
+[data-bs-theme='dark'] .pasta-dos-topicos {
+  background: var(--cor-superficie-3);
+}
+
+[data-bs-theme='dark'] .linha-do-topico-no-catalogo > span:first-child {
+  border-color: var(--cor-borda-interativa);
+}
+
+[data-bs-theme='dark'] .linha-do-topico-no-catalogo > span.estudado {
+  background: var(--cor-violeta);
+  border-color: var(--cor-violeta);
+  color: var(--cor-texto-botao);
+}
+
+[data-bs-theme='dark'] .capa-do-material {
+  background: var(--cor-superficie-3);
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .capa-do-material span {
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .capa-do-material.tipo-aula {
+  background: var(--cor-superficie-3);
+  box-shadow: inset 0 0.25rem 0 var(--cor-informacao);
+  color: var(--cor-informacao);
+}
+
+[data-bs-theme='dark'] .capa-do-material.tipo-pdf {
+  background: var(--cor-superficie-3);
+  box-shadow: inset 0 0.25rem 0 var(--cor-sucesso);
+  color: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .capa-do-material.tipo-outro {
+  background: var(--cor-superficie-3);
+  box-shadow: inset 0 0.25rem 0 var(--cor-aviso);
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .cartao-do-material:hover {
+  border-color: var(--cor-borda-interativa);
+  box-shadow: none !important;
+}
+
+[data-bs-theme='dark'] .menu-de-acoes-do-material,
+[data-bs-theme='dark'] .acoes-do-registro > div {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+  box-shadow: var(--sombra-elevada);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .menu-de-acoes-do-material button,
+[data-bs-theme='dark'] .acoes-do-registro > div button {
+  color: var(--cor-texto);
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .menu-de-acoes-do-material button:hover,
+[data-bs-theme='dark'] .acoes-do-registro > div button:hover {
+  background: var(--cor-superficie-2);
+}
+
+/* Histórico */
+[data-bs-theme='dark'] .etiqueta-da-materia-no-historico {
+  background: var(--cor-superficie-3);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo > div > span {
+  background: var(--cor-superficie-3);
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo > div > span > i {
+  background: var(--cor-violeta);
+}
+
+[data-bs-theme='dark'] .marcador-do-registro {
+  background: var(--cor-violeta);
+  box-shadow: 0 0 0 0.25rem rgb(167 139 250 / 14%);
+}
+
+/* Telegram */
+[data-bs-theme='dark'] .cartao-do-vinculo-telegram,
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram,
+[data-bs-theme='dark'] .historico-de-operacoes-assistidas {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram {
+  background: var(--cor-superficie-3);
+  box-shadow: inset 0.25rem 0 0 var(--cor-informacao);
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram > i {
+  color: var(--cor-informacao);
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram p,
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram li {
+  color: var(--cor-texto-secundario);
+}
+
+[data-bs-theme='dark'] .codigo-do-vinculo-telegram {
+  background: rgb(167 139 250 / 10%);
+  border-color: rgb(167 139 250 / 32%);
+}
+
+[data-bs-theme='dark'] .codigo-do-vinculo-telegram output,
+[data-bs-theme='dark'] .estrutura-da-operacao-assistida pre {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .lista-de-operacoes-assistidas button:hover {
+  background: var(--cor-superficie-3);
+}
+
+/* Planejamento */
+[data-bs-theme='dark'] .navegacao-do-planejamento a {
+  color: var(--cor-texto-secundario);
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .navegacao-do-planejamento a.router-link-active {
+  border-bottom-color: var(--cor-violeta);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .seletor-da-semana,
+[data-bs-theme='dark'] .formulario-de-disponibilidade,
+[data-bs-theme='dark'] .resumo-do-planejamento-de-hoje > div {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  box-shadow: none;
+}
+
+[data-bs-theme='dark'] .resumo-do-plano-semanal {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .cartao-de-disponibilidade {
+  background: var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .cartao-de-disponibilidade:focus-within {
+  border-color: var(--cor-foco);
+  box-shadow: 0 0 0 0.2rem rgb(196 181 253 / 20%);
+}
+
+[data-bs-theme='dark'] .disponibilidade-do-dia,
+[data-bs-theme='dark'] .lista-de-blocos-do-dia > li {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .resumo-da-carga-do-dia.com-excesso {
+  color: var(--cor-aviso);
+}
+
+[data-bs-theme='dark'] .proximo-bloco-do-dia {
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .campos-de-evidencia {
+  background: var(--cor-superficie-1);
+  border-color: var(--cor-borda);
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .lista-de-itens-oficiais > article,
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo {
+    min-width: 0;
+  }
+
+  [data-bs-theme='dark'] .lista-de-itens-oficiais .acoes-do-item-oficial,
+  [data-bs-theme='dark'] .acoes-do-vinculo-telegram,
+  [data-bs-theme='dark'] .codigo-do-vinculo-telegram > div {
+    width: 100%;
+  }
+}

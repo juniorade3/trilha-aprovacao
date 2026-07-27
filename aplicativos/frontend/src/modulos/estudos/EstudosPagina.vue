@@ -605,7 +605,7 @@ onBeforeUnmount(() => {
                   <small>{{ item.nomeDaMateria }}</small>
                   <span
                     v-if="item.exigidoNoConcursoAtivo"
-                    class="badge text-bg-light ms-2"
+                    class="badge etiqueta-neutra ms-2"
                     >Edital</span
                   >
                 </th>
@@ -662,7 +662,7 @@ onBeforeUnmount(() => {
             <span class="rotulo-discreto">Registros preservados</span>
             <h2 id="titulo-historico">Atividade recente</h2>
           </div>
-          <span class="badge text-bg-light">
+          <span class="badge etiqueta-neutra">
             {{ registrosFiltrados.length }}
             {{ registrosFiltrados.length === 1 ? 'registro' : 'registros' }}
           </span>

@@ -185,7 +185,7 @@ onBeforeUnmount(() => cancelamento?.abort())
           </p>
           <div>
             <RouterLink
-              class="btn btn-light"
+              class="btn botao-de-contraste"
               :to="`/concursos/${concursoAtivo.identificador}`"
             >
               Continuar configuração
@@ -216,7 +216,7 @@ onBeforeUnmount(() => cancelamento?.abort())
             class="card cartao-do-concurso"
           >
             <div>
-              <span class="badge text-bg-light">
+              <span class="badge etiqueta-neutra">
                 {{ rotulosDeSituacao[concurso.situacao] }}
               </span>
               <h3>{{ concurso.nome }}</h3>

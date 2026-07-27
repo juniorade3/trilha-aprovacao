@@ -504,8 +504,8 @@ onBeforeUnmount(() => cancelamento?.abort())
               <span
                 class="etiqueta-da-materia"
                 :style="{
-                  color: materiaSelecionada.cor ?? '#128f83',
-                  background: `${materiaSelecionada.cor ?? '#128f83'}18`,
+                  '--cor-identificadora-da-materia':
+                    materiaSelecionada.cor ?? '#A78BFA',
                 }"
               >
                 {{
