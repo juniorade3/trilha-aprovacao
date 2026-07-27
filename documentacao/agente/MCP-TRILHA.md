@@ -100,6 +100,10 @@ Usuário
   -> validação e aplicação
 ```
 
+Operações comuns também podem ser decididas na tela web autenticada. A ação usa
+sessão e CSRF, não expõe nem reutiliza o código do Telegram e percorre a mesma
+revalidação de prazo, assinatura e versões antes de aplicar.
+
 ## 6. Componentes do backend
 
 ### `ConfiguracaoDoServidorMcp`
@@ -551,6 +555,11 @@ Aceita:
 - texto;
 - voz.
 
+Na web, uma conta autenticada pode revisar e aceitar ou cancelar uma operação
+comum em `AGUARDANDO_CONFIRMACAO`. O backend bloqueia a operação, revalida a
+proposta e registra o ator `USUARIO_WEB` e a fonte `WEB`; operações reforçadas
+continuam exclusivas do Telegram. Cancelar pela web apenas descarta a prévia.
+
 Código:
 
 ```text
@@ -665,7 +674,9 @@ O plugin:
 - envia DTO fechado ao integrador;
 - não recebe segredo HMAC;
 - não recebe token MCP;
-- não lê corpo sensível do backend.
+- não lê corpo sensível do backend; para uma recusa de confirmação, interpreta
+  somente o JSON fechado e allowlisted `{ "codigo": "..." }` devolvido pelo
+  integrador, sem repassar códigos ou corpo ao Telegram.
 
 ## 21. Integrador confiável
 

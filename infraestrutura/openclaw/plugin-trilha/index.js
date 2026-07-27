@@ -31,6 +31,7 @@ const MENSAGENS = Object.freeze({
   confirmacaoAplicada: "Operacao confirmada e aplicada na Trilha. Recibo: ",
   confirmacaoReforcada: "Primeira confirmacao aceita. Confirme novamente com: ",
   confirmacaoRecusada: "A operacao expirou, mudou ou o codigo nao confere. Solicite uma nova previa.",
+  execucaoDoBlocoNaoEncontrada: "Esse bloco nao esta em execucao. Inicie-o na Trilha antes de concluir.",
   confirmacaoLimitada: "Foram feitas muitas tentativas de confirmacao. Aguarde um pouco antes de tentar novamente.",
   confirmacaoIndisponivel: "Nao foi possivel confirmar o resultado da operacao agora. Consulte a operacao antes de tentar novamente.",
   confirmacaoTempoEsgotado: "A confirmacao demorou mais que o esperado. Consulte a operacao antes de tentar novamente.",
@@ -276,7 +277,28 @@ async function descartarCorpo(resposta) {
   }
 }
 
-function mensagemDaRecusaDaConfirmacao(status) {
+function codigoSeguroDaRecusaDaConfirmacao(dados) {
+  if (!possuiChavesExatas(dados, ["codigo"])
+      || typeof dados.codigo !== "string") {
+    return null;
+  }
+  return dados.codigo === "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA"
+    ? dados.codigo : null;
+}
+
+async function mensagemDaRecusaDaConfirmacao(resposta) {
+  const status = resposta.status;
+  if (status === 409 || status === 410 || status === 422) {
+    try {
+      const codigo = codigoSeguroDaRecusaDaConfirmacao(await resposta.json());
+      if (codigo === "EXECUCAO_DO_BLOCO_NAO_ENCONTRADA") {
+        return MENSAGENS.execucaoDoBlocoNaoEncontrada;
+      }
+    } catch {
+      // A resposta de erro nao e confiavel; usa a mensagem generica abaixo.
+    }
+  }
+  await descartarCorpo(resposta);
   if (status === 400) return MENSAGENS.contextoDaConfirmacaoInvalido;
   if (status === 404) return MENSAGENS.vinculoDaConfirmacaoNaoEncontrado;
   if (status === 409 || status === 410 || status === 422) {
@@ -314,10 +336,9 @@ async function confirmarOperacao({
       signal: controlador.signal,
     });
     if (resposta.status < 200 || resposta.status >= 300) {
-      await descartarCorpo(resposta);
       registrarSeguro(logger, "warn",
         `confirmacao recusada status_http=${resposta.status}`);
-      return mensagemDaRecusaDaConfirmacao(resposta.status);
+      return mensagemDaRecusaDaConfirmacao(resposta);
     }
     let dados;
     try {

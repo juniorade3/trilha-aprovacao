@@ -214,6 +214,40 @@ public class ServicoDeOperacoesAssistidas {
     }
 
     @Transactional
+    public OperacaoAssistida cancelarPelaWeb(UUID usuario, UUID identificador,
+            UUID correlacao) {
+        OperacaoAssistidaPersistida persistida = operacoes
+                .encontrarParaAtualizacao(identificador, usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
+                        "Operacao assistida nao encontrada."));
+        OperacaoAssistida operacao = persistida.paraDominio();
+        if (operacao.estado() == EstadoDaOperacaoAssistida.CANCELADA) {
+            return operacao;
+        }
+        if (operacao.estado() == EstadoDaOperacaoAssistida.APLICADA
+                || operacao.estado() == EstadoDaOperacaoAssistida.FALHOU
+                || operacao.estado() == EstadoDaOperacaoAssistida.EXPIRADA) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao ja foi finalizada.");
+        }
+        OffsetDateTime agora = agora();
+        try {
+            operacao.cancelar(agora);
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao nao pode ser cancelada.");
+        }
+        persistida.atualizarDe(operacao);
+        OperacaoAssistida cancelada = operacoes.saveAndFlush(persistida)
+                .paraDominio();
+        auditarPelaWeb(cancelada, "OPERACAO_ASSISTIDA_CANCELADA",
+                segredos.hash(cancelada.identificador().toString()),
+                "CANCELADA", correlacao, agora);
+        return cancelada;
+    }
+
+    @Transactional
     public OperacaoAssistida validarAtualidade(UUID usuario, UUID identificador,
             String assinaturaInformada, String versoesAtuais) {
         return validarAtualidade(usuario, identificador, assinaturaInformada,
@@ -313,6 +347,17 @@ public class ServicoDeOperacoesAssistidas {
                 operacao.identificadorDoUsuario(), operacao.identificadorDoVinculo(),
                 operacao.identificador(), "SISTEMA", null, acao, hash, null,
                 "APLICACAO", resultado, UUID.randomUUID(), "{}", agora);
+        auditoria.save(new EventoDeAuditoriaDaAutomacaoPersistido(evento));
+    }
+
+    private void auditarPelaWeb(OperacaoAssistida operacao, String acao,
+            String hash, String resultado, UUID correlacao,
+            OffsetDateTime agora) {
+        EventoDeAuditoriaDaAutomacao evento = EventoDeAuditoriaDaAutomacao.criar(
+                operacao.identificadorDoUsuario(), operacao.identificadorDoVinculo(),
+                operacao.identificador(), "USUARIO_WEB", null, acao, hash, null,
+                "WEB", resultado,
+                correlacao == null ? UUID.randomUUID() : correlacao, "{}", agora);
         auditoria.save(new EventoDeAuditoriaDaAutomacaoPersistido(evento));
     }
 

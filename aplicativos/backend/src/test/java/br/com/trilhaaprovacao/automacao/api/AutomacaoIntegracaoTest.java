@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
@@ -731,6 +732,127 @@ class AutomacaoIntegracaoTest {
     }
 
     @Test
+    void devePermitirConfirmarECancelarOperacoesPelaWeb() throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("web.operacoes.a@example.com");
+        MockHttpSession sessaoB = criarContaEEntrar("web.operacoes.b@example.com");
+        UUID usuarioA = identificarUsuario("web.operacoes.a@example.com");
+        UUID materia = UUID.randomUUID();
+        UUID topico = UUID.randomUUID();
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO materias (identificador, usuario_id, nome,
+                  nome_normalizado, arquivada, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Direito', 'direito', false, ?, ?, 0)
+                """, materia, usuarioA, agora, agora);
+        banco.update("""
+                INSERT INTO topicos_da_materia (identificador, materia_id, nome,
+                  nome_normalizado, ordem, arquivado, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Atos', 'atos', 1, false, ?, ?, 0)
+                """, topico, materia, agora, agora);
+        Map<String, Object> proposta = Map.of(
+                "identificadorDoTopico", topico.toString(),
+                "dataHora", agora.toString(), "duracaoEmMinutos", 30,
+                "tipoDeEstudo", "TEORIA");
+        String propostaJson = json.writeValueAsString(proposta);
+        String versoes = json.writeValueAsString(preparacoes.versoesAtuais(
+                "REGISTRO_DE_ESTUDO", usuarioA, proposta));
+        var confirmavel = operacoes.prepararParaConfirmacao(usuarioA, null,
+                "REGISTRO_DE_ESTUDO", "Registrar estudo de 30 minutos.",
+                propostaJson, versoes, "confirmacao-web");
+
+        api.perform(post("/api/v1/operacoes-assistidas/{id}/confirmacao-web",
+                        confirmavel.operacao().identificador()).session(sessaoA))
+                .andExpect(status().isForbidden());
+        api.perform(post("/api/v1/operacoes-assistidas/{id}/confirmacao-web",
+                        confirmavel.operacao().identificador()).session(sessaoB)
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
+        api.perform(post("/api/v1/operacoes-assistidas/{id}/confirmacao-web",
+                        confirmavel.operacao().identificador()).session(sessaoA)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("APLICADA"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM registros_de_estudo WHERE topico_id = ?
+                """, Integer.class, topico)).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM eventos_de_auditoria_da_automacao
+                 WHERE operacao_assistida_id = ?
+                   AND ator = 'USUARIO_WEB' AND fonte = 'WEB'
+                   AND acao = 'OPERACAO_ASSISTIDA_APLICADA'
+                """, Integer.class, confirmavel.operacao().identificador()))
+                .isEqualTo(1);
+
+        String versoesParaCancelamento = json.writeValueAsString(
+                preparacoes.versoesAtuais("REGISTRO_DE_ESTUDO", usuarioA,
+                        proposta));
+        var cancelavel = operacoes.prepararParaConfirmacao(usuarioA, null,
+                "REGISTRO_DE_ESTUDO", "Registrar estudo de 30 minutos.",
+                propostaJson, versoesParaCancelamento, "cancelamento-web");
+        api.perform(post("/api/v1/operacoes-assistidas/{id}/cancelamento",
+                        cancelavel.operacao().identificador()).session(sessaoA)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("CANCELADA"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM eventos_de_auditoria_da_automacao
+                 WHERE operacao_assistida_id = ?
+                   AND ator = 'USUARIO_WEB' AND fonte = 'WEB'
+                   AND acao = 'OPERACAO_ASSISTIDA_CANCELADA'
+                """, Integer.class, cancelavel.operacao().identificador()))
+                .isEqualTo(1);
+
+        var reforcada = operacoes.prepararParaConfirmacaoReforcada(usuarioA,
+                null, "ATIVACAO_DO_CONCURSO", "Ativar concurso.", "{}", "{}",
+                "confirmacao-web-reforcada");
+        api.perform(post("/api/v1/operacoes-assistidas/{id}/confirmacao-web",
+                        reforcada.operacao().identificador()).session(sessaoA)
+                        .with(csrf()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo")
+                        .value("CONFIRMACAO_REFORCADA_EXIGE_TELEGRAM"));
+    }
+
+    @Test
+    void deveRecusarPreviaDeConclusaoSemExecucaoDoBloco() throws Exception {
+        criarContaEEntrar("previa.bloco.sem.execucao@example.com");
+        UUID usuario = identificarUsuario("previa.bloco.sem.execucao@example.com");
+        UUID plano = UUID.randomUUID();
+        UUID bloco = UUID.randomUUID();
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        banco.update("""
+                INSERT INTO planos_semanais (identificador, usuario_id, data_inicial,
+                  estado, criado_em, atualizado_em, versao)
+                VALUES (?, ?, ?, 'ATIVO', ?, ?, 0)
+                """, plano, usuario, LocalDate.of(2026, 7, 20), agora, agora);
+        banco.update("""
+                INSERT INTO blocos_de_estudo (identificador, plano_id, titulo,
+                  tipo_de_atividade, data, duracao_prevista_em_minutos, ordem,
+                  estado, criado_em, atualizado_em, versao)
+                VALUES (?, ?, 'Revisar lei', 'REVISAO', ?, 20, 1, 'PLANEJADO',
+                  ?, ?, 0)
+                """, bloco, plano, LocalDate.of(2026, 7, 20), agora, agora);
+        var identidade = new IdentidadeDaIntegracaoMcp(usuario, null,
+                UUID.randomUUID(), IDENTIFICADOR_DO_BOT, 998879L,
+                "agente-sem-execucao", "sessao-sem-execucao", 0,
+                Set.of("operacoes:preparar"));
+        var contexto = new ContextoDaChamadaMcp(identidade, UUID.randomUUID(),
+                "update-sem-execucao");
+
+        assertThatThrownBy(() -> preparacoes.preparar("CONCLUSAO_DO_BLOCO",
+                contexto, Map.of("identificadorDoBloco", bloco.toString(),
+                        "duracaoExecutadaEmMinutos", 20,
+                        "observacao", "Revisao concluida.")))
+                .isInstanceOf(RecursoNaoEncontrado.class)
+                .satisfies(excecao -> assertThat(
+                        ((RecursoNaoEncontrado) excecao).codigo())
+                        .isEqualTo("EXECUCAO_DO_BLOCO_NAO_ENCONTRADA"));
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM operacoes_assistidas WHERE usuario_id = ?
+                """, Integer.class, usuario)).isZero();
+    }
+
+    @Test
     void deveRejeitarEvidenciaIncoerenteAntesDePrepararOperacao()
             throws Exception {
         criarContaEEntrar("evidencia-previa@example.com");
@@ -903,6 +1025,16 @@ class AutomacaoIntegracaoTest {
                         "/paths/~1api~1v1~1operacoes-assistidas~1{identificador}/get"),
                 false, "200", "RespostaDeOperacaoAssistida",
                 List.of("400", "401", "403", "404"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1operacoes-assistidas~1{identificador}"
+                                + "~1confirmacao-web/post"),
+                true, "200", "RespostaDeOperacaoAssistida",
+                List.of("401", "403", "404", "409", "422"));
+        validarOperacaoOpenApi(documento.at(
+                        "/paths/~1api~1v1~1operacoes-assistidas~1{identificador}"
+                                + "~1cancelamento/post"),
+                true, "200", "RespostaDeOperacaoAssistida",
+                List.of("401", "403", "404", "409"));
 
         assertThat(documento.at(
                 "/paths/~1api~1v1~1integracoes-confiaveis~1telegram~1vinculos")

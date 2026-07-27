@@ -123,7 +123,11 @@ Mapeamento:
 
 - `400`: contexto inválido;
 - `404`: vínculo ausente;
-- `409`, `410`, `422`: operação recusada, expirada ou alterada;
+- `409`, `410`, `422`: operação recusada, expirada ou alterada. O plugin lê
+  somente um JSON fechado `{ "codigo": "..." }` do integrador e mapeia a
+  allowlist local `EXECUCAO_DO_BLOCO_NAO_ENCONTRADA` para orientar o usuário a
+  iniciar o bloco; códigos desconhecidos, corpo malformado ou campos extras
+  continuam com a mensagem genérica;
 - `429`: limite;
 - demais status ou rede: resultado indeterminado;
 - timeout: orientação para consultar operação antes de repetir.
