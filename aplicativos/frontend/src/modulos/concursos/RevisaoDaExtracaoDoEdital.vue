@@ -500,7 +500,7 @@ async function focarPrimeiraPendencia() {
         <summary>
           <h3 :id="`titulo-${severidade}`">
             {{ rotulosDasSeveridades[severidade] }}
-            <span class="badge text-bg-light">
+            <span class="badge etiqueta-neutra">
               {{ problemasPorSeveridade[severidade].length }}
             </span>
           </h3>
