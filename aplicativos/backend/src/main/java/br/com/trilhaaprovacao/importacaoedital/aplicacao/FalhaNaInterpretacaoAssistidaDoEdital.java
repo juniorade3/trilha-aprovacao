@@ -24,6 +24,7 @@ public class FalhaNaInterpretacaoAssistidaDoEdital extends RuntimeException {
         RECURSO_OCUPADO,
         FONTE_EXPIRADA,
         TEMPO_LIMITE_DA_IA,
+        LIMITE_DE_PAGINAS_RENDERIZADAS_EXCEDIDO,
         IA_INDISPONIVEL,
         RESPOSTA_RECUSADA_PELA_IA,
         RESPOSTA_INVALIDA_DA_IA

@@ -2,7 +2,6 @@ package br.com.trilhaaprovacao.importacaoedital.aplicacao;
 
 import br.com.trilhaaprovacao.compartilhado.api.RegraDeDominio;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.CargoExtraido;
-import br.com.trilhaaprovacao.importacaoedital.dominio.TipoDaFonteDoEdital;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -68,14 +67,12 @@ public class ServicoDeInterpretacaoAssistidaDoEdital {
             chaveExistente = cargo.chave();
             descricao = descrever(cargo);
         }
-        String textoParaOModelo = fonte.tipoDaFonte()
-                == TipoDaFonteDoEdital.TEXTO
-                ? fonte.textoExtraido() : null;
         ResultadoDaInterpretacaoAssistidaDoEdital resultado =
                 interpretador.interpretar(
                         new SolicitacaoDeInterpretacaoAssistidaDoEdital(
                                 fonte.tipoDaFonte(), fonte.nomeDoArquivo(),
-                                fonte.conteudoOriginal(), textoParaOModelo,
+                                fonte.conteudoOriginal(),
+                                fonte.textoExtraido(),
                                 descricao));
         var conversao = conversor.converter(fonte.extracaoAtual(),
                 resultado.arvore(), chaveExistente, fonte.textoExtraido());

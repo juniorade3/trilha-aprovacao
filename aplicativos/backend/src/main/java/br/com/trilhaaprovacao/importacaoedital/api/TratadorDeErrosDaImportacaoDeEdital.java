@@ -47,6 +47,8 @@ class TratadorDeErrosDaImportacaoDeEdital {
             case FONTE_EXPIRADA -> HttpStatus.GONE;
             case RESPOSTA_RECUSADA_PELA_IA, RESPOSTA_INVALIDA_DA_IA ->
                     HttpStatus.UNPROCESSABLE_ENTITY;
+            case LIMITE_DE_PAGINAS_RENDERIZADAS_EXCEDIDO ->
+                    HttpStatus.UNPROCESSABLE_ENTITY;
             case IA_DESABILITADA, IA_INDISPONIVEL ->
                     HttpStatus.SERVICE_UNAVAILABLE;
         };

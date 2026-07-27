@@ -1,0 +1,6 @@
+services:
+  backend:
+    volumes:
+      - type: bind
+        source: ${DIRETORIO_CREDENCIAIS_CODEX:?defina DIRETORIO_CREDENCIAIS_CODEX}
+        target: /home/aplicacao/.codex
