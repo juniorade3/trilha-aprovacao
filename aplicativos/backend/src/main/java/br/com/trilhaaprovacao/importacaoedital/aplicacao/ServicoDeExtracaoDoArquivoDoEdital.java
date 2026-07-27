@@ -115,8 +115,11 @@ public class ServicoDeExtracaoDoArquivoDoEdital {
                 throw new FalhaNaExtracaoDoEdital("LIMITE_DE_PAGINAS_EXCEDIDO",
                         "PDF excede o limite de paginas.");
             }
-            String texto = normalizarQuebras(
-                    new PDFTextStripper().getText(documento));
+            PDFTextStripper extrator = new PDFTextStripper();
+            extrator.setSortByPosition(true);
+            extrator.setPageEnd("\f");
+            String texto = removerSeparadorFinalDePagina(normalizarQuebras(
+                    extrator.getText(documento)));
             validarQuantidadeDeCaracteres(texto);
             long caracteresVisiveis = texto.codePoints()
                     .filter(codigo -> !Character.isWhitespace(codigo)).count();
@@ -142,7 +145,7 @@ public class ServicoDeExtracaoDoArquivoDoEdital {
                 return new ResultadoDaExtracaoDoArquivo(
                         TipoDaFonteDoEdital.PDF_DIGITALIZADO, null, paginas,
                         List.of(new ProblemaDaImportacao(
-                                SeveridadeDoProblemaDaImportacao.BLOQUEANTE,
+                                SeveridadeDoProblemaDaImportacao.AVISO,
                                 "OCR_INDISPONIVEL",
                                 "PDF sem camada textual; OCR nao esta disponivel.",
                                 "fonte")));
@@ -268,6 +271,12 @@ public class ServicoDeExtracaoDoArquivoDoEdital {
 
     private static String normalizarQuebras(String texto) {
         return texto.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static String removerSeparadorFinalDePagina(String texto) {
+        return texto.endsWith("\f")
+                ? texto.substring(0, texto.length() - 1)
+                : texto;
     }
 
     private int paginas(String texto) {

@@ -8,6 +8,7 @@ vi.mock('@/compartilhado/api/clienteHttp', () => ({ requisitar }))
 
 import {
   corrigirExtracaoDaImportacao,
+  extrairCargoComInterpretacaoAssistida,
   iniciarNovaTentativaDaImportacao,
   obterImportacaoDeEdital,
   obterRelatorioDaImportacao,
@@ -132,7 +133,70 @@ describe('apiDeImportacaoDeEdital', () => {
       '/v1/importacoes-de-edital/importacao-1/extracao',
       {
         method: 'PUT',
-        body: JSON.stringify({ versaoEsperada: 2, extracao }),
+        body: JSON.stringify({
+          versaoEsperada: 2,
+          extracao,
+          confirmacoesDeCampos: [],
+        }),
+      },
+    )
+  })
+
+  it('envia somente as confirmacoes de campos explicitamente informadas', async () => {
+    const extracao = {
+      versaoDoContrato: '1' as const,
+      fonte: {
+        nomeDoArquivo: 'edital.txt',
+        sha256: 'a'.repeat(64),
+        paginas: 1,
+      },
+      cargos: [],
+      provas: [],
+      materias: [],
+      avisos: [],
+      incertezas: [],
+    }
+    const confirmacoesDeCampos = [
+      {
+        tipoDoRecurso: 'cargo',
+        chaveDoRecurso: 'cargo-dados',
+        campo: 'area',
+      },
+    ]
+
+    await corrigirExtracaoDaImportacao(
+      'importacao-1',
+      2,
+      extracao,
+      confirmacoesDeCampos,
+    )
+
+    expect(requisitar).toHaveBeenCalledWith(
+      '/v1/importacoes-de-edital/importacao-1/extracao',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          versaoEsperada: 2,
+          extracao,
+          confirmacoesDeCampos,
+        }),
+      },
+    )
+  })
+
+  it('solicita extracao assistida com um alvo explicito e versao esperada', async () => {
+    await extrairCargoComInterpretacaoAssistida('importacao-1', 3, {
+      descricaoDoCargoAlvo: 'Analista de TI — Engenharia de Dados',
+    })
+
+    expect(requisitar).toHaveBeenCalledWith(
+      '/v1/importacoes-de-edital/importacao-1/extracao-assistida',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          versaoEsperada: 3,
+          descricaoDoCargoAlvo: 'Analista de TI — Engenharia de Dados',
+        }),
       },
     )
   })

@@ -1,6 +1,7 @@
 package br.com.trilhaaprovacao.importacaoedital.aplicacao;
 
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital;
+import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.CargoExtraido;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.ItemExtraido;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.MateriaExtraida;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital.ProvaExtraida;
@@ -12,12 +13,29 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ValidadorDaExtracaoDoEdital {
+    private static final Pattern CAMINHO_DO_CARGO = Pattern.compile(
+            "^cargos\\[(\\d+)](?:\\.(.+))?$");
+    private static final Pattern CAMINHO_DO_GRUPO = Pattern.compile(
+            "^provas\\[(\\d+)]\\.grupos\\[(\\d+)](?:\\.(.+))?$");
+    private static final Pattern CAMINHO_DA_PROVA = Pattern.compile(
+            "^provas\\[(\\d+)](?:\\.(.+))?$");
+    private static final Pattern CAMINHO_DO_TOPICO = Pattern.compile(
+            "^materias\\[(\\d+)]\\.topicos\\[(\\d+)](?:\\.(.+))?$");
+    private static final Pattern CAMINHO_DO_ITEM = Pattern.compile(
+            "^materias\\[(\\d+)]\\.itensDoEdital\\[(\\d+)](?:\\.(.+))?$");
+    private static final Pattern CAMINHO_DA_MATERIA = Pattern.compile(
+            "^materias\\[(\\d+)](?:\\.(.+))?$");
+
     private final NormalizadorDoTextoDoEdital normalizador;
 
     public ValidadorDaExtracaoDoEdital() {
@@ -113,17 +131,21 @@ public class ValidadorDaExtracaoDoEdital {
             validarOrdens(prova.grupos(),
                     ExtracaoEstruturadaDoEdital.GrupoExtraido::ordem,
                     caminho + ".grupos", problemas);
-            prova.grupos().forEach(item -> {
+            for (int indiceDoGrupo = 0;
+                    indiceDoGrupo < prova.grupos().size(); indiceDoGrupo++) {
+                var item = prova.grupos().get(indiceDoGrupo);
+                String caminhoDoGrupo = caminho + ".grupos["
+                        + indiceDoGrupo + "]";
                 provaDoGrupo.put(item.chave(), prova.chave());
                 if (!grupos.add(item.chave())) problemas.add(bloqueante(
                         "CHAVE_DUPLICADA", "Chave de grupo duplicada.",
-                        caminho + ".grupos"));
-                tamanho(item.nome(), 160, caminho + ".grupos.nome", problemas);
-                positivo(item.quantidadeDeQuestoes(), caminho + ".grupos",
-                        problemas);
+                        caminhoDoGrupo));
+                tamanho(item.nome(), 160, caminhoDoGrupo + ".nome", problemas);
+                positivo(item.quantidadeDeQuestoes(),
+                        caminhoDoGrupo + ".quantidadeDeQuestoes", problemas);
                 pontuacao(item.pontuacaoMinima(), item.pontuacaoMaxima(),
-                        caminho + ".grupos", problemas);
-            });
+                        caminhoDoGrupo, problemas);
+            }
         }
 
         Set<String> nomesDeMaterias = new HashSet<>();
@@ -184,7 +206,58 @@ public class ValidadorDaExtracaoDoEdital {
         }
         validarLimitesDaRaiz(extracao, problemas);
         validarProveniencias(extracao, problemas);
-        return List.copyOf(problemas);
+        return estabilizarReferencias(extracao, problemas);
+    }
+
+    public List<ProblemaDaImportacao> validarParaCargo(
+            ExtracaoEstruturadaDoEdital extracao, String chaveDoCargo) {
+        if (extracao == null) return validar(null);
+        if (chaveDoCargo == null || chaveDoCargo.isBlank()
+                || extracao.cargos().stream().noneMatch(cargo ->
+                        Objects.equals(cargo.chave(), chaveDoCargo))) {
+            return List.of(new ProblemaDaImportacao(
+                    SeveridadeDoProblemaDaImportacao.BLOQUEANTE,
+                    "CARGO_ALVO_INVALIDO",
+                    "Cargo selecionado nao pertence a extracao.", "cargos",
+                    "cargo", chaveDoCargo, "chave"));
+        }
+        List<CargoExtraido> cargos = extracao.cargos().stream()
+                .filter(cargo -> Objects.equals(cargo.chave(), chaveDoCargo))
+                .toList();
+        List<ProvaExtraida> provas = extracao.provas().stream()
+                .filter(prova -> Objects.equals(prova.chaveDoCargo(),
+                        chaveDoCargo))
+                .toList();
+        List<MateriaExtraida> materias = extracao.materias().stream()
+                .filter(materia -> Objects.equals(materia.chaveDoCargo(),
+                        chaveDoCargo))
+                .toList();
+        var extracaoDoCargo = new ExtracaoEstruturadaDoEdital(
+                extracao.versaoDoContrato(), extracao.fonte(),
+                extracao.concurso(), extracao.edital(), cargos, provas,
+                materias, extracao.avisos(), extracao.incertezas());
+        return referenciarColecoesNoCargo(validar(extracaoDoCargo),
+                chaveDoCargo);
+    }
+
+    public List<AvaliacaoDoCargo> avaliarCargos(
+            ExtracaoEstruturadaDoEdital extracao) {
+        if (extracao == null) return List.of();
+        Set<String> avaliadas = new LinkedHashSet<>();
+        List<AvaliacaoDoCargo> avaliacoes = new ArrayList<>();
+        for (CargoExtraido cargo : extracao.cargos()) {
+            if (cargo.chave() == null || cargo.chave().isBlank()
+                    || !avaliadas.add(cargo.chave())) {
+                continue;
+            }
+            List<ProblemaDaImportacao> problemas = validarParaCargo(extracao,
+                    cargo.chave());
+            boolean pronto = !possuiBloqueante(problemas)
+                    && !exigeDecisao(problemas);
+            avaliacoes.add(new AvaliacaoDoCargo(cargo.chave(), pronto,
+                    problemas));
+        }
+        return List.copyOf(avaliacoes);
     }
 
     public boolean possuiBloqueante(List<ProblemaDaImportacao> problemas) {
@@ -207,39 +280,46 @@ public class ValidadorDaExtracaoDoEdital {
                 caminho + ".topicos", problemas);
         validarOrdens(materia.itensDoEdital(), ItemExtraido::ordem,
                 caminho + ".itensDoEdital", problemas);
-        materia.topicos().forEach(item -> {
-            tamanho(item.nome(), 160, caminho + ".topicos.nome", problemas);
-            tamanho(item.descricao(), 1000, caminho + ".topicos.descricao",
+        for (int indice = 0; indice < materia.topicos().size(); indice++) {
+            TopicoExtraido item = materia.topicos().get(indice);
+            String caminhoDoTopico = caminho + ".topicos[" + indice + "]";
+            tamanho(item.nome(), 160, caminhoDoTopico + ".nome", problemas);
+            tamanho(item.descricao(), 1000, caminhoDoTopico + ".descricao",
                     problemas);
             if (item.chaveDoPai() != null && (!topicos.contains(item.chaveDoPai())
                     || possuiCiclo(item.chave(), item.chaveDoPai(),
                             materia.topicos(), TopicoExtraido::chave,
                             TopicoExtraido::chaveDoPai))) {
                 problemas.add(bloqueante("HIERARQUIA_DE_TOPICOS_INVALIDA",
-                        "Topico possui pai ausente ou ciclo.", caminho + ".topicos"));
+                        "Topico possui pai ausente ou ciclo.",
+                        caminhoDoTopico));
             }
-        });
-        materia.itensDoEdital().forEach(item -> {
+        }
+        for (int indice = 0;
+                indice < materia.itensDoEdital().size(); indice++) {
+            ItemExtraido item = materia.itensDoEdital().get(indice);
+            String caminhoDoItem = caminho + ".itensDoEdital[" + indice + "]";
             if (item.chaveDoPai() != null && (!itens.contains(item.chaveDoPai())
                     || possuiCiclo(item.chave(), item.chaveDoPai(),
                             materia.itensDoEdital(), ItemExtraido::chave,
                             ItemExtraido::chaveDoPai))) {
                 problemas.add(bloqueante("HIERARQUIA_DE_ITENS_INVALIDA",
                         "Item possui pai ausente ou ciclo.",
-                        caminho + ".itensDoEdital"));
+                        caminhoDoItem));
             }
             obrigatorio(item.descricaoLiteral(), "ITEM_SEM_DESCRICAO",
-                    "Item literal sem descricao.", caminho + ".itensDoEdital",
+                    "Item literal sem descricao.",
+                    caminhoDoItem + ".descricaoLiteral",
                     problemas);
             tamanho(item.numeroOficial(), 80,
-                    caminho + ".itensDoEdital.numeroOficial", problemas);
+                    caminhoDoItem + ".numeroOficial", problemas);
             if (item.chaveDoTopicoSugerido() != null
                     && !topicos.contains(item.chaveDoTopicoSugerido())) {
                 problemas.add(bloqueante("TOPICO_SUGERIDO_INVALIDO",
                         "Item referencia topico sugerido ausente.",
-                        caminho + ".itensDoEdital"));
+                        caminhoDoItem + ".chaveDoTopicoSugerido"));
             }
-        });
+        }
     }
 
     private void validarProveniencias(ExtracaoEstruturadaDoEdital extracao,
@@ -309,6 +389,144 @@ public class ValidadorDaExtracaoDoEdital {
             }
         }
         return chaves;
+    }
+
+    private static List<ProblemaDaImportacao> estabilizarReferencias(
+            ExtracaoEstruturadaDoEdital extracao,
+            List<ProblemaDaImportacao> problemas) {
+        List<ProblemaDaImportacao> resultado = new ArrayList<>();
+        for (ProblemaDaImportacao problema : problemas) {
+            resultado.add(estabilizarReferencia(extracao, problema));
+        }
+        return List.copyOf(resultado);
+    }
+
+    private static ProblemaDaImportacao estabilizarReferencia(
+            ExtracaoEstruturadaDoEdital extracao,
+            ProblemaDaImportacao problema) {
+        String caminho = problema.caminho();
+        if (caminho == null) return problema;
+
+        Matcher grupo = CAMINHO_DO_GRUPO.matcher(caminho);
+        if (grupo.matches()) {
+            ProvaExtraida prova = item(extracao.provas(), grupo.group(1));
+            if (prova != null) {
+                var registro = item(prova.grupos(), grupo.group(2));
+                if (registro != null) return problema.comReferencia("grupo",
+                        registro.chave(), grupo.group(3));
+                return problema.comReferencia("prova", prova.chave(),
+                        "grupos");
+            }
+        }
+
+        Matcher topico = CAMINHO_DO_TOPICO.matcher(caminho);
+        if (topico.matches()) {
+            MateriaExtraida materia = item(extracao.materias(),
+                    topico.group(1));
+            if (materia != null) {
+                TopicoExtraido registro = item(materia.topicos(),
+                        topico.group(2));
+                if (registro != null) return problema.comReferencia("topico",
+                        registro.chave(), topico.group(3));
+                return problema.comReferencia("materia", materia.chave(),
+                        "topicos");
+            }
+        }
+
+        Matcher itemDoEdital = CAMINHO_DO_ITEM.matcher(caminho);
+        if (itemDoEdital.matches()) {
+            MateriaExtraida materia = item(extracao.materias(),
+                    itemDoEdital.group(1));
+            if (materia != null) {
+                ItemExtraido registro = item(materia.itensDoEdital(),
+                        itemDoEdital.group(2));
+                if (registro != null) return problema.comReferencia(
+                        "itemDoEdital", registro.chave(),
+                        itemDoEdital.group(3));
+                return problema.comReferencia("materia", materia.chave(),
+                        "itensDoEdital");
+            }
+        }
+
+        Matcher cargo = CAMINHO_DO_CARGO.matcher(caminho);
+        if (cargo.matches()) {
+            CargoExtraido registro = item(extracao.cargos(), cargo.group(1));
+            if (registro != null) return problema.comReferencia("cargo",
+                    registro.chave(), cargo.group(2));
+        }
+
+        Matcher prova = CAMINHO_DA_PROVA.matcher(caminho);
+        if (prova.matches()) {
+            ProvaExtraida registro = item(extracao.provas(), prova.group(1));
+            if (registro != null) return problema.comReferencia("prova",
+                    registro.chave(), prova.group(2));
+        }
+
+        Matcher materia = CAMINHO_DA_MATERIA.matcher(caminho);
+        if (materia.matches()) {
+            MateriaExtraida registro = item(extracao.materias(),
+                    materia.group(1));
+            if (registro != null) return problema.comReferencia("materia",
+                    registro.chave(), materia.group(2));
+        }
+
+        if (caminho.startsWith("concurso")) {
+            return problema.comReferencia("concurso", "concurso",
+                    campoDepoisDaRaiz(caminho));
+        }
+        if (caminho.startsWith("edital")) {
+            return problema.comReferencia("edital", "edital",
+                    campoDepoisDaRaiz(caminho));
+        }
+        if (caminho.startsWith("provas[cargo=")) {
+            return problema.comReferencia("cargo",
+                    entre(caminho, "provas[cargo=", "]"), "provas");
+        }
+        if (caminho.startsWith("materias[grupo=")) {
+            String grupoComAssociacoes = entre(caminho, "materias[grupo=",
+                    "]");
+            int separador = grupoComAssociacoes == null ? -1
+                    : grupoComAssociacoes.lastIndexOf('\0');
+            String chaveDoGrupo = separador < 0 ? grupoComAssociacoes
+                    : grupoComAssociacoes.substring(separador + 1);
+            return problema.comReferencia("grupo", chaveDoGrupo, "materias");
+        }
+        if ("cargos".equals(caminho) || "provas".equals(caminho)
+                || "materias".equals(caminho)) {
+            return problema.comReferencia("extracao", "extracao", caminho);
+        }
+        return problema;
+    }
+
+    private static List<ProblemaDaImportacao> referenciarColecoesNoCargo(
+            List<ProblemaDaImportacao> problemas, String chaveDoCargo) {
+        return problemas.stream().map(problema -> switch (problema.codigo()) {
+            case "MATERIA_AUSENTE" -> problema.comReferencia("cargo",
+                    chaveDoCargo, "materias");
+            default -> problema;
+        }).toList();
+    }
+
+    private static <T> T item(List<T> itens, String indice) {
+        try {
+            int valor = Integer.parseInt(indice);
+            return valor >= 0 && valor < itens.size() ? itens.get(valor) : null;
+        } catch (NumberFormatException excecao) {
+            return null;
+        }
+    }
+
+    private static String campoDepoisDaRaiz(String caminho) {
+        int separador = caminho.indexOf('.');
+        return separador < 0 ? null : caminho.substring(separador + 1);
+    }
+
+    private static String entre(String valor, String inicio, String fim) {
+        int primeiro = valor.indexOf(inicio);
+        if (primeiro < 0) return null;
+        primeiro += inicio.length();
+        int ultimo = valor.indexOf(fim, primeiro);
+        return ultimo < 0 ? null : valor.substring(primeiro, ultimo);
     }
 
     private static <T> void validarOrdens(List<T> itens,

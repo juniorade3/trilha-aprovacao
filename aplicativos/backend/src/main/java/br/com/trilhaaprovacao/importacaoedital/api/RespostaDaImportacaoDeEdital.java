@@ -1,6 +1,8 @@
 package br.com.trilhaaprovacao.importacaoedital.api;
 
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.ConsultaDaImportacaoDeEdital;
+import br.com.trilhaaprovacao.importacaoedital.aplicacao.AvaliacaoDoCargo;
+import br.com.trilhaaprovacao.importacaoedital.aplicacao.PoliticaDosProblemasPersistentesDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.PreparadorDaImportacaoCompletaDoEdital.ContagensDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.PreparadorDaImportacaoCompletaDoEdital.ItemDaPreviaDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.PreparadorDaImportacaoCompletaDoEdital.PreviaDaImportacaoCompleta;
@@ -9,7 +11,9 @@ import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdit
 import br.com.trilhaaprovacao.importacaoedital.dominio.ModoDaImportacaoDeEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.PoliticaDeReutilizacao;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ProblemaDaImportacao;
+import br.com.trilhaaprovacao.importacaoedital.dominio.SeveridadeDoProblemaDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.dominio.TipoDaFonteDoEdital;
+import br.com.trilhaaprovacao.importacaoedital.aplicacao.ValidadorDaExtracaoDoEdital;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,18 +40,38 @@ public record RespostaDaImportacaoDeEdital(
         OffsetDateTime atualizadoEm,
         ExtracaoEstruturadaDoEdital extracao,
         List<ProblemaDaImportacao> problemas,
+        boolean interpretacaoAssistidaDisponivel,
+        List<AvaliacaoDoCargo> avaliacoesDosCargos,
         RespostaDaPrevia previa) {
 
     public static RespostaDaImportacaoDeEdital de(
             ConsultaDaImportacaoDeEdital consulta) {
-        return de(consulta, null);
+        return de(consulta, null, false);
+    }
+
+    public static RespostaDaImportacaoDeEdital de(
+            ConsultaDaImportacaoDeEdital consulta,
+            boolean interpretacaoAssistidaDisponivel) {
+        return de(consulta, null, interpretacaoAssistidaDisponivel);
     }
 
     public static RespostaDaImportacaoDeEdital de(
             ConsultaDaImportacaoDeEdital consulta,
             RespostaDaPrevia previa) {
+        return de(consulta, previa, false);
+    }
+
+    public static RespostaDaImportacaoDeEdital de(
+            ConsultaDaImportacaoDeEdital consulta,
+            RespostaDaPrevia previa,
+            boolean interpretacaoAssistidaDisponivel) {
         var staging = consulta.staging();
         var importacao = staging.importacao();
+        List<ProblemaDaImportacao> problemas = problemasAplicaveis(
+                staging.extracao(), staging.problemas(),
+                importacao.chaveDoCargoSelecionado());
+        List<AvaliacaoDoCargo> avaliacoes = avaliacoes(
+                staging.extracao(), staging.problemas());
         return new RespostaDaImportacaoDeEdital(
                 importacao.identificador(), importacao.estado(),
                 importacao.tipoDaFonte(), importacao.nomeDoArquivo(),
@@ -60,7 +84,61 @@ public record RespostaDaImportacaoDeEdital(
                 importacao.chaveDoCargoSelecionado(),
                 consulta.tentativaDaPreparacao(), importacao.criadoEm(),
                 importacao.atualizadoEm(), staging.extracao(),
-                staging.problemas(), previa);
+                problemas, interpretacaoAssistidaDisponivel, avaliacoes,
+                previa);
+    }
+
+    private static List<AvaliacaoDoCargo> avaliacoes(
+            ExtracaoEstruturadaDoEdital extracao,
+            List<ProblemaDaImportacao> persistidos) {
+        if (extracao == null) return List.of();
+        ValidadorDaExtracaoDoEdital validador =
+                new ValidadorDaExtracaoDoEdital();
+        return validador.avaliarCargos(extracao).stream().map(avaliacao -> {
+            List<ProblemaDaImportacao> problemas = unir(
+                    avaliacao.problemas(),
+                    PoliticaDosProblemasPersistentesDaImportacao
+                            .aplicaveisAoCargo(extracao,
+                                    avaliacao.chaveDoCargo(), persistidos));
+            boolean pronto = problemas.stream().noneMatch(problema ->
+                    problema.severidade()
+                            == SeveridadeDoProblemaDaImportacao.BLOQUEANTE
+                            || problema.severidade()
+                            == SeveridadeDoProblemaDaImportacao.EXIGE_DECISAO);
+            return new AvaliacaoDoCargo(avaliacao.chaveDoCargo(), pronto,
+                    problemas);
+        }).toList();
+    }
+
+    private static List<ProblemaDaImportacao> problemasAplicaveis(
+            ExtracaoEstruturadaDoEdital extracao,
+            List<ProblemaDaImportacao> persistidos,
+            String chaveDoCargo) {
+        if (chaveDoCargo == null || chaveDoCargo.isBlank()
+                || extracao == null) {
+            return persistidos == null ? List.of() : List.copyOf(persistidos);
+        }
+        ValidadorDaExtracaoDoEdital validador =
+                new ValidadorDaExtracaoDoEdital();
+        List<ProblemaDaImportacao> problemas = new ArrayList<>(
+                validador.validarParaCargo(extracao, chaveDoCargo));
+        problemas.addAll(PoliticaDosProblemasPersistentesDaImportacao
+                .aplicaveisAoCargo(extracao, chaveDoCargo, persistidos));
+        return unir(problemas, List.of());
+    }
+
+    private static List<ProblemaDaImportacao> unir(
+            List<ProblemaDaImportacao> primeiros,
+            List<ProblemaDaImportacao> segundos) {
+        Map<String, ProblemaDaImportacao> unicos = new LinkedHashMap<>();
+        java.util.stream.Stream.concat(primeiros.stream(), segundos.stream())
+                .forEach(problema -> unicos.putIfAbsent(
+                        problema.codigo() + "\0" + problema.tipoDoRecurso()
+                                + "\0" + problema.chaveDoRecurso() + "\0"
+                                + problema.campo() + "\0"
+                                + problema.caminho(),
+                        problema));
+        return List.copyOf(unicos.values());
     }
 
     public record RespostaDaPrevia(

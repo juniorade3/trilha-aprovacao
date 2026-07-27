@@ -44,8 +44,33 @@ documento são tratadas apenas como dados. Nos objetos de avaliação Cebraspe, 
 descrição numerada integral permanece como item literal e também origina um
 tópico hierárquico marcado como inferido, com sugestão de mapeamento pendente.
 Frases semelhantes a prompt injection são sinalizadas para revisão e nunca
-executadas. Não há download de URL nem chamada a shell, filesystem genérico,
-modelo ou ferramenta durante a extração.
+executadas. Não há download de URL nem chamada a shell, filesystem genérico ou
+ferramenta durante a extração determinística.
+
+Quando o parser local não for suficiente, o usuário pode acionar
+explicitamente uma interpretação externa para um único cargo. O adaptador usa a
+Responses API com entrada PDF ou texto e Structured Outputs estrito. A chamada
+não expõe ferramentas, usa `store: false`, não recebe credencial MCP e não
+escreve no domínio. O resultado é apenas uma candidata a nova versão do staging:
+o backend gera as chaves e associações internas, verifica as evidências contra o
+texto local e exige revisão quando não consegue comprovar página e trecho.
+Recusa, limite, indisponibilidade ou resposta inválida preservam integralmente a
+versão corrente e mantêm o editor manual disponível.
+
+Correções do editor são sanitizadas no backend. Metadados enviados pelo
+navegador são descartados: campos inalterados mantêm a proveniência anterior e
+campos alterados recebem `Correção do usuário`. Sugestões assistidas também
+podem ser confirmadas individualmente por referência estável de recurso e campo.
+Somente uma pendência existente na versão esperada pode ser confirmada; as
+demais pendências e os avisos de fonte são carregados para a versão seguinte.
+Esse mecanismo permite concluir PDFs digitalizados sem transformar um único
+salvamento em aprovação implícita de toda a resposta do modelo.
+
+O modelo padrão é configurável e começa em `gpt-5.6-sol`, com esforço `low`. A
+integração permanece desligada quando a chave não está disponível. O segredo
+fica fora do repositório e do Compose versionado. Apenas resultado operacional,
+duração e contagem de tokens são registrados como métricas; documento, prompt e
+resposta não entram em logs.
 
 O MCP recebe somente identificadores, versão da extração, cargo selecionado,
 modo, política e decisões por identificador. O documento e o DTO grande não
@@ -72,8 +97,11 @@ O concurso nasce em `PLANEJADO`. Ativação não faz parte da importação.
   cargo sem misturar conteúdo.
 - A retenção do bruto limita exposição, mas o uso de `BYTEA` deve ser revisto se
   o volume justificar object storage privado e transacionalmente reconciliado.
-- OCR e antivírus são portas opcionais. A ausência é informada; nunca é
-  apresentada como varredura ou OCR concluído.
+- OCR, antivírus e interpretação externa são portas opcionais. A ausência é
+  informada; nunca é apresentada como varredura, OCR ou interpretação concluída.
+- PDF digitalizado pode ser interpretado pela integração externa somente após
+  consentimento explícito. Sem ela, a correção manual continua sendo o caminho
+  garantido para concluir um staging válido.
 - A cor neutra de uma matéria nova é metadado visual do sistema, não dado
   extraído do edital, e é identificada como padrão no relatório.
 
@@ -87,5 +115,7 @@ O concurso nasce em `PLANEJADO`. Ativação não faz parte da importação.
   tópicos semanticamente diferentes.
 - Dar filesystem ou mídia ao agente OpenClaw: viola o catálogo mínimo e expõe
   arquivos fora do vínculo efetivo.
+- Executar Codex CLI ou encaminhar o bruto ao OpenClaw: mistura autenticação,
+  operação e extração, dificulta limitar custo e amplia o catálogo confiável.
 - Adicionar Tika/POI/serviço de OCR no primeiro corte: aumenta dependências e
   superfície sem infraestrutura operacional disponível.

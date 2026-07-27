@@ -270,6 +270,101 @@ class ParserEValidadorDoEditalTest {
                 });
     }
 
+    @Test
+    void avaliaProntidaoPorCargoSemHerdarPendenciasDosDemais() {
+        var extracao = new ParserDeterministicoDoEdital().extrair("""
+                CONCURSO: Tribunal
+                EDITAL: Edital de abertura
+                CARGO: Analista Administrativo
+                PROVA: Prova objetiva
+                TIPO: OBJETIVA
+                CARÁTER: CLASSIFICATORIO
+                GRUPO: Conhecimentos específicos
+                MATÉRIA: Administração
+                TÓPICO: Gestão pública
+                CARGO: Engenheiro de Dados
+                ESCOLARIDADE: SUPERIOR
+                PROVA: Prova objetiva
+                TIPO: OBJETIVA
+                CARÁTER: CLASSIFICATORIO
+                GRUPO: Conhecimentos específicos
+                MATÉRIA: Banco de Dados
+                TÓPICO: Modelagem relacional
+                """, new FonteDoEdital("edital.txt", HASH, 1));
+        var validador = new ValidadorDaExtracaoDoEdital();
+        var cargoComPendencia = extracao.cargos().getFirst();
+        var cargoPronto = extracao.cargos().getLast();
+
+        assertThat(validador.validar(extracao))
+                .filteredOn(problema -> problema.codigo().equals(
+                        "CARGO_SEM_ESCOLARIDADE"))
+                .singleElement()
+                .satisfies(problema -> {
+                    assertThat(problema.tipoDoRecurso()).isEqualTo("cargo");
+                    assertThat(problema.chaveDoRecurso())
+                            .isEqualTo(cargoComPendencia.chave());
+                    assertThat(problema.campo())
+                            .isEqualTo("nivelDeEscolaridade");
+                    assertThat(problema.caminho())
+                            .isEqualTo("cargos[0].nivelDeEscolaridade");
+                });
+
+        assertThat(validador.validarParaCargo(extracao,
+                cargoPronto.chave())).extracting("codigo")
+                .doesNotContain("CARGO_SEM_ESCOLARIDADE",
+                        "SELECAO_DE_CARGO_OBRIGATORIA");
+        assertThat(validador.avaliarCargos(extracao))
+                .anySatisfy(avaliacao -> {
+                    assertThat(avaliacao.chaveDoCargo())
+                            .isEqualTo(cargoComPendencia.chave());
+                    assertThat(avaliacao.pronto()).isFalse();
+                })
+                .anySatisfy(avaliacao -> {
+                    assertThat(avaliacao.chaveDoCargo())
+                            .isEqualTo(cargoPronto.chave());
+                    assertThat(avaliacao.pronto()).isTrue();
+                    assertThat(avaliacao.problemas()).extracting("codigo")
+                            .doesNotContain("CARGO_SEM_ESCOLARIDADE");
+                });
+    }
+
+    @Test
+    void materiaComMesmoNomeEmCargosDistintosNaoImpedeProntidaoIsolada() {
+        var extracao = new ParserDeterministicoDoEdital().extrair("""
+                CONCURSO: Tribunal
+                EDITAL: Edital de abertura
+                CARGO: Analista
+                ESCOLARIDADE: SUPERIOR
+                PROVA: Objetiva
+                TIPO: OBJETIVA
+                CARÁTER: CLASSIFICATORIO
+                GRUPO: Conhecimentos
+                MATÉRIA: Língua Portuguesa
+                TÓPICO: Interpretação
+                CARGO: Técnico
+                ESCOLARIDADE: MEDIO
+                PROVA: Objetiva
+                TIPO: OBJETIVA
+                CARÁTER: CLASSIFICATORIO
+                GRUPO: Conhecimentos
+                MATÉRIA: Língua Portuguesa
+                TÓPICO: Gramática
+                """, new FonteDoEdital("edital.txt", HASH, 1));
+        var validador = new ValidadorDaExtracaoDoEdital();
+
+        assertThat(validador.validar(extracao)).extracting("codigo")
+                .contains("MATERIA_DUPLICADA",
+                        "SELECAO_DE_CARGO_OBRIGATORIA");
+        assertThat(validador.avaliarCargos(extracao))
+                .hasSize(2)
+                .allSatisfy(avaliacao -> {
+                    assertThat(avaliacao.pronto()).isTrue();
+                    assertThat(avaliacao.problemas()).extracting("codigo")
+                            .doesNotContain("MATERIA_DUPLICADA",
+                                    "SELECAO_DE_CARGO_OBRIGATORIA");
+                });
+    }
+
     private static String fixture(String nome) throws Exception {
         try (var entrada = ParserEValidadorDoEditalTest.class
                 .getResourceAsStream("/fixtures/editais/" + nome)) {

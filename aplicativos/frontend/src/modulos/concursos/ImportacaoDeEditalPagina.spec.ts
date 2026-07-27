@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 
 const chamadas = vi.hoisted(() => ({
+  corrigirExtracaoDaImportacao: vi.fn(),
+  extrairCargoComInterpretacaoAssistida: vi.fn(),
   obterImportacaoDeEdital: vi.fn(),
   obterRelatorioDaImportacao: vi.fn(),
   iniciarNovaTentativaDaImportacao: vi.fn(),
@@ -181,7 +183,7 @@ describe('ImportacaoDeEditalPagina', () => {
       modo: 'CRIAR_NOVO',
       identificadorDoConcursoExistente: undefined,
     })
-    expect(pagina.text()).toContain('Selecione o cargo correto')
+    expect(pagina.text()).toContain('Revisar extração')
     expect(pagina.text()).not.toContain('Gerar prévia segura')
     pagina.unmount()
   })
@@ -233,6 +235,73 @@ describe('ImportacaoDeEditalPagina', () => {
       chamadas.registrarDecisoesDaImportacao.mock.calls[0]?.[1],
     ).not.toHaveProperty('identificadorDoUsuario')
     expect(pagina.text()).toContain('Gerar prévia segura')
+    pagina.unmount()
+  })
+
+  it('salva correcoes intermediarias com versao e recarrega em conflito', async () => {
+    const aguardando = importacao('AGUARDANDO_CORRECOES')
+    aguardando.extracao!.edital = {
+      titulo: dado('Versão inicial'),
+      numero: dado('1'),
+      ano: dado(2026),
+      descricao: dado<string>(null),
+      dataDePublicacao: dado<string>(null),
+    }
+    const atualizada = importacao('AGUARDANDO_CORRECOES')
+    atualizada.versaoAtualDaExtracao = 2
+    atualizada.hashDaExtracaoAtual = 'extracao-2'
+    atualizada.extracao!.edital = {
+      titulo: dado('Versão do servidor'),
+      numero: dado('1'),
+      ano: dado(2026),
+      descricao: dado<string>(null),
+      dataDePublicacao: dado<string>(null),
+    }
+    chamadas.obterImportacaoDeEdital
+      .mockResolvedValueOnce(aguardando)
+      .mockResolvedValueOnce(atualizada)
+    chamadas.corrigirExtracaoDaImportacao.mockRejectedValue(
+      new ErroDaApi(
+        409,
+        'Extração alterada.',
+        'EXTRACAO_DA_IMPORTACAO_DESATUALIZADA',
+      ),
+    )
+    const { pagina } = await montar('/concursos/importacoes/importacao-1')
+    const titulo = pagina
+      .findAll('label')
+      .find((label) => label.text().includes('Título do edital'))!
+      .get('input')
+
+    await titulo.setValue('Minha correção')
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text().includes('Salvar correções'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chamadas.corrigirExtracaoDaImportacao).toHaveBeenCalledWith(
+      'importacao-1',
+      1,
+      expect.objectContaining({
+        edital: expect.objectContaining({
+          titulo: expect.objectContaining({ valor: 'Minha correção' }),
+        }),
+      }),
+      [],
+    )
+    expect(pagina.get('[role="alert"]').text()).toContain(
+      'rascunho local foi descartado',
+    )
+    expect(
+      (
+        pagina
+          .findAll('label')
+          .find((label) => label.text().includes('Título do edital'))!
+          .get('input').element as HTMLInputElement
+      ).value,
+    ).toBe('Versão do servidor')
+    expect(pagina.text()).not.toContain('Há correções não salvas')
     pagina.unmount()
   })
 
@@ -374,7 +443,7 @@ describe('ImportacaoDeEditalPagina', () => {
     await flushPromises()
 
     expect(pagina.get('[role="alert"]').text()).toContain('A extração mudou')
-    expect(pagina.text()).toContain('Selecione o cargo correto')
+    expect(pagina.text()).toContain('Revisar extração')
     expect(pagina.text()).not.toContain('Prévia da importação')
     pagina.unmount()
   })

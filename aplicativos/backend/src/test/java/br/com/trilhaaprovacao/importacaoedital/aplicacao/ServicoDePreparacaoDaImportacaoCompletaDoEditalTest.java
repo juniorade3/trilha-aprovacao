@@ -13,6 +13,8 @@ import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdit
 import br.com.trilhaaprovacao.importacaoedital.dominio.ImportacaoDeEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ModoDaImportacaoDeEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.PoliticaDeReutilizacao;
+import br.com.trilhaaprovacao.importacaoedital.dominio.ProblemaDaImportacao;
+import br.com.trilhaaprovacao.importacaoedital.dominio.SeveridadeDoProblemaDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.dominio.TipoDaFonteDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.infraestrutura.ImportacaoDeEditalPersistida;
 import br.com.trilhaaprovacao.importacaoedital.infraestrutura.RepositorioDeImportacoesDeEdital;
@@ -125,6 +127,36 @@ class ServicoDePreparacaoDaImportacaoCompletaDoEditalTest {
                                 "HIERARQUIA_DO_TOPICO_REUTILIZADO_DIVERGENTE"));
     }
 
+    @Test
+    void evidenciaAssistidaDoCargoBloqueiaPreparacaoAteSerConfirmada() {
+        ExtracaoEstruturadaDoEdital extracao = extracao();
+        String cargo = extracao.cargos().getFirst().chave();
+        ProblemaDaImportacao evidencia = new ProblemaDaImportacao(
+                SeveridadeDoProblemaDaImportacao.EXIGE_DECISAO,
+                "EVIDENCIA_ASSISTIDA_NAO_VERIFICADA",
+                "Confira o valor sugerido.", null,
+                "cargo", cargo, "nome");
+        Cenario pendente = cenario(new BancoDeCatalogoFake(), Map.of(),
+                extracao, List.of(evidencia));
+
+        assertThat(pendente.servico().previsualizar(
+                pendente.solicitacao()).conflitos())
+                .extracting("codigo")
+                .contains("EVIDENCIA_ASSISTIDA_NAO_VERIFICADA");
+        assertThatThrownBy(() -> pendente.servico().preparar(
+                pendente.solicitacao()))
+                .isInstanceOfSatisfying(RegraDeDominio.class,
+                        erro -> assertThat(erro.codigo()).isEqualTo(
+                                "IMPORTACAO_EXIGE_DECISOES"));
+
+        Cenario confirmado = cenario(new BancoDeCatalogoFake(), Map.of(),
+                extracao, List.of());
+        assertThat(confirmado.servico().previsualizar(
+                confirmado.solicitacao()).conflitos())
+                .extracting("codigo")
+                .doesNotContain("EVIDENCIA_ASSISTIDA_NAO_VERIFICADA");
+    }
+
     private Cenario cenario(BancoDeCatalogoFake banco,
             Map<String, UUID> decisoes) {
         return cenario(banco, decisoes, extracao());
@@ -133,6 +165,13 @@ class ServicoDePreparacaoDaImportacaoCompletaDoEditalTest {
     private Cenario cenario(BancoDeCatalogoFake banco,
             Map<String, UUID> decisoes,
             ExtracaoEstruturadaDoEdital extracao) {
+        return cenario(banco, decisoes, extracao, List.of());
+    }
+
+    private Cenario cenario(BancoDeCatalogoFake banco,
+            Map<String, UUID> decisoes,
+            ExtracaoEstruturadaDoEdital extracao,
+            List<ProblemaDaImportacao> problemas) {
         UUID usuario = UUID.randomUUID();
         byte[] conteudo = "edital".getBytes(StandardCharsets.UTF_8);
         OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
@@ -156,7 +195,7 @@ class ServicoDePreparacaoDaImportacaoCompletaDoEditalTest {
                 mock(ServicoDeStagingDaImportacaoDeEdital.class);
         when(staging.obterExtracaoAtual(usuario, importacao.identificador()))
                 .thenReturn(new ResultadoDoStagingDaImportacao(importacao,
-                        extracao, List.of()));
+                        extracao, problemas));
         ServicoDePreparacaoDaImportacaoCompletaDoEdital servico =
                 new ServicoDePreparacaoDaImportacaoCompletaDoEdital(staging,
                         mock(ServicoDeAplicacaoDaEstruturaDoEdital.class),

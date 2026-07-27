@@ -12,6 +12,7 @@ import br.com.trilhaaprovacao.importacaoedital.infraestrutura.ConfiguracaoDaImpo
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -78,6 +79,49 @@ class ServicoDeExtracaoDoArquivoDoEditalTest {
     }
 
     @Test
+    void ordenaTextoVisualESeparaPaginasPreservandoProveniencia()
+            throws Exception {
+        servico = novoServico(null, null);
+        byte[] pdf = pdfPosicionado(List.of(
+                List.of(
+                        new TextoPosicionado("RODAPE PAGINA 1", 50, 30),
+                        new TextoPosicionado("COLUNA DIREITA", 300, 600),
+                        new TextoPosicionado("COLUNA ESQUERDA", 50, 600),
+                        new TextoPosicionado("EDITAL: Edital 1", 300, 650),
+                        new TextoPosicionado("CONCURSO: Tribunal", 50, 700),
+                        new TextoPosicionado("CABECALHO PAGINA 1", 50, 760)),
+                List.of(
+                        new TextoPosicionado("RODAPE PAGINA 2", 50, 30),
+                        new TextoPosicionado("CARGO: Engenheiro de Dados",
+                                300, 650),
+                        new TextoPosicionado("CABECALHO PAGINA 2", 50, 760))));
+
+        var resultado = servico.extrair(pdf);
+
+        assertThat(resultado.quantidadeDePaginas()).isEqualTo(2);
+        assertThat(resultado.texto()).containsOnlyOnce("\f")
+                .doesNotEndWith("\f");
+        String[] paginas = resultado.texto().split("\\f", -1);
+        assertThat(paginas).hasSize(2);
+        assertThat(paginas[0])
+                .containsSubsequence("CABECALHO PAGINA 1",
+                        "CONCURSO: Tribunal", "EDITAL: Edital 1",
+                        "COLUNA ESQUERDA", "COLUNA DIREITA",
+                        "RODAPE PAGINA 1");
+        assertThat(paginas[1])
+                .containsSubsequence("CABECALHO PAGINA 2",
+                        "CARGO: Engenheiro de Dados", "RODAPE PAGINA 2");
+
+        var extracao = new ParserDeterministicoDoEdital().extrair(
+                resultado.texto(),
+                new br.com.trilhaaprovacao.importacaoedital.dominio
+                        .ExtracaoEstruturadaDoEdital.FonteDoEdital(
+                                "edital.pdf", "0".repeat(64), 2));
+        assertThat(extracao.cargos()).singleElement().satisfies(cargo ->
+                assertThat(cargo.nome().fonte().pagina()).isEqualTo(2));
+    }
+
+    @Test
     void bloqueiaPdfDigitalizadoQuandoOcrNaoExiste() throws Exception {
         servico = novoServico(null, null);
         var resultado = servico.extrair(pdf(null));
@@ -138,5 +182,32 @@ class ServicoDeExtracaoDoArquivoDoEditalTest {
             documento.save(saida);
             return saida.toByteArray();
         }
+    }
+
+    private static byte[] pdfPosicionado(
+            List<List<TextoPosicionado>> paginas) throws Exception {
+        try (PDDocument documento = new PDDocument();
+                ByteArrayOutputStream saida = new ByteArrayOutputStream()) {
+            for (List<TextoPosicionado> textos : paginas) {
+                PDPage pagina = new PDPage();
+                documento.addPage(pagina);
+                try (PDPageContentStream conteudo = new PDPageContentStream(
+                        documento, pagina)) {
+                    for (TextoPosicionado texto : textos) {
+                        conteudo.beginText();
+                        conteudo.setFont(new PDType1Font(
+                                Standard14Fonts.FontName.HELVETICA), 12);
+                        conteudo.newLineAtOffset(texto.x(), texto.y());
+                        conteudo.showText(texto.valor());
+                        conteudo.endText();
+                    }
+                }
+            }
+            documento.save(saida);
+            return saida.toByteArray();
+        }
+    }
+
+    private record TextoPosicionado(String valor, float x, float y) {
     }
 }

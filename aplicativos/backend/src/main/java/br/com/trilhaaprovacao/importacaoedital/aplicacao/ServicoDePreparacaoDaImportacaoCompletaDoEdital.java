@@ -157,7 +157,10 @@ public class ServicoDePreparacaoDaImportacaoCompletaDoEdital
         exigirAusenciaDeOutroLote(persistida,
                 solicitacao.chaveDoCargoSelecionado());
         AnaliseDaPrevia analise = analisar(solicitacao, extracao,
-                problemasDaFonte(stagingAtual.problemas()));
+                PoliticaDosProblemasPersistentesDaImportacao
+                        .aplicaveisAoCargo(stagingAtual.extracao(),
+                                solicitacao.chaveDoCargoSelecionado(),
+                                stagingAtual.problemas()));
 
         Map<String, Object> proposta = proposta(solicitacao, persistida,
                 stagingAtual.importacao());
@@ -193,10 +196,12 @@ public class ServicoDePreparacaoDaImportacaoCompletaDoEdital
         validarModo(solicitacao);
         ResultadoDoStagingDaImportacao atual = staging.obterExtracaoAtual(
                 usuario, importacao);
-        ExtracaoEstruturadaDoEdital filtrada = filtrarCargo(
-                exigirExtracao(atual), cargo);
+        ExtracaoEstruturadaDoEdital completa = exigirExtracao(atual);
+        ExtracaoEstruturadaDoEdital filtrada = filtrarCargo(completa, cargo);
         List<ProblemaDaImportacao> problemas = new ArrayList<>(
-                problemasDaFonte(atual.problemas()));
+                PoliticaDosProblemasPersistentesDaImportacao
+                        .aplicaveisAoCargo(completa, cargo,
+                                atual.problemas()));
         problemas.addAll(validador.validar(filtrada));
         ImportacaoDeEditalPersistida loteAnterior = loteIdempotente(
                 persistida, cargo);
@@ -359,11 +364,15 @@ public class ServicoDePreparacaoDaImportacaoCompletaDoEdital
         versoesAtuais(usuario, propostaCanonica);
         ResultadoDoStagingDaImportacao atual = staging.obterExtracaoAtual(
                 usuario, importacao);
+        ExtracaoEstruturadaDoEdital completa = exigirExtracao(atual);
+        String chaveDoCargo = texto(propostaCanonica,
+                "chaveDoCargoSelecionado");
         ExtracaoEstruturadaDoEdital filtrada = filtrarCargo(
-                exigirExtracao(atual), texto(propostaCanonica,
-                        "chaveDoCargoSelecionado"));
+                completa, chaveDoCargo);
         List<ProblemaDaImportacao> problemasDaAplicacao = new ArrayList<>(
-                problemasDaFonte(atual.problemas()));
+                PoliticaDosProblemasPersistentesDaImportacao
+                        .aplicaveisAoCargo(completa, chaveDoCargo,
+                                atual.problemas()));
         problemasDaAplicacao.addAll(validador.validar(filtrada));
         ModoDaImportacaoDeEdital modo = enumeracao(propostaCanonica, "modo",
                 ModoDaImportacaoDeEdital.class);
@@ -1224,13 +1233,6 @@ public class ServicoDePreparacaoDaImportacaoCompletaDoEdital
             throw new RegraDeDominio(codigo,
                     "Resolva os problemas da previa antes de preparar a importacao.");
         }
-    }
-
-    private List<ProblemaDaImportacao> problemasDaFonte(
-            List<ProblemaDaImportacao> problemas) {
-        return problemas.stream().filter(item -> "fonte".equals(item.caminho())
-                || item.severidade()
-                        == SeveridadeDoProblemaDaImportacao.AVISO).toList();
     }
 
     private List<String> camposAusentes(List<ProblemaDaImportacao> problemas) {

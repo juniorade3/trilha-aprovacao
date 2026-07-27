@@ -22,6 +22,13 @@ OpenClaw, e ambos os segredos devem ter pelo menos 32 bytes:
 
 ```yaml
 trilha:
+  importacao-de-edital:
+    interpretacao-assistida:
+      habilitada: false
+      # Para habilitar, altere para true e defina a chave somente neste
+      # arquivo externo:
+      # chave-da-api: "sk-..."
+      # modelo: gpt-5.6-sol
   automacao:
     habilitada: true
     identificador-do-bot: 123456789
@@ -29,6 +36,13 @@ trilha:
     identificador-da-chave-do-gateway: gateway-openclaw
     segredo-do-gateway: "substitua-pelo-segredo-do-gateway-openclaw"
 ```
+
+A interpretação assistida de editais é opcional. Sem
+`interpretacao-assistida.habilitada: true` e uma `chave-da-api` não vazia, o
+parser local e o editor manual continuam funcionando e o botão de IA permanece
+indisponível. O PDF não é encaminhado ao OpenClaw; quando há consentimento, o
+backend chama diretamente a Responses API, sem ferramentas e sem persistência
+da resposta no provedor (`store: false`).
 
 ```bash
 chmod 644 "$HOME/.config/trilha-aprovacao/segredos-backend.yml"

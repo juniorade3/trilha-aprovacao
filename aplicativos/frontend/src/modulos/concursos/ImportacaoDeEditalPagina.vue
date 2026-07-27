@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import { listarConcursos, type Concurso } from './apiDeConcursos'
 import {
+  corrigirExtracaoDaImportacao,
+  extrairCargoComInterpretacaoAssistida,
   obterImportacaoDeEdital,
   obterRelatorioDaImportacao,
   iniciarNovaTentativaDaImportacao,
@@ -12,8 +14,11 @@ import {
   receberArquivoDoEdital,
   receberTextoDoEdital,
   registrarDecisoesDaImportacao,
+  type AlvoDaExtracaoAssistida,
+  type ConfirmacaoDeCampoDaExtracao,
   type DecisoesDaImportacaoDeEdital,
   type EstadoDaImportacaoDeEdital,
+  type ExtracaoEstruturadaDoEdital,
   type ImportacaoDeEdital,
   type ModoDaImportacaoDeEdital,
   type PreviaDaImportacaoDeEdital,
@@ -36,10 +41,13 @@ const carregando = ref(false)
 const carregandoConcursos = ref(false)
 const enviando = ref(false)
 const salvandoDecisoes = ref(false)
+const salvandoExtracao = ref(false)
+const extraindoComIa = ref(false)
 const preparando = ref(false)
 const retomando = ref(false)
 const carregandoRelatorio = ref(false)
 const erro = ref('')
+const erroDaIa = ref('')
 const alertaDeErro = ref<HTMLElement>()
 let temporizador: number | undefined
 let controleDaConsulta: AbortController | undefined
@@ -146,9 +154,12 @@ function reiniciarEstadoDaImportacao() {
   carregandoConcursos.value = false
   enviando.value = false
   salvandoDecisoes.value = false
+  salvandoExtracao.value = false
+  extraindoComIa.value = false
   preparando.value = false
   retomando.value = false
   carregandoRelatorio.value = false
+  erroDaIa.value = ''
   limparErro()
 }
 
@@ -306,6 +317,86 @@ async function salvarDecisoes(decisoes: DecisoesDaImportacaoDeEdital) {
   }
 }
 
+const codigosDeConflitoDaExtracao = new Set([
+  'EXTRACAO_DA_IMPORTACAO_DESATUALIZADA',
+  'VERSAO_DA_EXTRACAO_DESATUALIZADA',
+  'PREVIA_DA_IMPORTACAO_DESATUALIZADA',
+])
+
+function ehConflitoDaExtracao(causa: unknown) {
+  return (
+    causa instanceof ErroDaApi &&
+    causa.status === 409 &&
+    codigosDeConflitoDaExtracao.has(causa.codigo ?? '')
+  )
+}
+
+async function recarregarAposConflito(mensagem: string) {
+  previa.value = undefined
+  ultimasDecisoes.value = undefined
+  await carregarImportacao()
+  erro.value = mensagem
+  await nextTick()
+  alertaDeErro.value?.focus()
+}
+
+async function salvarExtracao(
+  extracao: ExtracaoEstruturadaDoEdital,
+  confirmacoesDeCampos: ConfirmacaoDeCampoDaExtracao[],
+) {
+  if (!importacao.value) return
+  salvandoExtracao.value = true
+  limparErro()
+  erroDaIa.value = ''
+  try {
+    const atualizada = await corrigirExtracaoDaImportacao(
+      importacao.value.identificador,
+      importacao.value.versaoAtualDaExtracao,
+      extracao,
+      confirmacoesDeCampos,
+    )
+    atualizarContextoDaImportacao(atualizada)
+  } catch (causa) {
+    if (ehConflitoDaExtracao(causa))
+      await recarregarAposConflito(
+        'Outra revisão foi salva. O rascunho local foi descartado para evitar sobrescrever a versão mais recente.',
+      )
+    else registrarErro(causa, 'Não foi possível salvar as correções.')
+  } finally {
+    salvandoExtracao.value = false
+  }
+}
+
+async function extrairComIa(alvo: AlvoDaExtracaoAssistida) {
+  if (!importacao.value) return
+  extraindoComIa.value = true
+  erroDaIa.value = ''
+  limparErro()
+  try {
+    const atualizada = await extrairCargoComInterpretacaoAssistida(
+      importacao.value.identificador,
+      importacao.value.versaoAtualDaExtracao,
+      alvo,
+    )
+    atualizarContextoDaImportacao(atualizada)
+  } catch (causa) {
+    if (ehConflitoDaExtracao(causa)) {
+      await recarregarAposConflito(
+        'A extração mudou enquanto a IA trabalhava. A versão mais recente foi carregada para uma nova revisão.',
+      )
+      erroDaIa.value =
+        'O resultado assistido foi descartado porque havia uma versão mais recente.'
+    } else {
+      erroDaIa.value =
+        causa instanceof Error
+          ? causa.message
+          : 'Não foi possível concluir a extração assistida.'
+    }
+  } finally {
+    extraindoComIa.value = false
+  }
+}
+
 function decisoesParaPreparar(): DecisoesDaImportacaoDeEdital | undefined {
   if (!importacao.value?.chaveDoCargoSelecionado) return undefined
   return (
@@ -344,10 +435,7 @@ async function preparar() {
     if (
       causa instanceof ErroDaApi &&
       causa.status === 409 &&
-      [
-        'EXTRACAO_DA_IMPORTACAO_DESATUALIZADA',
-        'PREVIA_DA_IMPORTACAO_DESATUALIZADA',
-      ].includes(causa.codigo ?? '')
+      codigosDeConflitoDaExtracao.has(causa.codigo ?? '')
     ) {
       previa.value = undefined
       ultimasDecisoes.value = undefined
@@ -440,7 +528,7 @@ onBeforeUnmount(() => {
         v-for="(nome, indice) in [
           'Receber',
           'Extrair',
-          'Cargo',
+          'Revisar',
           'Prévia',
           'Confirmar',
           'Concluir',
@@ -524,7 +612,12 @@ onBeforeUnmount(() => {
         identificadorDoConcursoExistente
       "
       :salvando="salvandoDecisoes"
+      :salvando-extracao="salvandoExtracao"
+      :extraindo-com-ia="extraindoComIa"
+      :erro-da-ia="erroDaIa"
       @salvar="salvarDecisoes"
+      @salvar-extracao="salvarExtracao"
+      @extrair-com-ia="extrairComIa"
     />
 
     <template v-else-if="importacao.estado === 'VALIDADA'">

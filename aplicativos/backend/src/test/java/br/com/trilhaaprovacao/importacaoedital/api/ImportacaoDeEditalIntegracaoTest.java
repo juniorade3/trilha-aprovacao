@@ -257,6 +257,93 @@ class ImportacaoDeEditalIntegracaoTest {
     }
 
     @Test
+    void iaDesabilitadaNaoAlteraStagingEMantemEditorManual()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar(
+                "ia.desabilitada.importacao@example.com");
+        JsonNode recebida = enviarTexto(sessao,
+                fixture("edital-textual-simples.txt"),
+                "edital-textual-simples.txt");
+        UUID importacao = UUID.fromString(
+                recebida.get("identificador").asText());
+        String cargo = recebida.get("extracao").get("cargos")
+                .get(0).get("chave").asText();
+        assertThat(recebida.get("interpretacaoAssistidaDisponivel")
+                .asBoolean()).isFalse();
+
+        api.perform(post(
+                        "/api/v1/importacoes-de-edital/{id}/extracao-assistida",
+                        importacao).session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "versaoEsperada", 1,
+                                "chaveDoCargoAlvo", cargo))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.codigo").value("IA_DESABILITADA"));
+
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM versoes_da_extracao_do_edital
+                WHERE importacao_id = ?
+                """, Integer.class, importacao)).isEqualTo(1);
+        api.perform(get("/api/v1/importacoes-de-edital/{id}", importacao)
+                        .session(sessao))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versaoAtualDaExtracao").value(1))
+                .andExpect(jsonPath("$.extracao").exists());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void correcaoManualVersionaESanitizaProvenienciaDoNavegador()
+            throws Exception {
+        MockHttpSession sessao = criarContaEEntrar(
+                "correcao.manual.importacao@example.com");
+        JsonNode recebida = enviarTexto(sessao,
+                fixture("edital-textual-simples.txt"),
+                "edital-textual-simples.txt");
+        UUID importacao = UUID.fromString(
+                recebida.get("identificador").asText());
+        Map<String, Object> extracao = json.convertValue(
+                recebida.get("extracao"), Map.class);
+        Map<String, Object> concurso =
+                (Map<String, Object>) extracao.get("concurso");
+        Map<String, Object> nome =
+                (Map<String, Object>) concurso.get("nome");
+        nome.put("valor", "Concurso corrigido pelo usuário");
+        nome.put("confianca", 0.99);
+        nome.put("inferido", false);
+        nome.put("fonte", Map.of(
+                "pagina", 999,
+                "secao", "fonte forjada",
+                "trecho", "trecho forjado"));
+
+        api.perform(put("/api/v1/importacoes-de-edital/{id}/extracao",
+                        importacao).session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "versaoEsperada", 1,
+                                "extracao", extracao))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versaoAtualDaExtracao").value(2))
+                .andExpect(jsonPath("$.extracao.concurso.nome.valor")
+                        .value("Concurso corrigido pelo usuário"))
+                .andExpect(jsonPath("$.extracao.concurso.nome.confianca")
+                        .value(1))
+                .andExpect(jsonPath("$.extracao.concurso.nome.inferido")
+                        .value(false))
+                .andExpect(jsonPath(
+                        "$.extracao.concurso.nome.fonte.pagina").isEmpty())
+                .andExpect(jsonPath(
+                        "$.extracao.concurso.nome.fonte.secao")
+                        .value("Correção do usuário"));
+        assertThat(banco.queryForObject("""
+                SELECT versao_do_extrator
+                FROM versoes_da_extracao_do_edital
+                WHERE importacao_id = ? AND numero_da_versao = 2
+                """, String.class, importacao)).isEqualTo("manual-1");
+    }
+
+    @Test
     void complementaConcursoEReutilizaMateriaSomenteComDecisaoExplicita()
             throws Exception {
         MockHttpSession sessaoWeb = criarContaEEntrar(

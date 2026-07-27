@@ -6,10 +6,12 @@ import br.com.trilhaaprovacao.importacaoedital.api.RespostaDaImportacaoDeEdital.
 import br.com.trilhaaprovacao.importacaoedital.api.RespostaDaImportacaoDeEdital.RespostaDaPrevia;
 import br.com.trilhaaprovacao.importacaoedital.api.RespostaDaImportacaoDeEdital.RespostaDoRelatorio;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.DecisoesDaImportacaoDoEdital;
+import br.com.trilhaaprovacao.importacaoedital.aplicacao.ConfirmacaoDeCampoDaExtracao;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.FalhaNaExtracaoDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.PreparadorDaImportacaoCompletaDoEdital.SolicitacaoDePreparacaoDaImportacao;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.ServicoDePreparacaoDaImportacaoCompletaDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.aplicacao.ServicoDeStagingDaImportacaoDeEdital;
+import br.com.trilhaaprovacao.importacaoedital.aplicacao.ServicoDeInterpretacaoAssistidaDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.EstadoDaImportacaoDeEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ExtracaoEstruturadaDoEdital;
 import br.com.trilhaaprovacao.importacaoedital.dominio.ModoDaImportacaoDeEdital;
@@ -23,6 +25,7 @@ import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.MediaType;
@@ -47,14 +50,17 @@ import org.springframework.web.multipart.MultipartFile;
 public class ControladorDeImportacoesDeEdital {
     private final ServicoDeStagingDaImportacaoDeEdital staging;
     private final ServicoDePreparacaoDaImportacaoCompletaDoEdital preparacao;
+    private final ServicoDeInterpretacaoAssistidaDoEdital interpretacao;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
 
     public ControladorDeImportacoesDeEdital(
             ServicoDeStagingDaImportacaoDeEdital staging,
             ServicoDePreparacaoDaImportacaoCompletaDoEdital preparacao,
+            ServicoDeInterpretacaoAssistidaDoEdital interpretacao,
             IdentidadeDoUsuarioAtual usuarioAtual) {
         this.staging = staging;
         this.preparacao = preparacao;
+        this.interpretacao = interpretacao;
         this.usuarioAtual = usuarioAtual;
     }
 
@@ -83,7 +89,8 @@ public class ControladorDeImportacoesDeEdital {
         extrairSeNecessario(usuario, importacao.identificador(),
                 importacao.estado(), importacao.versaoAtualDaExtracao());
         RespostaDaImportacaoDeEdital resposta = RespostaDaImportacaoDeEdital
-                .de(preparacao.consultar(usuario, importacao.identificador()));
+                .de(preparacao.consultar(usuario, importacao.identificador()),
+                        interpretacao.disponivel());
         return ResponseEntity.created(URI.create(
                 "/api/v1/importacoes-de-edital/" + importacao.identificador()))
                 .body(resposta);
@@ -105,7 +112,8 @@ public class ControladorDeImportacoesDeEdital {
         extrairSeNecessario(usuario, importacao.identificador(),
                 importacao.estado(), importacao.versaoAtualDaExtracao());
         RespostaDaImportacaoDeEdital resposta = RespostaDaImportacaoDeEdital
-                .de(preparacao.consultar(usuario, importacao.identificador()));
+                .de(preparacao.consultar(usuario, importacao.identificador()),
+                        interpretacao.disponivel());
         return ResponseEntity.created(URI.create(
                 "/api/v1/importacoes-de-edital/" + importacao.identificador()))
                 .body(resposta);
@@ -116,7 +124,8 @@ public class ControladorDeImportacoesDeEdital {
             @PathVariable UUID identificador,
             Authentication autenticacao) {
         return RespostaDaImportacaoDeEdital.de(preparacao.consultar(
-                usuario(autenticacao), identificador));
+                usuario(autenticacao), identificador),
+                interpretacao.disponivel());
     }
 
     @PutMapping("/{identificador}/decisoes")
@@ -137,7 +146,8 @@ public class ControladorDeImportacoesDeEdital {
                 requisicao.versaoDaExtracao());
         return RespostaDaImportacaoDeEdital.de(
                 preparacao.consultar(usuario,
-                        selecionada.importacao().identificador()));
+                        selecionada.importacao().identificador()),
+                interpretacao.disponivel());
     }
 
     @PostMapping("/{identificador}/preparacao")
@@ -167,7 +177,7 @@ public class ControladorDeImportacoesDeEdital {
         RespostaDaPrevia respostaDaPrevia = RespostaDaPrevia.de(previa);
         var respostaDaImportacao = RespostaDaImportacaoDeEdital.de(
                 preparacao.consultar(usuario, identificador),
-                respostaDaPrevia);
+                respostaDaPrevia, interpretacao.disponivel());
         return new RespostaDaPreparacao(respostaDaImportacao,
                 respostaDaPrevia);
     }
@@ -179,7 +189,8 @@ public class ControladorDeImportacoesDeEdital {
         UUID usuario = usuario(autenticacao);
         preparacao.iniciarNovaTentativa(usuario, identificador);
         return RespostaDaImportacaoDeEdital.de(
-                preparacao.consultar(usuario, identificador));
+                preparacao.consultar(usuario, identificador),
+                interpretacao.disponivel());
     }
 
     @PutMapping("/{identificador}/extracao")
@@ -189,9 +200,31 @@ public class ControladorDeImportacoesDeEdital {
             Authentication autenticacao) {
         UUID usuario = usuario(autenticacao);
         staging.registrarCorrecaoManual(usuario, identificador,
-                requisicao.versaoEsperada(), requisicao.extracao());
+                requisicao.versaoEsperada(), requisicao.extracao(),
+                requisicao.confirmacoesDeCampos().stream()
+                        .map(confirmacao -> new ConfirmacaoDeCampoDaExtracao(
+                                confirmacao.tipoDoRecurso(),
+                                confirmacao.chaveDoRecurso(),
+                                confirmacao.campo()))
+                        .toList());
         return RespostaDaImportacaoDeEdital.de(
-                preparacao.consultar(usuario, identificador));
+                preparacao.consultar(usuario, identificador),
+                interpretacao.disponivel());
+    }
+
+    @PostMapping("/{identificador}/extracao-assistida")
+    public RespostaDaImportacaoDeEdital interpretarExtracao(
+            @PathVariable UUID identificador,
+            @Valid @RequestBody RequisicaoDeInterpretacaoAssistida requisicao,
+            Authentication autenticacao) {
+        UUID usuario = usuario(autenticacao);
+        interpretacao.interpretar(usuario, identificador,
+                requisicao.versaoEsperada(),
+                requisicao.chaveDoCargoAlvo(),
+                requisicao.descricaoDoCargoAlvo());
+        return RespostaDaImportacaoDeEdital.de(
+                preparacao.consultar(usuario, identificador),
+                interpretacao.disponivel());
     }
 
     @GetMapping("/{identificador}/relatorio")
@@ -241,6 +274,26 @@ public class ControladorDeImportacoesDeEdital {
 
     public record RequisicaoDeCorrecaoDaExtracao(
             @Min(1) int versaoEsperada,
-            @NotNull @Valid ExtracaoEstruturadaDoEdital extracao) {
+            @NotNull @Valid ExtracaoEstruturadaDoEdital extracao,
+            @Size(max = 500)
+            List<@Valid RequisicaoDeConfirmacaoDeCampo>
+                    confirmacoesDeCampos) {
+
+        public RequisicaoDeCorrecaoDaExtracao {
+            confirmacoesDeCampos = confirmacoesDeCampos == null
+                    ? List.of() : List.copyOf(confirmacoesDeCampos);
+        }
+    }
+
+    public record RequisicaoDeConfirmacaoDeCampo(
+            @NotBlank @Size(max = 40) String tipoDoRecurso,
+            @NotBlank @Size(max = 160) String chaveDoRecurso,
+            @NotBlank @Size(max = 80) String campo) {
+    }
+
+    public record RequisicaoDeInterpretacaoAssistida(
+            @Min(1) int versaoEsperada,
+            @Size(max = 160) String chaveDoCargoAlvo,
+            @Size(max = 1_000) String descricaoDoCargoAlvo) {
     }
 }

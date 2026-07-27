@@ -31,7 +31,10 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class ServicoDeStagingDaImportacaoDeEdital {
+    private static final int LIMITE_DE_CONFIRMACOES_DE_CAMPOS = 500;
     private static final String VERSAO_DO_EXTRATOR_MANUAL = "manual-1";
+    private static final String VERSAO_DO_EXTRATOR_ASSISTIDO =
+            "ia-gpt56sol-p1";
     private static final Set<EstadoDaImportacaoDeEdital>
             ESTADOS_QUE_ACEITAM_CORRECAO_MANUAL = Set.of(
                     EstadoDaImportacaoDeEdital.EXTRAIDA,
@@ -53,6 +56,8 @@ public class ServicoDeStagingDaImportacaoDeEdital {
     private final ServicoDeExtracaoDoArquivoDoEdital extrator;
     private final ParserDeterministicoDoEdital parser;
     private final ValidadorDaExtracaoDoEdital validador;
+    private final SanitizadorDaCorrecaoDoEdital sanitizador =
+            new SanitizadorDaCorrecaoDoEdital();
     private final ObjectMapper mapeador;
     private final JdbcTemplate banco;
 
@@ -194,6 +199,15 @@ public class ServicoDeStagingDaImportacaoDeEdital {
     public ResultadoDoStagingDaImportacao registrarCorrecaoManual(UUID usuario,
             UUID identificador, int versaoEsperada,
             ExtracaoEstruturadaDoEdital extracaoCorrigida) {
+        return registrarCorrecaoManual(usuario, identificador, versaoEsperada,
+                extracaoCorrigida, List.of());
+    }
+
+    @Transactional
+    public ResultadoDoStagingDaImportacao registrarCorrecaoManual(UUID usuario,
+            UUID identificador, int versaoEsperada,
+            ExtracaoEstruturadaDoEdital extracaoCorrigida,
+            List<ConfirmacaoDeCampoDaExtracao> confirmacoesDeCampos) {
         if (usuario == null || identificador == null) {
             throw new RegraDeDominio("CORRECAO_MANUAL_INVALIDA",
                     "Usuario e importacao sao obrigatorios.");
@@ -217,9 +231,30 @@ public class ServicoDeStagingDaImportacaoDeEdital {
         }
 
         validarFonteDaCorrecao(persistida, extracaoCorrigida);
-        List<ProblemaDaImportacao> problemas = validarCorrecao(
-                extracaoCorrigida);
-        String dados = escrever(extracaoCorrigida);
+        var versaoAnterior = versoes
+                .findFirstByIdentificadorDaImportacaoAndIdentificadorDoUsuarioOrderByNumeroDaVersaoDesc(
+                        identificador, usuario);
+        ExtracaoEstruturadaDoEdital extracaoAnterior = versaoAnterior
+                .map(versao -> ler(versao.dadosEstruturados(),
+                        ExtracaoEstruturadaDoEdital.class)).orElse(null);
+        List<ProblemaDaImportacao> problemasAnteriores = versaoAnterior
+                .map(versao -> lerProblemas(versao.problemas()))
+                .orElse(List.of());
+        Set<ConfirmacaoDeCampoDaExtracao> confirmacoes =
+                validarConfirmacoesDeCampos(confirmacoesDeCampos,
+                        problemasAnteriores, extracaoAnterior);
+        SanitizadorDaCorrecaoDoEdital.ResultadoDaSanitizacao sanitizacao =
+                sanitizador.sanitizarComResultado(extracaoAnterior,
+                        extracaoCorrigida, confirmacoes);
+        ExtracaoEstruturadaDoEdital extracaoSanitizada =
+                sanitizacao.extracao();
+        List<ProblemaDaImportacao> problemas = unir(
+                validarCorrecao(extracaoSanitizada),
+                preservarProblemasExternos(problemasAnteriores,
+                        sanitizacao.camposAlterados()));
+        extracaoSanitizada = atualizarMarcadorDeEvidencias(
+                extracaoSanitizada, problemas);
+        String dados = escrever(extracaoSanitizada);
         String problemasJson = escrever(problemas);
         validarLimiteDoJson(dados, problemasJson);
         String hash = ServicoDeExtracaoDoArquivoDoEdital.sha256(
@@ -233,17 +268,124 @@ public class ServicoDeStagingDaImportacaoDeEdital {
         OffsetDateTime agora = OffsetDateTime.now();
         importacao.reiniciarExtracao(agora);
         int numero = versaoEsperada + 1;
-        EstadoDaImportacaoDeEdital estado = proximoEstado(extracaoCorrigida,
+        EstadoDaImportacaoDeEdital estado = proximoEstado(extracaoSanitizada,
                 problemas);
         versoes.save(new VersaoDaExtracaoDoEditalPersistida(
                 identificador, usuario, numero,
-                extracaoCorrigida.versaoDoContrato(),
+                extracaoSanitizada.versaoDoContrato(),
                 VERSAO_DO_EXTRATOR_MANUAL, dados, problemasJson, hash, agora));
         importacao.registrarExtracao(numero, hash, estado, agora);
         persistida.limparFalha();
         persistida.atualizarDe(importacao);
         return new ResultadoDoStagingDaImportacao(importacao,
-                extracaoCorrigida, problemas);
+                extracaoSanitizada, problemas);
+    }
+
+    @Transactional(readOnly = true)
+    public FonteRetidaDaImportacaoDoEdital obterFonteRetida(
+            UUID usuario, UUID identificador, int versaoEsperada) {
+        ImportacaoDeEditalPersistida persistida = importacoes
+                .findByIdentificadorAndIdentificadorDoUsuario(
+                        identificador, usuario)
+                .orElseThrow(ServicoDeStagingDaImportacaoDeEdital::naoEncontrada);
+        if (versaoEsperada < 1
+                || persistida.versaoAtualDaExtracao() != versaoEsperada) {
+            throw new ConflitoDeDominio(
+                    "VERSAO_DA_EXTRACAO_DESATUALIZADA",
+                    "A extracao mudou. Atualize os dados antes de continuar.");
+        }
+        if (persistida.conteudoOriginal() == null
+                || persistida.reterConteudoAte() == null
+                || !persistida.reterConteudoAte().isAfter(
+                        OffsetDateTime.now())) {
+            throw new FalhaNaInterpretacaoAssistidaDoEdital(
+                    FalhaNaInterpretacaoAssistidaDoEdital.Codigo.FONTE_EXPIRADA,
+                    "O documento original expirou; envie o edital novamente.");
+        }
+        ExtracaoEstruturadaDoEdital atual = versoes
+                .findFirstByIdentificadorDaImportacaoAndIdentificadorDoUsuarioOrderByNumeroDaVersaoDesc(
+                        identificador, usuario)
+                .map(versao -> ler(versao.dadosEstruturados(),
+                        ExtracaoEstruturadaDoEdital.class))
+                .orElseThrow(() -> new ConflitoDeDominio(
+                        "EXTRACAO_DA_IMPORTACAO_INDISPONIVEL",
+                        "A importacao ainda nao possui extracao revisavel."));
+        return new FonteRetidaDaImportacaoDoEdital(
+                persistida.versaoAtualDaExtracao(),
+                persistida.tipoDaFonte(), persistida.nomeDoArquivo(),
+                persistida.conteudoOriginal(), persistida.textoExtraido(),
+                atual);
+    }
+
+    @Transactional
+    public ResultadoDoStagingDaImportacao registrarInterpretacaoAssistida(
+            UUID usuario, UUID identificador, int versaoEsperada,
+            ExtracaoEstruturadaDoEdital extracaoInterpretada,
+            List<ProblemaDaImportacao> problemasAdicionais) {
+        ImportacaoDeEditalPersistida persistida = importacoes
+                .encontrarParaAtualizacao(identificador, usuario)
+                .orElseThrow(ServicoDeStagingDaImportacaoDeEdital::naoEncontrada);
+        ImportacaoDeEdital importacao = persistida.paraDominio();
+        if (versaoEsperada < 1
+                || versaoEsperada != importacao.versaoAtualDaExtracao()) {
+            throw new ConflitoDeDominio(
+                    "VERSAO_DA_EXTRACAO_DESATUALIZADA",
+                    "A extracao mudou durante a interpretacao assistida.");
+        }
+        if (persistida.identificadorDaOperacaoAssistida() != null
+                || !ESTADOS_QUE_ACEITAM_CORRECAO_MANUAL.contains(
+                        importacao.estado())) {
+            throw new ConflitoDeDominio(
+                    "IMPORTACAO_NAO_ACEITA_INTERPRETACAO_ASSISTIDA",
+                    "A importacao ja foi preparada, aplicada ou encerrada.");
+        }
+        validarFonteDaCorrecao(persistida, extracaoInterpretada);
+        var versaoAnterior = versoes
+                .findFirstByIdentificadorDaImportacaoAndIdentificadorDoUsuarioOrderByNumeroDaVersaoDesc(
+                        identificador, usuario);
+        ExtracaoEstruturadaDoEdital extracaoAnterior = versaoAnterior
+                .map(versao -> ler(versao.dadosEstruturados(),
+                        ExtracaoEstruturadaDoEdital.class)).orElse(null);
+        List<ProblemaDaImportacao> problemasAnteriores = versaoAnterior
+                .map(versao -> lerProblemas(versao.problemas()))
+                .orElse(List.of());
+        Set<ConfirmacaoDeCampoDaExtracao> camposAlterados =
+                SanitizadorDaCorrecaoDoEdital.camposAlteradosEntre(
+                        extracaoAnterior, extracaoInterpretada);
+        List<ProblemaDaImportacao> problemas = unir(
+                validarCorrecao(extracaoInterpretada),
+                unir(preservarProblemasExternos(problemasAnteriores,
+                                camposAlterados),
+                        problemasAdicionais == null ? List.of()
+                                : problemasAdicionais));
+        extracaoInterpretada = atualizarMarcadorDeEvidencias(
+                extracaoInterpretada, problemas);
+        String dados = escrever(extracaoInterpretada);
+        String problemasJson = escrever(problemas);
+        validarLimiteDoJson(dados, problemasJson);
+        String hash = ServicoDeExtracaoDoArquivoDoEdital.sha256(
+                (dados + "\n" + problemasJson).getBytes(
+                        StandardCharsets.UTF_8));
+        if (hash.equals(importacao.hashDaExtracaoAtual())) {
+            throw new ConflitoDeDominio(
+                    "INTERPRETACAO_ASSISTIDA_SEM_ALTERACOES",
+                    "A interpretacao nao alterou a extracao atual.");
+        }
+        OffsetDateTime agora = OffsetDateTime.now();
+        importacao.reiniciarExtracao(agora);
+        int numero = versaoEsperada + 1;
+        EstadoDaImportacaoDeEdital estado = proximoEstado(
+                extracaoInterpretada, problemas);
+        versoes.save(new VersaoDaExtracaoDoEditalPersistida(
+                identificador, usuario, numero,
+                extracaoInterpretada.versaoDoContrato(),
+                VERSAO_DO_EXTRATOR_ASSISTIDO, dados, problemasJson, hash,
+                agora));
+        importacao.registrarExtracao(numero, hash, estado, agora);
+        persistida.limparFalha();
+        persistida.atualizarDe(importacao);
+        return new ResultadoDoStagingDaImportacao(importacao,
+                extracaoInterpretada, problemas);
     }
 
     @Transactional(readOnly = true)
@@ -354,8 +496,99 @@ public class ServicoDeStagingDaImportacaoDeEdital {
         List<ProblemaDaImportacao> todos = new ArrayList<>(primeiros);
         todos.addAll(segundos);
         todos.forEach(item -> unicos.putIfAbsent(
-                item.codigo() + "\0" + item.caminho(), item));
+                item.codigo() + "\0" + item.tipoDoRecurso() + "\0"
+                        + item.chaveDoRecurso() + "\0" + item.campo()
+                        + "\0" + item.caminho(), item));
         return List.copyOf(unicos.values());
+    }
+
+    private static Set<ConfirmacaoDeCampoDaExtracao>
+            validarConfirmacoesDeCampos(
+                    List<ConfirmacaoDeCampoDaExtracao> informadas,
+                    List<ProblemaDaImportacao> problemasAnteriores,
+                    ExtracaoEstruturadaDoEdital extracaoAnterior) {
+        List<ConfirmacaoDeCampoDaExtracao> confirmacoes = informadas == null
+                ? List.of() : List.copyOf(informadas);
+        if (confirmacoes.size() > LIMITE_DE_CONFIRMACOES_DE_CAMPOS
+                || confirmacoes.stream().anyMatch(Objects::isNull)) {
+            throw confirmacaoDeCampoInvalida();
+        }
+        Set<ConfirmacaoDeCampoDaExtracao> elegiveis =
+                new java.util.LinkedHashSet<>();
+        problemasAnteriores.stream().filter(problema ->
+                        PoliticaDosProblemasPersistentesDaImportacao
+                                .EVIDENCIA_ASSISTIDA_NAO_VERIFICADA
+                                .equals(problema.codigo()))
+                .filter(problema -> problema.tipoDoRecurso() != null
+                        && problema.chaveDoRecurso() != null
+                        && problema.campo() != null)
+                .map(problema -> new ConfirmacaoDeCampoDaExtracao(
+                        problema.tipoDoRecurso(),
+                        problema.chaveDoRecurso(), problema.campo()))
+                .forEach(elegiveis::add);
+        elegiveis.addAll(SanitizadorDaCorrecaoDoEdital
+                .camposInferidosComValor(extracaoAnterior));
+        Set<ConfirmacaoDeCampoDaExtracao> unicas =
+                new java.util.LinkedHashSet<>(confirmacoes);
+        if (!elegiveis.containsAll(unicas)) {
+            throw confirmacaoDeCampoInvalida();
+        }
+        return Set.copyOf(unicas);
+    }
+
+    private static List<ProblemaDaImportacao> preservarProblemasExternos(
+            List<ProblemaDaImportacao> anteriores,
+            Set<ConfirmacaoDeCampoDaExtracao> camposAlterados) {
+        Set<ConfirmacaoDeCampoDaExtracao> alterados =
+                camposAlterados == null ? Set.of() : camposAlterados;
+        return anteriores.stream()
+                .filter(PoliticaDosProblemasPersistentesDaImportacao
+                        ::devePersistirEntreVersoes)
+                .filter(problema -> !PoliticaDosProblemasPersistentesDaImportacao
+                        .EVIDENCIA_ASSISTIDA_NAO_VERIFICADA.equals(
+                                problema.codigo())
+                        || !campoFoiAlterado(problema, alterados))
+                .toList();
+    }
+
+    private static boolean campoFoiAlterado(ProblemaDaImportacao problema,
+            Set<ConfirmacaoDeCampoDaExtracao> alterados) {
+        if (problema.tipoDoRecurso() == null
+                || problema.chaveDoRecurso() == null
+                || problema.campo() == null) {
+            return false;
+        }
+        return alterados.contains(new ConfirmacaoDeCampoDaExtracao(
+                problema.tipoDoRecurso(), problema.chaveDoRecurso(),
+                problema.campo()));
+    }
+
+    private static RegraDeDominio confirmacaoDeCampoInvalida() {
+        return new RegraDeDominio("CONFIRMACAO_DE_CAMPO_INVALIDA",
+                "A confirmacao nao corresponde a uma pendencia assistida "
+                        + "da versao atual.");
+    }
+
+    private static ExtracaoEstruturadaDoEdital atualizarMarcadorDeEvidencias(
+            ExtracaoEstruturadaDoEdital extracao,
+            List<ProblemaDaImportacao> problemas) {
+        boolean pendente = problemas.stream().anyMatch(problema ->
+                PoliticaDosProblemasPersistentesDaImportacao
+                        .EVIDENCIA_ASSISTIDA_NAO_VERIFICADA
+                        .equals(problema.codigo()));
+        if (pendente || !extracao.incertezas().contains(
+                ConversorDaInterpretacaoAssistidaDoEdital
+                        .INCERTEZA_DE_EVIDENCIAS_NAO_VERIFICADAS)) {
+            return extracao;
+        }
+        return new ExtracaoEstruturadaDoEdital(
+                extracao.versaoDoContrato(), extracao.fonte(),
+                extracao.concurso(), extracao.edital(), extracao.cargos(),
+                extracao.provas(), extracao.materias(), extracao.avisos(),
+                extracao.incertezas().stream().filter(item ->
+                        !ConversorDaInterpretacaoAssistidaDoEdital
+                                .INCERTEZA_DE_EVIDENCIAS_NAO_VERIFICADAS
+                                .equals(item)).toList());
     }
 
     private String escrever(Object valor) {

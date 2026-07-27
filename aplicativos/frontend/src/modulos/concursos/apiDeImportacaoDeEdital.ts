@@ -27,6 +27,18 @@ export type ProvenienciaDoDado = {
   trecho?: string | null
 }
 
+export type NivelDeEscolaridade =
+  'FUNDAMENTAL' | 'MEDIO' | 'TECNICO' | 'SUPERIOR' | 'NAO_INFORMADO'
+
+export type TipoDeProva =
+  'OBJETIVA' | 'DISCURSIVA' | 'PRATICA' | 'TITULOS' | 'OUTRA'
+
+export type CaraterDaProva =
+  | 'ELIMINATORIO'
+  | 'CLASSIFICATORIO'
+  | 'ELIMINATORIO_E_CLASSIFICATORIO'
+  | 'NAO_INFORMADO'
+
 export type ValorExtraido<T> = {
   valor?: T | null
   confianca: number
@@ -34,12 +46,28 @@ export type ValorExtraido<T> = {
   inferido: boolean
 }
 
+export type ConcursoExtraido = {
+  nome: ValorExtraido<string>
+  descricao: ValorExtraido<string>
+  orgao: ValorExtraido<string>
+  banca: ValorExtraido<string>
+  dataPrevista: ValorExtraido<string>
+}
+
+export type EditalExtraido = {
+  titulo: ValorExtraido<string>
+  numero: ValorExtraido<string>
+  ano: ValorExtraido<number>
+  descricao: ValorExtraido<string>
+  dataDePublicacao: ValorExtraido<string>
+}
+
 export type CargoExtraido = {
   chave: string
   nome: ValorExtraido<string>
   area: ValorExtraido<string>
   especialidade: ValorExtraido<string>
-  nivelDeEscolaridade: ValorExtraido<string>
+  nivelDeEscolaridade: ValorExtraido<NivelDeEscolaridade>
   ordem: number
 }
 
@@ -56,8 +84,8 @@ export type ProvaExtraida = {
   chave: string
   chaveDoCargo: string
   nome: ValorExtraido<string>
-  tipo: ValorExtraido<string>
-  carater: ValorExtraido<string>
+  tipo: ValorExtraido<TipoDeProva>
+  carater: ValorExtraido<CaraterDaProva>
   ordem: number
   dataHora: ValorExtraido<string>
   duracaoEmMinutos: ValorExtraido<number>
@@ -108,8 +136,8 @@ export type ExtracaoEstruturadaDoEdital = {
     sha256: string
     paginas: number
   }
-  concurso?: Record<string, ValorExtraido<unknown> | undefined> | null
-  edital?: Record<string, ValorExtraido<unknown> | undefined> | null
+  concurso?: ConcursoExtraido | null
+  edital?: EditalExtraido | null
   cargos: CargoExtraido[]
   provas: ProvaExtraida[]
   materias: MateriaExtraida[]
@@ -117,12 +145,40 @@ export type ExtracaoEstruturadaDoEdital = {
   incertezas: string[]
 }
 
+export type ExtracaoEstruturadaEditavelDoEdital = Omit<
+  ExtracaoEstruturadaDoEdital,
+  'concurso' | 'edital'
+> & {
+  concurso: ConcursoExtraido
+  edital: EditalExtraido
+}
+
+export type ConfirmacaoDeCampoDaExtracao = {
+  tipoDoRecurso: string
+  chaveDoRecurso: string
+  campo: string
+}
+
 export type ProblemaDaImportacao = {
   severidade: SeveridadeDoProblemaDaImportacao
   codigo: string
   mensagem: string
   caminho?: string | null
+  tipoDoRecurso?: string | null
+  chaveDoRecurso?: string | null
+  campo?: string | null
+  referencia?: {
+    tipoDoRecurso?: string | null
+    chaveDoRecurso?: string | null
+    campo?: string | null
+  } | null
   opcoes?: Array<{ valor: string; rotulo: string }>
+}
+
+export type AvaliacaoDoCargo = {
+  chaveDoCargo: string
+  pronto: boolean
+  problemas: ProblemaDaImportacao[]
 }
 
 export type ItemDaPreviaDaImportacao = {
@@ -169,6 +225,8 @@ export type ImportacaoDeEdital = {
   atualizadoEm: string
   extracao?: ExtracaoEstruturadaDoEdital | null
   problemas: ProblemaDaImportacao[]
+  interpretacaoAssistidaDisponivel?: boolean
+  avaliacoesDosCargos?: AvaliacaoDoCargo[]
   previa?: PreviaDaImportacaoDeEdital | null
 }
 
@@ -286,11 +344,33 @@ export const corrigirExtracaoDaImportacao = (
   identificador: string,
   versaoEsperada: number,
   extracao: ExtracaoEstruturadaDoEdital,
+  confirmacoesDeCampos: ConfirmacaoDeCampoDaExtracao[] = [],
 ) =>
   requisitar<ImportacaoDeEdital>(
     `/v1/importacoes-de-edital/${identificador}/extracao`,
     {
       method: 'PUT',
-      body: JSON.stringify({ versaoEsperada, extracao }),
+      body: JSON.stringify({
+        versaoEsperada,
+        extracao,
+        confirmacoesDeCampos,
+      }),
+    },
+  )
+
+export type AlvoDaExtracaoAssistida =
+  | { chaveDoCargoAlvo: string; descricaoDoCargoAlvo?: never }
+  | { chaveDoCargoAlvo?: never; descricaoDoCargoAlvo: string }
+
+export const extrairCargoComInterpretacaoAssistida = (
+  identificador: string,
+  versaoEsperada: number,
+  alvo: AlvoDaExtracaoAssistida,
+) =>
+  requisitar<ImportacaoDeEdital>(
+    `/v1/importacoes-de-edital/${identificador}/extracao-assistida`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ versaoEsperada, ...alvo }),
     },
   )
