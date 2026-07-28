@@ -63,8 +63,17 @@ A aplicação:
   inicialização do Vue;
 - não existe seletor de tema nem variação clara baseada no sistema operacional;
 - `src/compartilhado/estilos/principal.scss` é a entrada do sistema visual;
-- tokens, base do Bootstrap, shell, componentes e módulos permanecem separados
-  dentro de `src/compartilhado/estilos/`;
+- tokens, base do Bootstrap, shell e componentes compartilhados permanecem
+  separados dentro de `src/compartilhado/estilos/`;
+- os recortes visuais de jornadas extensas ficam em parciais por domínio
+  (`inicio-moderno`, `concursos-moderno`, `catalogos-modernos`,
+  `planejamento-moderno`, `editores-planejamento-modernos`,
+  `historico-moderno`, `autenticacao-integracoes-modernas` e
+  `registro-estudo-moderno`); `modulos.scss` só concentra regras transversais
+  e compatibilidade com a estrutura existente;
+- a navegação de desktop usa sidebar e barra de contexto; em celular a ação
+  principal e a navegação inferior permanecem acessíveis sem introduzir um
+  segundo tema;
 - cores fixas pertencem aos tokens semânticos; cores escolhidas para matérias
   servem apenas como marcadores decorativos;
 - texto comum deve alcançar contraste WCAG AA e ações de toque devem manter

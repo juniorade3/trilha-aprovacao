@@ -556,8 +556,9 @@ onBeforeUnmount(() => {
         <section
           class="card cartao-do-vinculo-telegram"
           aria-labelledby="titulo-vinculo"
+          aria-describedby="descricao-vinculo"
         >
-          <header>
+          <header class="cabecalho-do-vinculo-telegram">
             <div>
               <p class="sobretitulo-da-pagina">Conexão privada</p>
               <h2 id="titulo-vinculo">Sua conta no Telegram</h2>
@@ -569,14 +570,18 @@ onBeforeUnmount(() => {
             >
               {{ rotulosDosEstadosDoVinculo[vinculo.estado] }}
             </span>
+            <span v-else class="badge etiqueta-neutra">Não conectado</span>
           </header>
 
           <template v-if="vinculoAtivo && vinculo">
-            <p class="text-body-secondary">
+            <p id="descricao-vinculo" class="text-body-secondary">
               Este Telegram pode consultar seus dados usando uma credencial
               exclusiva. O agente nunca recebe seu identificador de usuário.
             </p>
-            <dl class="dados-do-vinculo-telegram">
+            <dl
+              class="dados-do-vinculo-telegram"
+              aria-label="Dados do vínculo ativo"
+            >
               <div>
                 <dt>Telegram</dt>
                 <dd>{{ vinculo.identificadorExterno }}</dd>
@@ -595,7 +600,11 @@ onBeforeUnmount(() => {
               </div>
             </dl>
 
-            <div class="acoes-do-vinculo-telegram">
+            <div
+              class="acoes-do-vinculo-telegram"
+              role="group"
+              aria-label="Administrar vínculo do Telegram"
+            >
               <p
                 v-if="erroDaRotacao"
                 class="alert alert-danger w-100"
@@ -635,14 +644,25 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else>
-            <p class="text-body-secondary">
+            <p id="descricao-vinculo" class="text-body-secondary">
               Gere um código temporário e envie o comando em uma conversa direta
               com o bot oficial. O código funciona uma única vez.
             </p>
 
-            <div v-if="codigoDeVinculo" class="codigo-do-vinculo-telegram">
-              <span>Envie este comando ao bot</span>
-              <output ref="codigoExibido" tabindex="-1">
+            <section
+              v-if="codigoDeVinculo"
+              class="codigo-do-vinculo-telegram"
+              aria-labelledby="titulo-comando-de-vinculo"
+            >
+              <span id="titulo-comando-de-vinculo">
+                Envie este comando ao bot
+              </span>
+              <output
+                ref="codigoExibido"
+                tabindex="-1"
+                aria-live="polite"
+                aria-label="Comando temporário de conexão"
+              >
                 {{ comandoDeVinculo }}
               </output>
               <small>
@@ -673,9 +693,13 @@ onBeforeUnmount(() => {
               >
                 {{ avisoDaCopia }}
               </p>
-            </div>
+            </section>
 
-            <div class="acoes-do-vinculo-telegram">
+            <div
+              class="acoes-do-vinculo-telegram"
+              role="group"
+              aria-label="Iniciar conexão com o Telegram"
+            >
               <button
                 ref="botaoDeCriarCodigo"
                 class="btn btn-primary"
@@ -698,16 +722,22 @@ onBeforeUnmount(() => {
           </template>
         </section>
 
-        <aside class="card cartao-de-privacidade-do-telegram">
+        <aside
+          class="card cartao-de-privacidade-do-telegram"
+          aria-labelledby="titulo-privacidade-telegram"
+        >
           <i class="bi bi-shield-lock" aria-hidden="true"></i>
           <div>
-            <h2>Controle permanece com você</h2>
+            <p class="sobretitulo-da-pagina">Privacidade por padrão</p>
+            <h2 id="titulo-privacidade-telegram">
+              Controle permanece com você
+            </h2>
             <p>
               Consultas são automáticas. Alterações futuras exigirão uma prévia
               e uma confirmação associada à sua conta e à operação correta.
             </p>
           </div>
-          <ul>
+          <ul aria-label="Garantias de privacidade">
             <li>Somente conversas diretas vinculadas</li>
             <li>Credencial individual e revogável</li>
             <li>Nenhum acesso direto ao banco ou ao navegador</li>
@@ -718,18 +748,20 @@ onBeforeUnmount(() => {
       <section
         class="historico-de-operacoes-assistidas"
         aria-labelledby="titulo-operacoes"
+        aria-describedby="descricao-operacoes"
+        :aria-busy="carregandoHistorico"
       >
         <header>
           <div>
             <p class="sobretitulo-da-pagina">Auditoria pessoal</p>
             <h2 id="titulo-operacoes">Histórico de operações</h2>
-            <p>
+            <p id="descricao-operacoes">
               Consulte o que foi preparado, confirmado, aplicado ou recusado
               pelo assistente. Abra uma prévia pendente para aceitar ou cancelar
               a operação.
             </p>
           </div>
-          <span
+          <span role="status" aria-live="polite"
             >{{ totalDeItens }}
             {{ totalDeItens === 1 ? 'operação' : 'operações' }}</span
           >
@@ -757,7 +789,11 @@ onBeforeUnmount(() => {
           descricao="As prévias e ações do assistente aparecerão aqui."
           icone="bi-clock-history"
         />
-        <ul v-else-if="!erroDoHistorico" class="lista-de-operacoes-assistidas">
+        <ul
+          v-else-if="!erroDoHistorico"
+          class="lista-de-operacoes-assistidas"
+          aria-label="Operações registradas"
+        >
           <li v-for="operacao in operacoes" :key="operacao.identificador">
             <button
               type="button"
@@ -839,36 +875,41 @@ onBeforeUnmount(() => {
     </EstadoDaPagina>
 
     <template v-else-if="detalhe">
-      <dl class="detalhes-da-operacao-assistida">
-        <div>
-          <dt>Estado</dt>
-          <dd>
-            <span class="badge" :class="classeDoEstado(detalhe.estado)">
-              {{ rotulosDosEstadosDaOperacao[detalhe.estado] }}
-            </span>
-          </dd>
-        </div>
-        <div>
-          <dt>Criada em</dt>
-          <dd>{{ formatarDataHora(detalhe.criadoEm) }}</dd>
-        </div>
-        <div>
-          <dt>Expira em</dt>
-          <dd>{{ formatarDataHora(detalhe.expiraEm) }}</dd>
-        </div>
-        <div v-if="detalhe.confirmadaEm">
-          <dt>Confirmada em</dt>
-          <dd>{{ formatarDataHora(detalhe.confirmadaEm) }}</dd>
-        </div>
-        <div v-if="detalhe.aplicadaEm">
-          <dt>Aplicada em</dt>
-          <dd>{{ formatarDataHora(detalhe.aplicadaEm) }}</dd>
-        </div>
-        <div v-if="detalhe.canceladaEm">
-          <dt>Cancelada em</dt>
-          <dd>{{ formatarDataHora(detalhe.canceladaEm) }}</dd>
-        </div>
-      </dl>
+      <section aria-labelledby="titulo-resumo-da-operacao">
+        <h3 id="titulo-resumo-da-operacao" class="visually-hidden">
+          Resumo e datas da operação
+        </h3>
+        <dl class="detalhes-da-operacao-assistida">
+          <div>
+            <dt>Estado</dt>
+            <dd>
+              <span class="badge" :class="classeDoEstado(detalhe.estado)">
+                {{ rotulosDosEstadosDaOperacao[detalhe.estado] }}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt>Criada em</dt>
+            <dd>{{ formatarDataHora(detalhe.criadoEm) }}</dd>
+          </div>
+          <div>
+            <dt>Expira em</dt>
+            <dd>{{ formatarDataHora(detalhe.expiraEm) }}</dd>
+          </div>
+          <div v-if="detalhe.confirmadaEm">
+            <dt>Confirmada em</dt>
+            <dd>{{ formatarDataHora(detalhe.confirmadaEm) }}</dd>
+          </div>
+          <div v-if="detalhe.aplicadaEm">
+            <dt>Aplicada em</dt>
+            <dd>{{ formatarDataHora(detalhe.aplicadaEm) }}</dd>
+          </div>
+          <div v-if="detalhe.canceladaEm">
+            <dt>Cancelada em</dt>
+            <dd>{{ formatarDataHora(detalhe.canceladaEm) }}</dd>
+          </div>
+        </dl>
+      </section>
 
       <p v-if="detalhe.falha" class="alert alert-danger" role="alert">
         {{ detalhe.falha }}
@@ -937,25 +978,32 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="estrutura-da-operacao-assistida">
-        <h3>Proposta registrada</h3>
-        <pre>{{ formatarEstrutura(detalhe.proposta) }}</pre>
-      </section>
-      <section class="estrutura-da-operacao-assistida">
-        <h3>Versões consultadas</h3>
-        <pre>{{ formatarEstrutura(detalhe.versoesConsultadas) }}</pre>
-      </section>
-      <section
-        v-if="detalhe.resultado != null"
-        class="estrutura-da-operacao-assistida"
+      <div
+        class="dados-tecnicos-da-operacao-assistida"
+        aria-label="Dados técnicos da operação"
       >
-        <h3>Resultado aplicado</h3>
-        <pre>{{ formatarEstrutura(detalhe.resultado) }}</pre>
-      </section>
-      <details class="assinatura-da-operacao-assistida">
-        <summary>Ver assinatura da prévia</summary>
-        <code>{{ detalhe.assinatura }}</code>
-      </details>
+        <section class="estrutura-da-operacao-assistida">
+          <h3>Proposta registrada</h3>
+          <pre><code>{{ formatarEstrutura(detalhe.proposta) }}</code></pre>
+        </section>
+        <section class="estrutura-da-operacao-assistida">
+          <h3>Versões consultadas</h3>
+          <pre><code>{{
+            formatarEstrutura(detalhe.versoesConsultadas)
+          }}</code></pre>
+        </section>
+        <section
+          v-if="detalhe.resultado != null"
+          class="estrutura-da-operacao-assistida"
+        >
+          <h3>Resultado aplicado</h3>
+          <pre><code>{{ formatarEstrutura(detalhe.resultado) }}</code></pre>
+        </section>
+        <details class="assinatura-da-operacao-assistida">
+          <summary>Ver assinatura da prévia</summary>
+          <code>{{ detalhe.assinatura }}</code>
+        </details>
+      </div>
     </template>
   </GavetaLateral>
 </template>

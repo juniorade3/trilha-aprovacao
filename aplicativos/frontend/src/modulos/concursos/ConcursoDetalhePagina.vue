@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
@@ -79,8 +86,33 @@ const gavetaDaEstruturaAberta = ref(false)
 const abaDoConcurso = ref<'visao' | 'conteudo'>(
   rota.query.foco === 'mapeamentos' ? 'conteudo' : 'visao',
 )
+const abasDoConcurso = ['visao', 'conteudo'] as const
 const identificadorDaMateriaSelecionada = ref('')
 const cancelamento = new AbortController()
+
+async function navegarEntreAbas(evento: KeyboardEvent) {
+  const indiceAtual = abasDoConcurso.indexOf(abaDoConcurso.value)
+  let proximoIndice: number
+
+  if (evento.key === 'ArrowRight' || evento.key === 'ArrowDown') {
+    proximoIndice = (indiceAtual + 1) % abasDoConcurso.length
+  } else if (evento.key === 'ArrowLeft' || evento.key === 'ArrowUp') {
+    proximoIndice =
+      (indiceAtual - 1 + abasDoConcurso.length) % abasDoConcurso.length
+  } else if (evento.key === 'Home') {
+    proximoIndice = 0
+  } else if (evento.key === 'End') {
+    proximoIndice = abasDoConcurso.length - 1
+  } else {
+    return
+  }
+
+  evento.preventDefault()
+  const proximaAba = abasDoConcurso[proximoIndice] ?? 'visao'
+  abaDoConcurso.value = proximaAba
+  await nextTick()
+  document.getElementById(`aba-do-concurso-${proximaAba}`)?.focus()
+}
 
 const rotulosDaSituacao: Record<string, string> = {
   PLANEJADO: 'Planejado',
@@ -886,9 +918,11 @@ onBeforeUnmount(() => cancelamento.abort())
 </script>
 
 <template>
-  <main class="pagina-da-jornada pagina-do-concurso">
+  <main
+    class="pagina-da-jornada pagina-do-concurso pagina-do-detalhe-do-concurso modulo-concursos-moderno"
+  >
     <button
-      class="btn btn-link px-0 mb-3"
+      class="btn btn-link px-0 mb-3 acao-de-retorno-dos-concursos"
       type="button"
       @click="roteador.push('/concursos')"
     >
@@ -912,7 +946,11 @@ onBeforeUnmount(() => cancelamento.abort())
       Concurso criado. Complete as próximas seções no seu ritmo.
     </p>
 
-    <div v-if="carregando" class="text-center py-5" aria-live="polite">
+    <div
+      v-if="carregando"
+      class="text-center py-5 estado-de-carregamento-do-concurso"
+      aria-live="polite"
+    >
       <div class="spinner-border text-primary mb-3" role="status">
         <span class="visually-hidden">Carregando estrutura</span>
       </div>
@@ -920,10 +958,10 @@ onBeforeUnmount(() => cancelamento.abort())
     </div>
 
     <template v-else-if="concurso">
-      <header class="cabecalho-da-pagina">
+      <header class="cabecalho-da-pagina cabecalho-do-detalhe-do-concurso">
         <div>
           <p class="sobretitulo-da-pagina">Seu objetivo ativo</p>
-          <div class="d-flex gap-2 my-2">
+          <div class="d-flex flex-wrap gap-2 my-2 estados-do-concurso">
             <span class="badge etiqueta-neutra">
               {{ rotuloDoDominio(concurso.situacao, rotulosDaSituacao) }}
             </span>
@@ -938,7 +976,7 @@ onBeforeUnmount(() => cancelamento.abort())
             <span v-if="concurso.banca"> · {{ concurso.banca }}</span>
           </p>
         </div>
-        <div class="acoes-do-cabecalho">
+        <div class="acoes-do-cabecalho acoes-do-detalhe-do-concurso">
           <button
             class="btn btn-outline-primary"
             type="button"
@@ -965,7 +1003,10 @@ onBeforeUnmount(() => cancelamento.abort())
         </div>
       </header>
 
-      <nav class="passos-do-concurso" aria-label="Etapas do concurso">
+      <nav
+        class="passos-do-concurso marcos-do-detalhe-do-concurso"
+        aria-label="Etapas do concurso"
+      >
         <button
           type="button"
           :class="{
@@ -1042,20 +1083,36 @@ onBeforeUnmount(() => cancelamento.abort())
         Restaure o concurso para alterar sua estrutura.
       </section>
 
-      <nav class="abas-do-concurso" aria-label="Visualização do concurso">
+      <nav
+        class="abas-do-concurso abas-modernas-do-concurso"
+        aria-label="Visualização do concurso"
+        role="tablist"
+      >
         <button
+          id="aba-do-concurso-visao"
           type="button"
+          role="tab"
           :class="{ ativo: abaDoConcurso === 'visao' }"
           :aria-current="abaDoConcurso === 'visao' ? 'page' : undefined"
+          :aria-selected="abaDoConcurso === 'visao'"
+          aria-controls="painel-da-visao-do-concurso"
+          :tabindex="abaDoConcurso === 'visao' ? 0 : -1"
           @click="abaDoConcurso = 'visao'"
+          @keydown="navegarEntreAbas"
         >
           Visão do concurso
         </button>
         <button
+          id="aba-do-concurso-conteudo"
           type="button"
+          role="tab"
           :class="{ ativo: abaDoConcurso === 'conteudo' }"
           :aria-current="abaDoConcurso === 'conteudo' ? 'page' : undefined"
+          :aria-selected="abaDoConcurso === 'conteudo'"
+          aria-controls="painel-do-conteudo-programatico"
+          :tabindex="abaDoConcurso === 'conteudo' ? 0 : -1"
           @click="abaDoConcurso = 'conteudo'"
+          @keydown="navegarEntreAbas"
         >
           Conteúdo programático
           <span>{{ itensSemMapeamento.length }}</span>
@@ -1064,9 +1121,14 @@ onBeforeUnmount(() => cancelamento.abort())
 
       <section
         v-if="abaDoConcurso === 'visao'"
-        class="grade-da-visao-do-concurso"
+        id="painel-da-visao-do-concurso"
+        class="grade-da-visao-do-concurso painel-da-visao-do-concurso"
+        role="tabpanel"
+        aria-labelledby="aba-do-concurso-visao"
       >
-        <article class="card proximo-passo-do-concurso">
+        <article
+          class="card proximo-passo-do-concurso cartao-de-proximo-passo-do-concurso"
+        >
           <p class="sobretitulo-da-pagina">{{ proximoPasso.etiqueta }}</p>
           <h2 class="titulo-editorial">{{ proximoPasso.titulo }}</h2>
           <p>{{ proximoPasso.descricao }}</p>
@@ -1080,7 +1142,9 @@ onBeforeUnmount(() => cancelamento.abort())
           </button>
         </article>
 
-        <article class="card dados-resumidos-do-concurso">
+        <article
+          class="card dados-resumidos-do-concurso cartao-de-dados-do-concurso"
+        >
           <header class="cabecalho-do-cartao-da-jornada">
             <div>
               <span class="rotulo-discreto">Dados principais</span>
@@ -1115,7 +1179,9 @@ onBeforeUnmount(() => cancelamento.abort())
           </dl>
         </article>
 
-        <article class="card estrutura-consolidada-do-concurso">
+        <article
+          class="card estrutura-consolidada-do-concurso cartao-da-estrutura-do-concurso"
+        >
           <header class="cabecalho-do-cartao-da-jornada">
             <div>
               <span class="rotulo-discreto">Estrutura consolidada</span>
@@ -1173,7 +1239,9 @@ onBeforeUnmount(() => cancelamento.abort())
           </div>
         </article>
 
-        <article class="card distribuicao-do-conteudo-oficial">
+        <article
+          class="card distribuicao-do-conteudo-oficial cartao-da-cobertura-do-concurso"
+        >
           <span class="rotulo-discreto">Cobertura do edital</span>
           <h2 class="titulo-editorial">Conteúdo por situação</h2>
           <div
@@ -1202,10 +1270,15 @@ onBeforeUnmount(() => cancelamento.abort())
 
       <section
         v-else
-        class="conteudo-programatico-do-concurso"
+        id="painel-do-conteudo-programatico"
+        class="conteudo-programatico-do-concurso painel-do-conteudo-programatico"
         aria-label="Conteúdo programático"
+        role="tabpanel"
+        aria-labelledby="aba-do-concurso-conteudo"
       >
-        <aside class="card navegador-do-conteudo-programatico">
+        <aside
+          class="card navegador-do-conteudo-programatico navegador-das-materias-do-edital"
+        >
           <span class="rotulo-discreto">Estrutura da prova</span>
           <h2 class="titulo-editorial">Matérias vinculadas</h2>
           <div
@@ -1250,7 +1323,9 @@ onBeforeUnmount(() => cancelamento.abort())
           </button>
         </aside>
 
-        <article class="card itens-oficiais-do-concurso">
+        <article
+          class="card itens-oficiais-do-concurso painel-dos-itens-oficiais"
+        >
           <header class="cabecalho-do-cartao-da-jornada">
             <div>
               <span class="rotulo-discreto">

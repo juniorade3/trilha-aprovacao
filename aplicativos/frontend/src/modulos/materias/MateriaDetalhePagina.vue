@@ -166,9 +166,9 @@ onBeforeUnmount(() => cancelamento.abort())
 </script>
 
 <template>
-  <main class="container py-4 py-md-5">
+  <main class="pagina-da-jornada pagina-de-detalhe-da-materia">
     <button
-      class="btn btn-link px-0 mb-3"
+      class="btn btn-link botao-de-voltar-do-catalogo"
       type="button"
       @click="roteador.push('/materias')"
     >
@@ -185,7 +185,11 @@ onBeforeUnmount(() => cancelamento.abort())
       {{ erro }}
     </p>
 
-    <div v-if="carregando" class="text-center py-5" aria-live="polite">
+    <div
+      v-if="carregando"
+      class="estado-do-catalogo carregamento-do-detalhe-da-materia"
+      aria-live="polite"
+    >
       <div class="spinner-border text-primary mb-3" role="status">
         <span class="visually-hidden">Carregando materia</span>
       </div>
@@ -193,208 +197,229 @@ onBeforeUnmount(() => cancelamento.abort())
     </div>
 
     <template v-else-if="materia">
-      <header class="card border-0 shadow-sm mb-4">
-        <div class="card-body d-flex flex-wrap gap-3 align-items-center">
-          <span
-            class="marca-de-cor marca-de-cor-grande"
-            :style="{ backgroundColor: materia.cor ?? '#6c757d' }"
-            aria-hidden="true"
-          ></span>
-          <div class="flex-grow-1">
-            <p class="text-uppercase fw-semibold text-success mb-1">Materia</p>
-            <h1 class="mb-1">{{ materia.nome }}</h1>
-            <p class="text-secondary mb-0">
-              {{ materia.descricao || 'Sem descricao.' }}
-            </p>
+      <header
+        class="card hero-do-detalhe-da-materia"
+        :style="{
+          '--cor-identificadora-da-materia':
+            materia.cor ?? 'var(--cor-violeta)',
+        }"
+      >
+        <span
+          class="marca-de-cor marca-de-cor-grande"
+          aria-hidden="true"
+        ></span>
+        <div class="identidade-do-detalhe-da-materia">
+          <div class="rotulos-do-detalhe-da-materia">
+            <span class="sobretitulo-da-pagina">Materia</span>
+            <span class="badge etiqueta-neutra">
+              {{ materia.arquivada ? 'Arquivada' : 'Ativa' }}
+            </span>
           </div>
-          <button
-            class="btn btn-outline-secondary"
-            type="button"
-            @click="alternarArquivamentoDaMateria"
-          >
-            {{ materia.arquivada ? 'Restaurar materia' : 'Arquivar materia' }}
-          </button>
+          <h1>{{ materia.nome }}</h1>
+          <p>{{ materia.descricao || 'Sem descricao.' }}</p>
         </div>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          @click="alternarArquivamentoDaMateria"
+        >
+          {{ materia.arquivada ? 'Restaurar materia' : 'Arquivar materia' }}
+        </button>
       </header>
 
-      <div class="row g-4">
-        <section class="col-lg-8" aria-labelledby="titulo-topicos">
-          <div class="card border-0 shadow-sm">
-            <div class="card-body">
-              <div
-                class="d-flex justify-content-between align-items-center mb-3"
-              >
-                <div>
-                  <h2 id="titulo-topicos" class="h4 mb-1">Arvore de topicos</h2>
-                  <p class="text-secondary mb-0">
-                    {{ topicos.length }} topico{{
-                      topicos.length === 1 ? '' : 's'
-                    }}
-                  </p>
-                </div>
-              </div>
-              <div
-                v-if="topicos.length === 0"
-                class="text-center bg-body-tertiary rounded-3 p-5"
-              >
-                <i
-                  class="bi bi-diagram-3 fs-1 text-success"
-                  aria-hidden="true"
-                ></i>
-                <h3 class="h5 mt-3">Nenhum topico cadastrado</h3>
-                <p class="text-secondary mb-0">
-                  Adicione o primeiro topico desta materia.
+      <div class="grade-do-detalhe-da-materia">
+        <section
+          class="coluna-principal-do-detalhe"
+          aria-labelledby="titulo-topicos"
+        >
+          <section class="card painel-da-arvore-completa">
+            <header class="cabecalho-do-cartao-da-jornada">
+              <div>
+                <span class="rotulo-discreto">Estrutura de estudo</span>
+                <h2 id="titulo-topicos">Arvore de topicos</h2>
+                <p>
+                  {{ topicos.length }} topico{{
+                    topicos.length === 1 ? '' : 's'
+                  }}
                 </p>
               </div>
-              <ArvoreDeTopicos
-                v-else
-                :topicos="topicosOrdenados"
-                @editar="editar"
-                @arquivar="alternarArquivamentoDoTopico"
-                @excluir="excluir"
-              />
-            </div>
-          </div>
+              <span class="badge etiqueta-neutra">
+                {{ topicos.length }}
+              </span>
+            </header>
 
-          <div class="row g-3 mt-1">
-            <div class="col-md-4">
-              <section class="card card-body border-0 shadow-sm h-100">
-                <h2 class="h6">Materiais relacionados</h2>
-                <p
-                  v-if="uso.materiais.length === 0"
-                  class="small text-secondary mb-0"
-                >
+            <div
+              v-if="topicos.length === 0"
+              class="estado-do-catalogo estado-vazio-com-borda"
+            >
+              <i class="bi bi-diagram-3" aria-hidden="true"></i>
+              <h3>Nenhum topico cadastrado</h3>
+              <p>Adicione o primeiro topico desta materia.</p>
+            </div>
+            <ArvoreDeTopicos
+              v-else
+              :topicos="topicosOrdenados"
+              @editar="editar"
+              @arquivar="alternarArquivamentoDoTopico"
+              @excluir="excluir"
+            />
+          </section>
+
+          <section
+            class="grade-de-uso-da-materia"
+            aria-label="Uso desta matéria"
+          >
+            <article class="card cartao-de-uso-da-materia">
+              <span class="icone-do-uso-da-materia">
+                <i class="bi bi-collection" aria-hidden="true"></i>
+              </span>
+              <div>
+                <h2>Materiais relacionados</h2>
+                <p v-if="uso.materiais.length === 0">
                   Nenhum material cobre os tópicos desta matéria.
                 </p>
-                <ul v-else class="list-unstyled small mb-0">
+                <ul v-else>
                   <li
                     v-for="material in uso.materiais"
                     :key="material.identificador"
-                    class="mb-2"
                   >
                     <RouterLink :to="`/materiais/${material.identificador}`">
                       {{ material.titulo }}
                     </RouterLink>
-                    <span class="badge etiqueta-neutra ms-1">{{
+                    <span class="badge etiqueta-neutra">{{
                       material.tipo
                     }}</span>
                   </li>
                 </ul>
-              </section>
-            </div>
-            <div class="col-md-4">
-              <section class="card card-body border-0 shadow-sm h-100">
-                <h2 class="h6">Estudos recentes</h2>
-                <p
-                  v-if="uso.estudosRecentes.length === 0"
-                  class="small text-secondary mb-0"
-                >
+              </div>
+            </article>
+
+            <article class="card cartao-de-uso-da-materia">
+              <span class="icone-do-uso-da-materia">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+              </span>
+              <div>
+                <h2>Estudos recentes</h2>
+                <p v-if="uso.estudosRecentes.length === 0">
                   Nenhum estudo ativo nesta matéria.
                 </p>
-                <ul v-else class="list-unstyled small mb-0">
+                <ul v-else>
                   <li
                     v-for="estudo in uso.estudosRecentes"
                     :key="estudo.identificador"
-                    class="mb-2"
                   >
                     <strong>{{ estudo.nomeDoTopico }}</strong>
-                    <span class="d-block text-secondary">
+                    <span>
                       {{ estudo.duracaoEmMinutos }} min ·
                       {{ dataHoraLegivel(estudo.dataHora) }}
                     </span>
                   </li>
                 </ul>
-              </section>
-            </div>
-            <div class="col-md-4">
-              <section class="card card-body border-0 shadow-sm h-100">
-                <h2 class="h6">Concursos relacionados</h2>
-                <p
-                  v-if="uso.concursos.length === 0"
-                  class="small text-secondary mb-0"
-                >
+              </div>
+            </article>
+
+            <article class="card cartao-de-uso-da-materia">
+              <span class="icone-do-uso-da-materia">
+                <i class="bi bi-bullseye" aria-hidden="true"></i>
+              </span>
+              <div>
+                <h2>Concursos relacionados</h2>
+                <p v-if="uso.concursos.length === 0">
                   Esta matéria ainda não é exigida em um concurso.
                 </p>
-                <ul v-else class="list-unstyled small mb-0">
+                <ul v-else>
                   <li
                     v-for="concurso in uso.concursos"
                     :key="concurso.identificador"
-                    class="mb-2"
                   >
                     <RouterLink :to="`/concursos/${concurso.identificador}`">
                       {{ concurso.nome }}
                     </RouterLink>
-                    <span
-                      v-if="concurso.ativo"
-                      class="badge text-bg-success ms-1"
-                    >
+                    <span v-if="concurso.ativo" class="badge text-bg-success">
                       Ativo
                     </span>
                   </li>
                 </ul>
-              </section>
-            </div>
-          </div>
+              </div>
+            </article>
+          </section>
         </section>
 
-        <aside class="col-lg-4">
+        <aside class="coluna-do-editor-de-topico">
           <form
             id="formulario-topico"
-            class="card card-body border-0 shadow-sm sticky-lg-top"
+            class="card formulario-da-aplicacao formulario-de-topico-completo"
             @submit.prevent="salvar"
           >
-            <h2 class="h4">
-              {{ identificadorEmEdicao ? 'Editar topico' : 'Novo topico' }}
-            </h2>
+            <header>
+              <span class="rotulo-discreto">Organizar conteúdo</span>
+              <h2>
+                {{ identificadorEmEdicao ? 'Editar topico' : 'Novo topico' }}
+              </h2>
+              <p>
+                Defina nome, hierarquia e ordem sem sair da árvore da matéria.
+              </p>
+            </header>
             <p v-if="materia.arquivada" class="alert alert-warning">
               Restaure a materia para alterar seus topicos.
             </p>
-            <fieldset :disabled="materia.arquivada || salvando">
-              <label class="form-label" for="nome-topico">Nome</label>
-              <input
-                id="nome-topico"
-                v-model="formulario.nome"
-                class="form-control mb-3"
-                maxlength="160"
-                required
-              />
-              <label class="form-label" for="descricao-topico">Descricao</label>
-              <textarea
-                id="descricao-topico"
-                v-model="formulario.descricao"
-                class="form-control mb-3"
-                maxlength="1000"
-                rows="3"
-              ></textarea>
-              <label class="form-label" for="pai-topico">Topico-pai</label>
-              <select
-                id="pai-topico"
-                v-model="formulario.identificadorDoTopicoPai"
-                class="form-select mb-3"
-              >
-                <option value="">Nenhum: topico raiz</option>
-                <option
-                  v-for="opcao in topicosOrdenados"
-                  :key="opcao.identificador"
-                  :value="opcao.identificador"
-                  :disabled="
-                    opcao.identificador === identificadorEmEdicao ||
-                    opcao.arquivado
-                  "
+            <fieldset
+              class="campos-do-editor-de-topico"
+              :disabled="materia.arquivada || salvando"
+            >
+              <label>
+                <span>Nome</span>
+                <input
+                  id="nome-topico"
+                  v-model="formulario.nome"
+                  class="form-control"
+                  maxlength="160"
+                  required
+                />
+              </label>
+              <label>
+                <span>Descricao</span>
+                <textarea
+                  id="descricao-topico"
+                  v-model="formulario.descricao"
+                  class="form-control"
+                  maxlength="1000"
+                  rows="3"
+                ></textarea>
+              </label>
+              <label>
+                <span>Topico-pai</span>
+                <select
+                  id="pai-topico"
+                  v-model="formulario.identificadorDoTopicoPai"
+                  class="form-select"
                 >
-                  {{ opcao.nome }}
-                </option>
-              </select>
-              <label class="form-label" for="ordem-topico">Ordem</label>
-              <input
-                id="ordem-topico"
-                v-model.number="formulario.ordem"
-                class="form-control mb-3"
-                type="number"
-                min="1"
-                required
-              />
-              <div class="d-flex gap-2">
+                  <option value="">Nenhum: topico raiz</option>
+                  <option
+                    v-for="opcao in topicosOrdenados"
+                    :key="opcao.identificador"
+                    :value="opcao.identificador"
+                    :disabled="
+                      opcao.identificador === identificadorEmEdicao ||
+                      opcao.arquivado
+                    "
+                  >
+                    {{ opcao.nome }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Ordem</span>
+                <input
+                  id="ordem-topico"
+                  v-model.number="formulario.ordem"
+                  class="form-control"
+                  type="number"
+                  min="1"
+                  required
+                />
+              </label>
+              <div class="acoes-do-editor-de-topico">
                 <button class="btn btn-primary flex-grow-1">
                   {{ salvando ? 'Salvando...' : 'Salvar topico' }}
                 </button>

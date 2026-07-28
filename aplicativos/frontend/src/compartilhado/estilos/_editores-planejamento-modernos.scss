@@ -1,0 +1,946 @@
+/* Editores contextuais do planejamento.
+ * Mantém os componentes de diálogo compartilhados e especializa somente os
+ * fluxos de bloco, geração e replanejamento.
+ */
+
+[data-bs-theme='dark'] {
+  .gaveta-do-editor-de-bloco,
+  .gaveta-de-geracao-moderna,
+  .gaveta-de-replanejamento-moderna {
+    background: rgb(0 0 0 / 68%);
+    backdrop-filter: blur(0.35rem);
+  }
+
+  .gaveta-do-editor-de-bloco .gaveta-da-aplicacao,
+  .gaveta-de-geracao-moderna .gaveta-da-aplicacao,
+  .gaveta-de-replanejamento-moderna .gaveta-da-aplicacao {
+    background: var(--cor-superficie-1);
+    border-left: 1px solid var(--cor-borda);
+    box-shadow: var(--sombra-elevada);
+    scrollbar-color: var(--cor-borda-interativa) transparent;
+    width: min(68rem, 100%);
+  }
+
+  .gaveta-do-editor-de-bloco .cabecalho-da-gaveta,
+  .gaveta-de-geracao-moderna .cabecalho-da-gaveta,
+  .gaveta-de-replanejamento-moderna .cabecalho-da-gaveta {
+    background: rgb(13 20 30 / 96%);
+    border-color: var(--cor-borda);
+    padding: clamp(1.15rem, 2.5vw, 1.8rem);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .gaveta-do-editor-de-bloco .cabecalho-da-gaveta h2,
+  .gaveta-de-geracao-moderna .cabecalho-da-gaveta h2,
+  .gaveta-de-replanejamento-moderna .cabecalho-da-gaveta h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.65rem, 3vw, 2.35rem);
+    letter-spacing: -0.04em;
+    line-height: 1.08;
+  }
+
+  .gaveta-do-editor-de-bloco .cabecalho-da-gaveta p:last-child,
+  .gaveta-de-geracao-moderna .cabecalho-da-gaveta p:last-child,
+  .gaveta-de-replanejamento-moderna .cabecalho-da-gaveta p:last-child {
+    color: var(--cor-texto-secundario);
+    max-width: 70ch;
+  }
+
+  .gaveta-do-editor-de-bloco .corpo-da-gaveta,
+  .gaveta-de-geracao-moderna .corpo-da-gaveta,
+  .gaveta-de-replanejamento-moderna .corpo-da-gaveta {
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+  }
+
+  .gaveta-do-editor-de-bloco .mensagem-do-editor-de-bloco,
+  .gaveta-de-geracao-moderna .mensagem-da-geracao,
+  .gaveta-de-replanejamento-moderna .mensagem-do-replanejamento {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    min-width: 0;
+  }
+
+  .gaveta-do-editor-de-bloco .mensagem-do-editor-de-bloco > i,
+  .gaveta-de-geracao-moderna .mensagem-da-geracao > i,
+  .gaveta-de-replanejamento-moderna .mensagem-do-replanejamento > i {
+    flex: 0 0 auto;
+    font-size: 1.15rem;
+  }
+
+  .gaveta-do-editor-de-bloco .mensagem-do-editor-de-bloco > span,
+  .gaveta-de-geracao-moderna .mensagem-da-geracao > span,
+  .gaveta-de-replanejamento-moderna .mensagem-do-replanejamento > span {
+    flex: 1;
+    line-height: 1.45;
+    min-width: 0;
+  }
+
+  /* Editor manual de bloco. */
+  .editor-moderno-de-bloco {
+    gap: 0;
+  }
+
+  .editor-moderno-de-bloco .cabecalho-da-secao-do-editor {
+    align-items: center;
+    border-top: 1px solid var(--cor-borda);
+    display: flex;
+    gap: 0.85rem;
+    margin-top: 1.25rem;
+    padding: 1.25rem 0 0.9rem;
+  }
+
+  .editor-moderno-de-bloco .cabecalho-da-secao-do-editor:first-child {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .cabecalho-da-secao-do-editor > span,
+  .cabecalho-da-etapa-de-geracao > span,
+  .cabecalho-da-secao-do-replanejamento > span {
+    align-items: center;
+    background: rgb(var(--cor-violeta-rgb) / 14%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 24%);
+    border-radius: var(--raio-sm);
+    color: var(--cor-link);
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 2.65rem;
+    justify-content: center;
+    width: 2.65rem;
+  }
+
+  .cabecalho-da-secao-do-editor > div,
+  .cabecalho-da-etapa-de-geracao > div,
+  .cabecalho-da-secao-do-replanejamento > div {
+    min-width: 0;
+  }
+
+  .cabecalho-da-secao-do-editor h3,
+  .cabecalho-da-etapa-de-geracao h3,
+  .cabecalho-da-secao-do-replanejamento h3 {
+    color: var(--cor-texto);
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .cabecalho-da-secao-do-editor p,
+  .cabecalho-da-etapa-de-geracao p,
+  .cabecalho-da-secao-do-replanejamento p {
+    color: var(--cor-texto-secundario);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    margin: 0.2rem 0 0;
+  }
+
+  .editor-moderno-de-bloco .campo-principal-do-editor,
+  .editor-moderno-de-bloco .grade-da-identificacao-do-bloco,
+  .editor-moderno-de-bloco .grade-do-conteudo-do-bloco,
+  .editor-moderno-de-bloco .grade-da-distribuicao-do-bloco,
+  .editor-moderno-de-bloco .campo-de-observacao-do-bloco {
+    background: var(--cor-superficie-2);
+    border-inline: 1px solid var(--cor-borda);
+    padding-inline: 1rem;
+  }
+
+  .editor-moderno-de-bloco .campo-principal-do-editor {
+    border-radius: var(--raio-md) var(--raio-md) 0 0;
+    border-top: 1px solid var(--cor-borda);
+    padding-top: 1rem;
+  }
+
+  .editor-moderno-de-bloco .grade-da-identificacao-do-bloco {
+    border-bottom: 1px solid var(--cor-borda);
+    border-radius: 0 0 var(--raio-md) var(--raio-md);
+    padding-block: 1rem;
+  }
+
+  .editor-moderno-de-bloco .grade-do-conteudo-do-bloco {
+    border-block: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    padding-block: 1rem;
+  }
+
+  .editor-moderno-de-bloco .grade-da-distribuicao-do-bloco {
+    border-radius: var(--raio-md) var(--raio-md) 0 0;
+    border-top: 1px solid var(--cor-borda);
+    padding-top: 1rem;
+  }
+
+  .editor-moderno-de-bloco .campo-de-observacao-do-bloco {
+    border-bottom: 1px solid var(--cor-borda);
+    border-radius: 0 0 var(--raio-md) var(--raio-md);
+    padding-block: 1rem;
+  }
+
+  .editor-moderno-de-bloco .form-label {
+    color: var(--cor-texto);
+    font-size: 0.8125rem;
+    font-weight: 680;
+    margin-bottom: 0.4rem;
+  }
+
+  .editor-moderno-de-bloco .text-secondary {
+    color: var(--cor-texto-secundario) !important;
+    font-weight: 450;
+  }
+
+  .editor-moderno-de-bloco input,
+  .editor-moderno-de-bloco select,
+  .editor-moderno-de-bloco textarea {
+    background: var(--cor-superficie-3);
+    border-color: var(--cor-borda-forte);
+  }
+
+  .acoes-do-editor-de-bloco {
+    background: rgb(13 20 30 / 96%);
+    border-top: 1px solid var(--cor-borda);
+    bottom: calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    margin: 1.5rem calc(-1 * clamp(1rem, 2.5vw, 1.75rem))
+      calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    padding: 1rem clamp(1rem, 2.5vw, 1.75rem);
+    position: sticky;
+    z-index: 8;
+  }
+
+  /* Assistente de geração determinística. */
+  .navegacao-do-assistente-de-geracao {
+    background: var(--cor-superficie-1);
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 7;
+  }
+
+  .navegacao-do-assistente-de-geracao .etapa-da-geracao {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto-secundario);
+    font-size: 0.875rem;
+    font-weight: 680;
+    min-height: 3rem;
+    padding: 0.65rem 0.75rem;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .navegacao-do-assistente-de-geracao .etapa-da-geracao:hover:not(:disabled) {
+    border-color: var(--cor-borda-interativa);
+    color: var(--cor-texto);
+  }
+
+  .navegacao-do-assistente-de-geracao .etapa-da-geracao.ativa {
+    background: rgb(var(--cor-violeta-rgb) / 16%);
+    border-color: rgb(var(--cor-violeta-rgb) / 42%);
+    box-shadow: inset 0 -0.18rem 0 var(--cor-violeta);
+    color: var(--cor-link);
+  }
+
+  .navegacao-do-assistente-de-geracao .etapa-da-geracao:disabled {
+    color: var(--cor-texto-suave);
+    opacity: 0.48;
+  }
+
+  .gaveta-de-geracao-moderna .mensagem-da-geracao {
+    flex-wrap: wrap;
+  }
+
+  .gaveta-de-geracao-moderna .mensagem-da-geracao .btn {
+    flex: 0 0 auto;
+  }
+
+  .estado-da-geracao-moderna,
+  .estado-do-replanejamento {
+    align-items: center;
+    background: var(--cor-superficie-2);
+    border: 1px dashed var(--cor-borda-interativa);
+    border-radius: var(--raio-lg);
+    color: var(--cor-texto-secundario);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    min-height: 13rem;
+    padding: 2rem;
+  }
+
+  .etapa-do-assistente-de-geracao {
+    min-width: 0;
+  }
+
+  .cabecalho-da-etapa-de-geracao,
+  .cabecalho-da-secao-do-replanejamento {
+    align-items: center;
+    display: flex;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .cabecalho-da-etapa-de-geracao h3,
+  .cabecalho-da-secao-do-replanejamento h3 {
+    font-size: clamp(1.15rem, 2vw, 1.45rem);
+  }
+
+  .lista-de-prioridades {
+    display: grid;
+    gap: 0.6rem;
+    margin: 1rem 0 1.25rem;
+  }
+
+  .lista-de-prioridades label {
+    align-items: center;
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem);
+    min-height: 4.5rem;
+    padding: 0.75rem 0.9rem;
+  }
+
+  .lista-de-prioridades label:focus-within {
+    border-color: var(--cor-foco);
+    box-shadow: 0 0 0 0.2rem rgb(var(--cor-violeta-rgb) / 14%);
+  }
+
+  .nome-da-materia-priorizada {
+    align-items: center;
+    color: var(--cor-texto);
+    display: flex;
+    font-weight: 650;
+    gap: 0.65rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .nome-da-materia-priorizada > i {
+    color: var(--cor-link);
+    flex: 0 0 auto;
+  }
+
+  .lista-de-prioridades select {
+    min-width: 0;
+  }
+
+  .acao-principal-da-etapa {
+    margin-top: 0.25rem;
+  }
+
+  .grade-da-configuracao {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 1rem 0 1.25rem;
+  }
+
+  .grade-da-configuracao label {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .grade-da-configuracao label > span {
+    color: var(--cor-texto);
+    font-size: 0.875rem;
+    font-weight: 680;
+  }
+
+  .grade-da-configuracao label > small {
+    color: var(--cor-texto-secundario);
+    line-height: 1.4;
+  }
+
+  .grade-da-configuracao input {
+    max-width: 12rem;
+  }
+
+  .acoes-da-etapa-de-geracao {
+    justify-content: flex-end;
+  }
+
+  .cabecalho-da-previa {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--cor-borda);
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .cabecalho-da-previa > div {
+    min-width: 0;
+  }
+
+  .cabecalho-da-previa h3 {
+    color: var(--cor-texto);
+    font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+
+  .cabecalho-da-previa p {
+    color: var(--cor-texto-secundario);
+    line-height: 1.45;
+    margin: 0.3rem 0 0;
+  }
+
+  .mensagem-da-previa {
+    line-height: 1.45;
+  }
+
+  .dias-da-previa {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 1rem 0;
+  }
+
+  .cartao-do-dia-da-previa {
+    align-content: start;
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .cartao-do-dia-da-previa > header {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+  }
+
+  .cartao-do-dia-da-previa > header strong {
+    color: var(--cor-texto);
+    overflow-wrap: anywhere;
+    text-transform: capitalize;
+  }
+
+  .cartao-do-dia-da-previa > header span {
+    color: var(--cor-texto-secundario);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    text-align: right;
+  }
+
+  .barra-de-capacidade {
+    background: var(--cor-superficie-3);
+    border-radius: 999px;
+    height: 0.45rem;
+    margin: 0.85rem 0;
+    overflow: hidden;
+  }
+
+  .barra-de-capacidade span {
+    background: var(--cor-violeta);
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+  }
+
+  .bloco-da-previa {
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    display: grid;
+    gap: 0.4rem 0.65rem;
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) auto;
+    margin-top: 0.55rem;
+    min-width: 0;
+    padding: 0.75rem;
+  }
+
+  .bloco-da-previa.preservado {
+    background: var(--cor-superficie-3);
+  }
+
+  .bloco-da-previa.sugerido {
+    background: rgb(var(--cor-violeta-rgb) / 11%);
+    border-color: rgb(var(--cor-violeta-rgb) / 24%);
+  }
+
+  .bloco-da-previa > span {
+    color: var(--cor-texto-secundario);
+    font-size: 0.8125rem;
+    font-weight: 680;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+  }
+
+  .bloco-da-previa > strong {
+    color: var(--cor-texto);
+    line-height: 1.35;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .bloco-da-previa .duracao-do-bloco {
+    color: var(--cor-link);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .contexto-do-bloco,
+  .justificativas-do-bloco {
+    grid-column: 2 / -1;
+  }
+
+  .contexto-do-bloco {
+    align-items: center;
+    color: var(--cor-texto-secundario);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    gap: 0.35rem;
+  }
+
+  .justificativas-do-bloco {
+    color: var(--cor-texto-secundario);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    margin: 0;
+    padding-left: 1rem;
+  }
+
+  .aviso-do-dia {
+    align-items: flex-start;
+    color: var(--cor-aviso);
+    display: flex;
+    font-size: 0.875rem;
+    gap: 0.5rem;
+    line-height: 1.4;
+    margin: 0.7rem 0 0;
+  }
+
+  .painel-de-aplicacao-da-geracao {
+    align-items: center;
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 28%);
+    border-radius: var(--raio-md);
+    bottom: calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin: 1rem calc(-1 * clamp(1rem, 2.5vw, 1.75rem))
+      calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    padding: 1rem clamp(1rem, 2.5vw, 1.75rem);
+    position: sticky;
+    z-index: 8;
+  }
+
+  .painel-de-aplicacao-da-geracao p {
+    color: var(--cor-texto-secundario);
+    line-height: 1.4;
+    max-width: 55ch;
+  }
+
+  /* Replanejamento das pendências. */
+  .estado-do-replanejamento {
+    margin-bottom: 1rem;
+  }
+
+  .resumo-do-replanejamento {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0 0 1.25rem;
+  }
+
+  .resumo-do-replanejamento > div {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-width: 0;
+    padding: 1rem;
+    position: relative;
+  }
+
+  .resumo-do-replanejamento > div::before {
+    background: var(--cor-link);
+    border-radius: 999px;
+    content: '';
+    display: block;
+    height: 0.22rem;
+    margin-bottom: 0.8rem;
+    width: 2rem;
+  }
+
+  .resumo-do-replanejamento > div:nth-child(2)::before {
+    background: var(--cor-sucesso);
+  }
+
+  .resumo-do-replanejamento > div:nth-child(3)::before {
+    background: var(--cor-aviso);
+  }
+
+  .resumo-do-replanejamento dt {
+    color: var(--cor-texto-secundario);
+    font-size: 0.8125rem;
+    font-weight: 650;
+  }
+
+  .resumo-do-replanejamento dd {
+    color: var(--cor-texto);
+    font-size: clamp(1.2rem, 2vw, 1.5rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 720;
+    letter-spacing: -0.025em;
+    margin: 0.25rem 0 0;
+  }
+
+  .painel-da-capacidade-do-replanejamento {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
+
+  .lista-da-capacidade-do-replanejamento {
+    background: transparent;
+    border-radius: var(--raio-md);
+    display: grid;
+    gap: 0.45rem;
+    overflow: hidden;
+  }
+
+  .lista-da-capacidade-do-replanejamento .list-group-item {
+    align-items: center;
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto);
+    display: flex;
+    min-height: 3.5rem;
+    padding: 0.75rem;
+  }
+
+  .lista-da-capacidade-do-replanejamento strong {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lista-da-capacidade-do-replanejamento span {
+    color: var(--cor-texto-secundario);
+    font-size: 0.875rem;
+    text-align: right;
+  }
+
+  .cabecalho-da-proposta {
+    border-bottom: 1px solid var(--cor-borda);
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .cartao-moderno-de-pendencia {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    margin-top: 0.75rem;
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .cartao-moderno-de-pendencia > header {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+
+  .cartao-moderno-de-pendencia > header > div {
+    min-width: 0;
+  }
+
+  .cartao-moderno-de-pendencia > header strong,
+  .cartao-moderno-de-pendencia .resumo-da-pendencia {
+    display: block;
+  }
+
+  .cartao-moderno-de-pendencia > header strong {
+    color: var(--cor-texto);
+    font-size: 1rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .cartao-moderno-de-pendencia .resumo-da-pendencia {
+    color: var(--cor-link);
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    margin-top: 0.25rem;
+    text-transform: uppercase;
+  }
+
+  .cartao-moderno-de-pendencia > p {
+    color: var(--cor-texto-secundario);
+    line-height: 1.5;
+    margin: 0.85rem 0;
+    max-width: 70ch;
+  }
+
+  .fragmentos-do-replanejamento {
+    display: grid;
+    gap: 0.4rem;
+    list-style: none;
+    padding: 0;
+  }
+
+  .fragmentos-do-replanejamento li {
+    align-items: center;
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto-secundario);
+    display: flex;
+    font-size: 0.875rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .confirmacao-da-pendencia {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.65rem;
+    margin-top: 0.9rem;
+    padding: 0.85rem;
+  }
+
+  .confirmacao-da-pendencia .form-check-input,
+  .confirmacao-final-moderna .form-check-input {
+    flex: 0 0 auto;
+    margin: 0.2rem 0 0;
+  }
+
+  .confirmacao-da-pendencia .form-check-label,
+  .confirmacao-final-moderna .form-check-label {
+    line-height: 1.45;
+  }
+
+  .confirmacao-final-moderna {
+    align-items: flex-start;
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 28%);
+    border-radius: var(--raio-md);
+    display: flex;
+    gap: 0.7rem;
+    padding: 1rem;
+  }
+
+  .acoes-do-replanejamento {
+    background: rgb(13 20 30 / 96%);
+    border-top: 1px solid var(--cor-borda);
+    bottom: calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    margin-inline: calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    margin-bottom: calc(-1 * clamp(1rem, 2.5vw, 1.75rem));
+    padding: 1rem clamp(1rem, 2.5vw, 1.75rem);
+    position: sticky;
+    z-index: 8;
+  }
+}
+
+@media (max-width: 899.98px) {
+  [data-bs-theme='dark'] {
+    .dias-da-previa {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark'] {
+    .gaveta-do-editor-de-bloco .gaveta-da-aplicacao,
+    .gaveta-de-geracao-moderna .gaveta-da-aplicacao,
+    .gaveta-de-replanejamento-moderna .gaveta-da-aplicacao {
+      border-left: 0;
+    }
+
+    .editor-moderno-de-bloco .duas-colunas-do-formulario,
+    .editor-moderno-de-bloco .tres-colunas-do-formulario {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .grade-da-configuracao {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .resumo-do-replanejamento {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] {
+    .gaveta-do-editor-de-bloco .cabecalho-da-gaveta,
+    .gaveta-de-geracao-moderna .cabecalho-da-gaveta,
+    .gaveta-de-replanejamento-moderna .cabecalho-da-gaveta {
+      padding: 1rem;
+    }
+
+    .gaveta-do-editor-de-bloco .corpo-da-gaveta,
+    .gaveta-de-geracao-moderna .corpo-da-gaveta,
+    .gaveta-de-replanejamento-moderna .corpo-da-gaveta {
+      padding: 0.9rem;
+    }
+
+    .gaveta-do-editor-de-bloco .mensagem-do-editor-de-bloco,
+    .gaveta-de-geracao-moderna .mensagem-da-geracao,
+    .gaveta-de-replanejamento-moderna .mensagem-do-replanejamento {
+      align-items: flex-start;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .gaveta-de-geracao-moderna .mensagem-da-geracao .btn,
+    .gaveta-de-replanejamento-moderna .mensagem-do-replanejamento .btn {
+      grid-column: 1 / -1;
+      margin-left: 0 !important;
+      width: 100%;
+    }
+
+    .cabecalho-da-secao-do-editor,
+    .cabecalho-da-etapa-de-geracao,
+    .cabecalho-da-secao-do-replanejamento {
+      align-items: flex-start;
+    }
+
+    .editor-moderno-de-bloco .campo-principal-do-editor,
+    .editor-moderno-de-bloco .grade-da-identificacao-do-bloco,
+    .editor-moderno-de-bloco .grade-do-conteudo-do-bloco,
+    .editor-moderno-de-bloco .grade-da-distribuicao-do-bloco,
+    .editor-moderno-de-bloco .campo-de-observacao-do-bloco {
+      padding-inline: 0.75rem;
+    }
+
+    .acoes-do-editor-de-bloco {
+      bottom: -0.9rem;
+      flex-direction: column-reverse;
+      margin: 1.25rem -0.9rem -0.9rem;
+      padding: 0.9rem;
+    }
+
+    .acoes-do-editor-de-bloco .btn {
+      width: 100%;
+    }
+
+    .navegacao-do-assistente-de-geracao {
+      gap: 0.35rem;
+      margin-inline: -0.2rem;
+    }
+
+    .navegacao-do-assistente-de-geracao .etapa-da-geracao {
+      font-size: 0.8125rem;
+      min-width: 0;
+      padding-inline: 0.35rem;
+    }
+
+    .lista-de-prioridades label {
+      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .acoes-da-etapa-de-geracao {
+      flex-direction: column-reverse;
+    }
+
+    .acoes-da-etapa-de-geracao .btn {
+      width: 100%;
+    }
+
+    .cabecalho-da-previa {
+      display: grid;
+    }
+
+    .cabecalho-da-previa .btn {
+      width: 100%;
+    }
+
+    .cartao-do-dia-da-previa > header {
+      display: grid;
+    }
+
+    .cartao-do-dia-da-previa > header span {
+      text-align: left;
+    }
+
+    .bloco-da-previa {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .bloco-da-previa > span,
+    .contexto-do-bloco,
+    .justificativas-do-bloco {
+      grid-column: 1 / -1;
+    }
+
+    .painel-de-aplicacao-da-geracao {
+      align-items: stretch;
+      bottom: -0.9rem;
+      flex-direction: column;
+      margin: 1rem -0.9rem -0.9rem;
+      padding: 0.9rem;
+    }
+
+    .painel-de-aplicacao-da-geracao .btn {
+      width: 100%;
+    }
+
+    .resumo-do-replanejamento {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .lista-da-capacidade-do-replanejamento .list-group-item {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.25rem !important;
+    }
+
+    .lista-da-capacidade-do-replanejamento span {
+      text-align: left;
+    }
+
+    .cartao-moderno-de-pendencia > header {
+      display: grid;
+    }
+
+    .cartao-moderno-de-pendencia > header .btn {
+      width: 100%;
+    }
+
+    .acoes-do-replanejamento {
+      bottom: -0.9rem;
+      flex-direction: column-reverse;
+      margin: 1.25rem -0.9rem -0.9rem;
+      padding: 0.9rem;
+    }
+
+    .acoes-do-replanejamento .btn {
+      width: 100%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-bs-theme='dark'] {
+    .navegacao-do-assistente-de-geracao .etapa-da-geracao {
+      transition: none;
+    }
+  }
+}

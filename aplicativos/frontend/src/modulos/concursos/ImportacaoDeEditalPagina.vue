@@ -502,9 +502,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="pagina-da-jornada pagina-da-importacao-de-edital">
+  <main
+    class="pagina-da-jornada pagina-da-importacao-de-edital modulo-concursos-moderno"
+  >
     <button
-      class="btn btn-link px-0 mb-3 text-decoration-none"
+      class="btn btn-link px-0 mb-3 text-decoration-none acao-de-retorno-dos-concursos"
       type="button"
       @click="roteador.push('/concursos')"
     >
@@ -512,7 +514,7 @@ onBeforeUnmount(() => {
       Voltar para concursos
     </button>
 
-    <header class="cabecalho-da-pagina">
+    <header class="cabecalho-da-pagina cabecalho-da-importacao-de-edital">
       <div>
         <p class="sobretitulo-da-pagina">Importação rastreável</p>
         <h1>Importar edital</h1>
@@ -523,7 +525,10 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <ol class="passos-do-assistente" aria-label="Etapas da importação">
+    <ol
+      class="passos-do-assistente trilho-da-importacao-de-edital"
+      aria-label="Etapas da importação"
+    >
       <li
         v-for="(nome, indice) in [
           'Receber',
@@ -564,206 +569,225 @@ onBeforeUnmount(() => {
       {{ erro }}
     </p>
 
-    <div v-if="carregando" class="estado-da-importacao" role="status">
-      <span class="spinner-border" aria-hidden="true"></span>
-      Consultando importação…
-    </div>
-
-    <RecebimentoDaImportacaoDeEdital
-      v-else-if="!importacao"
-      :concursos="concursos"
-      :enviando="enviando"
-      :carregando-concursos="carregandoConcursos"
-      @enviar="receber"
-      @pesquisar-concursos="pesquisarConcursos"
-    />
-
     <section
-      v-else-if="['RECEBIDA', 'EXTRAINDO'].includes(importacao.estado)"
-      class="card estado-da-importacao"
-      role="status"
-      aria-live="polite"
+      class="fluxo-da-importacao-de-edital"
+      aria-label="Andamento da importação"
     >
-      <span class="spinner-border" aria-hidden="true"></span>
-      <h2>Extraindo dados do edital</h2>
-      <p>
-        Fonte: {{ importacao.nomeDoArquivo }}. Arquivo permanece isolado e nada
-        será cadastrado nesta etapa.
-      </p>
-      <button
-        class="btn btn-outline-primary"
-        type="button"
-        @click="carregarImportacao"
-      >
-        Atualizar agora
-      </button>
-    </section>
-
-    <RevisaoDaExtracaoDoEdital
-      v-else-if="
-        estadosParaRevisar.has(importacao.estado) ||
-        (importacao.estado === 'VALIDADA' &&
-          !importacao.chaveDoCargoSelecionado)
-      "
-      :importacao="importacao"
-      :modo="importacao.modo ?? modo"
-      :identificador-do-concurso-existente="
-        importacao.identificadorDoConcursoExistente ??
-        identificadorDoConcursoExistente
-      "
-      :salvando="salvandoDecisoes"
-      :salvando-extracao="salvandoExtracao"
-      :extraindo-com-ia="extraindoComIa"
-      :erro-da-ia="erroDaIa"
-      @salvar="salvarDecisoes"
-      @salvar-extracao="salvarExtracao"
-      @extrair-com-ia="extrairComIa"
-    />
-
-    <template v-else-if="importacao.estado === 'VALIDADA'">
-      <PreviaDaImportacaoDeEditalComponente v-if="previa" :previa="previa" />
-      <section
-        class="card preparacao-da-importacao"
-        aria-labelledby="titulo-preparacao-importacao"
-      >
-        <p class="sobretitulo-da-pagina">Dados validados</p>
-        <h2 id="titulo-preparacao-importacao">
-          {{ previa ? 'Prévia segura gerada' : 'Gerar prévia segura' }}
-        </h2>
-        <p>
-          Servidor verificará duplicidades, reutilizações, versão da extração e
-          campos ausentes. Nenhum cadastro será alterado pela página.
-        </p>
-        <p v-if="previa" class="alert alert-info" role="status">
-          Para criar a operação reforçada, peça ao assistente no Telegram para
-          importar o staging <code>{{ importacao.identificador }}</code
-          >. O arquivo bruto não é enviado ao modelo.
-        </p>
-        <button
-          class="btn btn-primary"
-          type="button"
-          :disabled="preparando || possuiProblemaBloqueante"
-          @click="preparar"
-        >
-          {{ preparando ? 'Gerando…' : 'Gerar prévia da importação' }}
-        </button>
-      </section>
-    </template>
-
-    <template
-      v-else-if="
-        ['AGUARDANDO_CONFIRMACAO', 'APLICANDO'].includes(importacao.estado)
-      "
-    >
-      <PreviaDaImportacaoDeEditalComponente v-if="previa" :previa="previa" />
-      <section v-else class="card estado-da-importacao" role="status">
-        <h2>Operação aguardando confirmação</h2>
-        <p>Consulte o assistente no Telegram para revisar e confirmar.</p>
-      </section>
-      <section
-        v-if="importacao.estado === 'APLICANDO'"
-        class="alert alert-info"
+      <div
+        v-if="carregando"
+        class="estado-da-importacao painel-de-estado-da-importacao"
         role="status"
       >
-        Aplicação transacional em andamento. Aguarde o recibo.
-      </section>
-      <button
-        class="btn btn-outline-primary"
-        type="button"
-        @click="carregarImportacao"
-      >
-        Atualizar status
-      </button>
-      <button
-        v-if="importacao.estado === 'AGUARDANDO_CONFIRMACAO'"
-        class="btn btn-outline-secondary"
-        type="button"
-        :disabled="retomando"
-        @click="iniciarNovaTentativa"
-      >
-        {{
-          retomando ? 'Retomando…' : 'Retomar após expiração ou cancelamento'
-        }}
-      </button>
-    </template>
+        <span class="spinner-border" aria-hidden="true"></span>
+        Consultando importação…
+      </div>
 
-    <section
-      v-else-if="importacao.estado === 'APLICADA'"
-      class="card recibo-da-importacao"
-      aria-labelledby="titulo-recibo-importacao"
-    >
-      <p class="sobretitulo-da-pagina">Importação concluída</p>
-      <h2 id="titulo-recibo-importacao">Estrutura criada com atomicidade</h2>
-      <p v-if="carregandoRelatorio" role="status">Carregando recibo…</p>
-      <template v-else-if="relatorio">
+      <RecebimentoDaImportacaoDeEdital
+        v-else-if="!importacao"
+        :concursos="concursos"
+        :enviando="enviando"
+        :carregando-concursos="carregandoConcursos"
+        @enviar="receber"
+        @pesquisar-concursos="pesquisarConcursos"
+      />
+
+      <section
+        v-else-if="['RECEBIDA', 'EXTRAINDO'].includes(importacao.estado)"
+        class="card estado-da-importacao painel-de-estado-da-importacao"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="spinner-border" aria-hidden="true"></span>
+        <h2>Extraindo dados do edital</h2>
         <p>
-          Concurso permanece
-          <strong>{{ formatarRotulo(relatorio.situacaoDoConcurso) }}</strong
-          >.
+          Fonte: {{ importacao.nomeDoArquivo }}. Arquivo permanece isolado e
+          nada será cadastrado nesta etapa.
         </p>
-        <dl class="contagens-do-recibo">
-          <div v-for="(quantidade, nome) in relatorio.contagens" :key="nome">
-            <dt>{{ formatarRotulo(String(nome)) }}</dt>
-            <dd>{{ quantidade }}</dd>
-          </div>
-        </dl>
-        <section v-if="relatorio.pendencias.length">
-          <h3>Pendências</h3>
-          <ul>
-            <li v-for="pendencia in relatorio.pendencias" :key="pendencia">
-              {{ pendencia }}
-            </li>
-          </ul>
-        </section>
-        <section v-if="relatorio.incertezas.length">
-          <h3>Incertezas preservadas</h3>
-          <ul>
-            <li v-for="incerteza in relatorio.incertezas" :key="incerteza">
-              {{ incerteza }}
-            </li>
-          </ul>
-        </section>
-        <RouterLink
-          class="btn btn-primary align-self-start"
-          :to="`/concursos/${relatorio.identificadorDoConcurso}?foco=mapeamentos`"
+        <button
+          class="btn btn-outline-primary"
+          type="button"
+          @click="carregarImportacao"
         >
-          Revisar estrutura e mapeamentos
-        </RouterLink>
-      </template>
-    </section>
+          Atualizar agora
+        </button>
+      </section>
 
-    <section
-      v-else-if="['FALHOU', 'CANCELADA'].includes(importacao.estado)"
-      class="card estado-da-importacao"
-      role="alert"
-    >
-      <h2>
-        {{
-          importacao.estado === 'FALHOU'
-            ? 'Importação falhou'
-            : 'Importação cancelada'
-        }}
-      </h2>
-      <p>Nenhuma estrutura parcial foi aplicada.</p>
-      <ul
-        v-if="importacao.estado === 'FALHOU' && importacao.problemas.length > 0"
-        class="list-group w-100"
-        aria-label="Problemas encontrados na importação"
-      >
-        <li
-          v-for="problema in importacao.problemas"
-          :key="`${problema.codigo}-${problema.caminho ?? ''}`"
-          class="list-group-item"
+      <RevisaoDaExtracaoDoEdital
+        v-else-if="
+          estadosParaRevisar.has(importacao.estado) ||
+          (importacao.estado === 'VALIDADA' &&
+            !importacao.chaveDoCargoSelecionado)
+        "
+        :importacao="importacao"
+        :modo="importacao.modo ?? modo"
+        :identificador-do-concurso-existente="
+          importacao.identificadorDoConcursoExistente ??
+          identificadorDoConcursoExistente
+        "
+        :salvando="salvandoDecisoes"
+        :salvando-extracao="salvandoExtracao"
+        :extraindo-com-ia="extraindoComIa"
+        :erro-da-ia="erroDaIa"
+        @salvar="salvarDecisoes"
+        @salvar-extracao="salvarExtracao"
+        @extrair-com-ia="extrairComIa"
+      />
+
+      <template v-else-if="importacao.estado === 'VALIDADA'">
+        <PreviaDaImportacaoDeEditalComponente v-if="previa" :previa="previa" />
+        <section
+          class="card preparacao-da-importacao painel-de-preparacao-da-importacao"
+          aria-labelledby="titulo-preparacao-importacao"
         >
-          <strong
-            ><code>{{ problema.codigo }}</code></strong
+          <p class="sobretitulo-da-pagina">Dados validados</p>
+          <h2 id="titulo-preparacao-importacao">
+            {{ previa ? 'Prévia segura gerada' : 'Gerar prévia segura' }}
+          </h2>
+          <p>
+            Servidor verificará duplicidades, reutilizações, versão da extração
+            e campos ausentes. Nenhum cadastro será alterado pela página.
+          </p>
+          <p v-if="previa" class="alert alert-info" role="status">
+            Para criar a operação reforçada, peça ao assistente no Telegram para
+            importar o staging <code>{{ importacao.identificador }}</code
+            >. O arquivo bruto não é enviado ao modelo.
+          </p>
+          <button
+            class="btn btn-primary"
+            type="button"
+            :disabled="preparando || possuiProblemaBloqueante"
+            @click="preparar"
           >
-          <span class="d-block">{{ problema.mensagem }}</span>
-        </li>
-      </ul>
-      <RouterLink class="btn btn-primary" to="/concursos/importar">
-        Iniciar nova importação
-      </RouterLink>
+            {{ preparando ? 'Gerando…' : 'Gerar prévia da importação' }}
+          </button>
+        </section>
+      </template>
+
+      <template
+        v-else-if="
+          ['AGUARDANDO_CONFIRMACAO', 'APLICANDO'].includes(importacao.estado)
+        "
+      >
+        <PreviaDaImportacaoDeEditalComponente v-if="previa" :previa="previa" />
+        <section
+          v-else
+          class="card estado-da-importacao painel-de-estado-da-importacao"
+          role="status"
+        >
+          <h2>Operação aguardando confirmação</h2>
+          <p>Consulte o assistente no Telegram para revisar e confirmar.</p>
+        </section>
+        <section
+          v-if="importacao.estado === 'APLICANDO'"
+          class="alert alert-info"
+          role="status"
+        >
+          Aplicação transacional em andamento. Aguarde o recibo.
+        </section>
+        <div class="acoes-do-status-da-importacao">
+          <button
+            class="btn btn-outline-primary"
+            type="button"
+            @click="carregarImportacao"
+          >
+            Atualizar status
+          </button>
+          <button
+            v-if="importacao.estado === 'AGUARDANDO_CONFIRMACAO'"
+            class="btn btn-outline-secondary"
+            type="button"
+            :disabled="retomando"
+            @click="iniciarNovaTentativa"
+          >
+            {{
+              retomando
+                ? 'Retomando…'
+                : 'Retomar após expiração ou cancelamento'
+            }}
+          </button>
+        </div>
+      </template>
+
+      <section
+        v-else-if="importacao.estado === 'APLICADA'"
+        class="card recibo-da-importacao painel-do-recibo-da-importacao"
+        aria-labelledby="titulo-recibo-importacao"
+      >
+        <p class="sobretitulo-da-pagina">Importação concluída</p>
+        <h2 id="titulo-recibo-importacao">Estrutura criada com atomicidade</h2>
+        <p v-if="carregandoRelatorio" role="status">Carregando recibo…</p>
+        <template v-else-if="relatorio">
+          <p>
+            Concurso permanece
+            <strong>{{ formatarRotulo(relatorio.situacaoDoConcurso) }}</strong
+            >.
+          </p>
+          <dl class="contagens-do-recibo">
+            <div v-for="(quantidade, nome) in relatorio.contagens" :key="nome">
+              <dt>{{ formatarRotulo(String(nome)) }}</dt>
+              <dd>{{ quantidade }}</dd>
+            </div>
+          </dl>
+          <section v-if="relatorio.pendencias.length">
+            <h3>Pendências</h3>
+            <ul>
+              <li v-for="pendencia in relatorio.pendencias" :key="pendencia">
+                {{ pendencia }}
+              </li>
+            </ul>
+          </section>
+          <section v-if="relatorio.incertezas.length">
+            <h3>Incertezas preservadas</h3>
+            <ul>
+              <li v-for="incerteza in relatorio.incertezas" :key="incerteza">
+                {{ incerteza }}
+              </li>
+            </ul>
+          </section>
+          <RouterLink
+            class="btn btn-primary align-self-start"
+            :to="`/concursos/${relatorio.identificadorDoConcurso}?foco=mapeamentos`"
+          >
+            Revisar estrutura e mapeamentos
+          </RouterLink>
+        </template>
+      </section>
+
+      <section
+        v-else-if="['FALHOU', 'CANCELADA'].includes(importacao.estado)"
+        class="card estado-da-importacao painel-de-estado-da-importacao"
+        role="alert"
+      >
+        <h2>
+          {{
+            importacao.estado === 'FALHOU'
+              ? 'Importação falhou'
+              : 'Importação cancelada'
+          }}
+        </h2>
+        <p>Nenhuma estrutura parcial foi aplicada.</p>
+        <ul
+          v-if="
+            importacao.estado === 'FALHOU' && importacao.problemas.length > 0
+          "
+          class="list-group w-100"
+          aria-label="Problemas encontrados na importação"
+        >
+          <li
+            v-for="problema in importacao.problemas"
+            :key="`${problema.codigo}-${problema.caminho ?? ''}`"
+            class="list-group-item"
+          >
+            <strong
+              ><code>{{ problema.codigo }}</code></strong
+            >
+            <span class="d-block">{{ problema.mensagem }}</span>
+          </li>
+        </ul>
+        <RouterLink class="btn btn-primary" to="/concursos/importar">
+          Iniciar nova importação
+        </RouterLink>
+      </section>
     </section>
   </main>
 </template>

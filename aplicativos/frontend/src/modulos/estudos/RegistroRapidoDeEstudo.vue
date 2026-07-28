@@ -246,166 +246,281 @@ onBeforeUnmount(() => cancelamento.abort())
     descricao="Guarde o fato estudado. O progresso dos concursos será atualizado automaticamente."
     @fechar="emitir('fechar')"
   >
-    <div v-if="carregando" class="estado-do-modal" aria-live="polite">
-      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      Preparando seu catálogo...
-    </div>
-
-    <div v-else-if="erroDeCarregamento" class="estado-do-modal" role="alert">
-      <i class="bi bi-cloud-slash" aria-hidden="true"></i>
-      <p>{{ erroDeCarregamento }}</p>
-      <button
-        ref="botaoDeRepetir"
-        class="btn btn-outline-primary"
-        type="button"
-        @click="repetirCarregamento"
+    <div class="registro-estudo-moderno">
+      <div
+        v-if="carregando"
+        class="estado-do-modal registro-estudo-moderno__estado"
+        aria-live="polite"
       >
-        Tentar novamente
-      </button>
-    </div>
-
-    <form v-else id="registro-rapido-de-estudo" @submit.prevent="salvar">
-      <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
-      <div v-if="materias.length === 0" class="nota-contextual">
-        <i class="bi bi-journal-plus" aria-hidden="true"></i>
-        <p>
-          <strong>Cadastre uma matéria e um tópico primeiro.</strong>
-          <span>O estudo precisa apontar para um tópico do seu catálogo.</span>
-        </p>
-      </div>
-      <div class="formulario-da-aplicacao">
-        <label>
-          <span>Tipo de estudo</span>
-          <select ref="campoDoTipo" v-model="formulario.tipoDeEstudo" required>
-            <option
-              v-for="tipo in tiposDeEstudo"
-              :key="tipo.valor"
-              :value="tipo.valor"
-            >
-              {{ tipo.rotulo }}
-            </option>
-          </select>
-        </label>
-        <label>
-          <span>Matéria</span>
-          <select
-            v-model="formulario.identificadorDaMateria"
-            required
-            @change="ajustarTopico"
-          >
-            <option value="" disabled>Selecione a matéria</option>
-            <option
-              v-for="materia in materias"
-              :key="materia.identificador"
-              :value="materia.identificador"
-            >
-              {{ materia.nome }}
-            </option>
-          </select>
-        </label>
-        <label>
-          <span>Tópico estudado</span>
-          <select
-            v-model="formulario.identificadorDoTopico"
-            :disabled="!formulario.identificadorDaMateria"
-            required
-            @change="ajustarMaterial"
-          >
-            <option value="" disabled>Selecione o tópico</option>
-            <option
-              v-for="topico in topicosDaMateria"
-              :key="topico.identificador"
-              :value="topico.identificador"
-            >
-              {{ topico.nome }}
-            </option>
-          </select>
-        </label>
-        <label>
-          <span>Material utilizado <em>opcional</em></span>
-          <select
-            v-model="formulario.identificadorDoMaterial"
-            :disabled="!formulario.identificadorDoTopico"
-          >
-            <option value="">Sem material</option>
-            <option
-              v-for="material in materiaisDoTopico"
-              :key="material.identificador"
-              :value="material.identificador"
-            >
-              {{ material.titulo }}
-            </option>
-          </select>
-        </label>
-        <div class="duas-colunas-do-formulario">
-          <label>
-            <span>Data e horário</span>
-            <input
-              v-model="formulario.dataHora"
-              type="datetime-local"
-              required
-            />
-          </label>
-          <label>
-            <span>Duração em minutos</span>
-            <input
-              v-model.number="formulario.duracaoEmMinutos"
-              type="number"
-              min="1"
-              max="1440"
-              required
-            />
-          </label>
+        <span class="registro-estudo-moderno__icone-de-estado">
+          <span
+            class="spinner-border spinner-border-sm"
+            aria-hidden="true"
+          ></span>
+        </span>
+        <div>
+          <strong>Preparando seu registro</strong>
+          <span>Carregando matérias, tópicos e materiais...</span>
         </div>
-        <fieldset>
-          <legend>Duração rápida</legend>
-          <div class="duracoes-rapidas">
-            <button
-              v-for="duracao in duracoesRapidas"
-              :key="duracao"
-              class="botao-de-duracao"
-              :class="{
-                ativo: formulario.duracaoEmMinutos === duracao,
-              }"
-              :aria-pressed="formulario.duracaoEmMinutos === duracao"
-              type="button"
-              @click="formulario.duracaoEmMinutos = duracao"
-            >
-              {{ duracao }} min
-            </button>
-          </div>
-        </fieldset>
-        <CamposDeEvidencia
-          v-model="formulario.evidencia"
-          :tipo="formulario.tipoDeEstudo"
-          :identificador-do-topico="formulario.identificadorDoTopico"
-        />
-        <label>
-          <span>Observação <em>opcional</em></span>
-          <textarea
-            v-model="formulario.observacao"
-            rows="3"
-            placeholder="O que você estudou ou precisa revisar depois?"
-          ></textarea>
-        </label>
       </div>
-    </form>
+
+      <div
+        v-else-if="erroDeCarregamento"
+        class="estado-do-modal registro-estudo-moderno__estado registro-estudo-moderno__estado--erro"
+        role="alert"
+      >
+        <span class="registro-estudo-moderno__icone-de-estado">
+          <i class="bi bi-cloud-slash" aria-hidden="true"></i>
+        </span>
+        <div>
+          <strong>Não foi possível preparar o registro</strong>
+          <p>{{ erroDeCarregamento }}</p>
+          <button
+            ref="botaoDeRepetir"
+            class="btn btn-outline-primary"
+            type="button"
+            @click="repetirCarregamento"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+
+      <form
+        v-else
+        id="registro-rapido-de-estudo"
+        class="registro-estudo-moderno__formulario"
+        @submit.prevent="salvar"
+      >
+        <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
+        <div
+          v-if="materias.length === 0"
+          class="nota-contextual registro-estudo-moderno__aviso"
+        >
+          <i class="bi bi-journal-plus" aria-hidden="true"></i>
+          <p>
+            <strong>Cadastre uma matéria e um tópico primeiro.</strong>
+            <span
+              >O estudo precisa apontar para um tópico do seu catálogo.</span
+            >
+          </p>
+        </div>
+
+        <div class="formulario-da-aplicacao">
+          <section
+            class="registro-estudo-moderno__secao registro-estudo-moderno__secao--principal"
+            aria-labelledby="titulo-contexto-do-estudo"
+          >
+            <header class="registro-estudo-moderno__cabecalho-de-secao">
+              <span
+                class="registro-estudo-moderno__icone-de-secao"
+                aria-hidden="true"
+              >
+                <i class="bi bi-book"></i>
+              </span>
+              <div>
+                <span class="registro-estudo-moderno__etapa"
+                  >01 · Contexto</span
+                >
+                <h3 id="titulo-contexto-do-estudo">O que você estudou?</h3>
+                <p>Localize a sessão no seu catálogo de conteúdos.</p>
+              </div>
+            </header>
+
+            <div
+              class="registro-estudo-moderno__grade registro-estudo-moderno__grade--duas-colunas"
+            >
+              <label>
+                <span>Tipo de estudo</span>
+                <select
+                  ref="campoDoTipo"
+                  v-model="formulario.tipoDeEstudo"
+                  required
+                >
+                  <option
+                    v-for="tipo in tiposDeEstudo"
+                    :key="tipo.valor"
+                    :value="tipo.valor"
+                  >
+                    {{ tipo.rotulo }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Matéria</span>
+                <select
+                  v-model="formulario.identificadorDaMateria"
+                  required
+                  @change="ajustarTopico"
+                >
+                  <option value="" disabled>Selecione a matéria</option>
+                  <option
+                    v-for="materia in materias"
+                    :key="materia.identificador"
+                    :value="materia.identificador"
+                  >
+                    {{ materia.nome }}
+                  </option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              <span>Tópico estudado</span>
+              <select
+                v-model="formulario.identificadorDoTopico"
+                :disabled="!formulario.identificadorDaMateria"
+                required
+                @change="ajustarMaterial"
+              >
+                <option value="" disabled>Selecione o tópico</option>
+                <option
+                  v-for="topico in topicosDaMateria"
+                  :key="topico.identificador"
+                  :value="topico.identificador"
+                >
+                  {{ topico.nome }}
+                </option>
+              </select>
+            </label>
+
+            <label>
+              <span>Material utilizado <em>opcional</em></span>
+              <select
+                v-model="formulario.identificadorDoMaterial"
+                :disabled="!formulario.identificadorDoTopico"
+              >
+                <option value="">Sem material</option>
+                <option
+                  v-for="material in materiaisDoTopico"
+                  :key="material.identificador"
+                  :value="material.identificador"
+                >
+                  {{ material.titulo }}
+                </option>
+              </select>
+            </label>
+          </section>
+
+          <section
+            class="registro-estudo-moderno__secao"
+            aria-labelledby="titulo-sessao-de-estudo"
+          >
+            <header class="registro-estudo-moderno__cabecalho-de-secao">
+              <span
+                class="registro-estudo-moderno__icone-de-secao"
+                aria-hidden="true"
+              >
+                <i class="bi bi-clock"></i>
+              </span>
+              <div>
+                <span class="registro-estudo-moderno__etapa">02 · Sessão</span>
+                <h3 id="titulo-sessao-de-estudo">Quando e por quanto tempo?</h3>
+                <p>Informe o momento e a duração real da atividade.</p>
+              </div>
+            </header>
+
+            <div class="duas-colunas-do-formulario">
+              <label>
+                <span>Data e horário</span>
+                <input
+                  v-model="formulario.dataHora"
+                  type="datetime-local"
+                  required
+                />
+              </label>
+              <label>
+                <span>Duração em minutos</span>
+                <input
+                  v-model.number="formulario.duracaoEmMinutos"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  required
+                />
+              </label>
+            </div>
+
+            <fieldset class="registro-estudo-moderno__duracoes">
+              <legend>Atalhos de duração</legend>
+              <div class="duracoes-rapidas">
+                <button
+                  v-for="duracao in duracoesRapidas"
+                  :key="duracao"
+                  class="botao-de-duracao"
+                  :class="{
+                    ativo: formulario.duracaoEmMinutos === duracao,
+                  }"
+                  :aria-pressed="formulario.duracaoEmMinutos === duracao"
+                  type="button"
+                  @click="formulario.duracaoEmMinutos = duracao"
+                >
+                  {{ duracao }} min
+                </button>
+              </div>
+            </fieldset>
+          </section>
+
+          <CamposDeEvidencia
+            v-model="formulario.evidencia"
+            :tipo="formulario.tipoDeEstudo"
+            :identificador-do-topico="formulario.identificadorDoTopico"
+          />
+
+          <section
+            class="registro-estudo-moderno__secao registro-estudo-moderno__secao--observacao"
+            aria-labelledby="titulo-anotacoes-do-estudo"
+          >
+            <header class="registro-estudo-moderno__cabecalho-de-secao">
+              <span
+                class="registro-estudo-moderno__icone-de-secao"
+                aria-hidden="true"
+              >
+                <i class="bi bi-chat-square-text"></i>
+              </span>
+              <div>
+                <span class="registro-estudo-moderno__etapa"
+                  >04 · Anotações</span
+                >
+                <h3 id="titulo-anotacoes-do-estudo">
+                  Deixe um lembrete para depois
+                </h3>
+                <p>Registre uma descoberta, dúvida ou próximo passo.</p>
+              </div>
+            </header>
+
+            <label>
+              <span>Observação <em>opcional</em></span>
+              <textarea
+                v-model="formulario.observacao"
+                rows="3"
+                placeholder="O que você estudou ou precisa revisar depois?"
+              ></textarea>
+            </label>
+          </section>
+        </div>
+      </form>
+    </div>
 
     <template #rodape>
       <button
-        class="btn btn-link text-secondary text-decoration-none"
+        class="btn btn-link text-secondary text-decoration-none registro-estudo-moderno__cancelar"
         type="button"
         @click="emitir('fechar')"
       >
         Cancelar
       </button>
       <button
-        class="btn btn-primary px-4"
+        class="btn btn-primary px-4 registro-estudo-moderno__salvar"
         type="submit"
         form="registro-rapido-de-estudo"
         :disabled="carregando || salvando || materias.length === 0"
       >
-        <i class="bi bi-check2 me-2" aria-hidden="true"></i>
+        <i
+          :class="salvando ? 'bi bi-arrow-repeat' : 'bi bi-check2'"
+          class="me-2"
+          aria-hidden="true"
+        ></i>
         {{ salvando ? 'Salvando...' : 'Salvar estudo' }}
       </button>
     </template>

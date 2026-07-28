@@ -114,14 +114,20 @@ onMounted(() => recalcular())
 
 <template>
   <GavetaLateral
+    class="gaveta-de-replanejamento-moderna"
     titulo="Replanejar pendências"
     etiqueta="Replanejamento determinístico"
     descricao="Transfira somente o que cabe entre a data de referência e domingo."
     larga
     @fechar="emitir('fechar')"
   >
-    <div v-if="erro" class="alert alert-danger" role="alert">
-      {{ erro }}
+    <div
+      v-if="erro"
+      class="alert alert-danger mensagem-do-replanejamento"
+      role="alert"
+    >
+      <i class="bi bi-exclamation-octagon" aria-hidden="true"></i>
+      <span>{{ erro }}</span>
       <button
         class="btn btn-sm btn-outline-danger ms-2"
         type="button"
@@ -130,10 +136,17 @@ onMounted(() => recalcular())
         Tentar novamente
       </button>
     </div>
-    <div v-if="aviso" class="alert alert-info" role="status">{{ aviso }}</div>
+    <div
+      v-if="aviso"
+      class="alert alert-info mensagem-do-replanejamento"
+      role="status"
+    >
+      <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+      <span>{{ aviso }}</span>
+    </div>
     <div
       v-if="carregando"
-      class="d-flex align-items-center gap-2"
+      class="d-flex align-items-center gap-2 estado-do-replanejamento"
       role="status"
     >
       <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -141,7 +154,10 @@ onMounted(() => recalcular())
     </div>
 
     <template v-else-if="previa">
-      <dl class="resumo-do-replanejamento">
+      <dl
+        class="resumo-do-replanejamento"
+        aria-label="Resumo da proposta de replanejamento"
+      >
         <div>
           <dt>Pendentes</dt>
           <dd>{{ previa.resumo.minutosPendentes }} min</dd>
@@ -156,22 +172,47 @@ onMounted(() => recalcular())
         </div>
       </dl>
 
-      <h3 class="h5 mt-4">Capacidade até domingo</h3>
-      <ul class="list-group mb-4">
-        <li
-          v-for="dia in previa.capacidadesPorDia"
-          :key="dia.data"
-          class="list-group-item d-flex justify-content-between gap-3"
-        >
-          <strong>{{ dia.data }}</strong>
-          <span
-            >{{ dia.minutosAlocados }} min novos ·
-            {{ dia.minutosRestantes }} min livres</span
+      <section
+        class="painel-da-capacidade-do-replanejamento"
+        aria-labelledby="titulo-capacidade-replanejamento"
+      >
+        <header class="cabecalho-da-secao-do-replanejamento">
+          <span>
+            <i class="bi bi-calendar2-week" aria-hidden="true"></i>
+          </span>
+          <div>
+            <h3 id="titulo-capacidade-replanejamento">
+              Capacidade até domingo
+            </h3>
+            <p>Distribuição disponível depois dos blocos já preservados.</p>
+          </div>
+        </header>
+        <ul class="list-group lista-da-capacidade-do-replanejamento">
+          <li
+            v-for="dia in previa.capacidadesPorDia"
+            :key="dia.data"
+            class="list-group-item d-flex justify-content-between gap-3"
           >
-        </li>
-      </ul>
+            <strong>{{ dia.data }}</strong>
+            <span>
+              {{ dia.minutosAlocados }} min novos ·
+              {{ dia.minutosRestantes }} min livres
+            </span>
+          </li>
+        </ul>
+      </section>
 
-      <h3 class="h5">Proposta</h3>
+      <header
+        class="cabecalho-da-secao-do-replanejamento cabecalho-da-proposta"
+      >
+        <span>
+          <i class="bi bi-signpost-split" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3>Proposta</h3>
+          <p>Revise cada transferência antes da confirmação final.</p>
+        </div>
+      </header>
       <p v-if="!previa.pendencias.length" class="text-body-secondary">
         Não há pendências elegíveis nesta data.
       </p>
@@ -180,12 +221,12 @@ onMounted(() => recalcular())
           (item) => item.decisao !== 'IGNORAR',
         )"
         :key="pendencia.identificadorDoBloco"
-        class="cartao-de-pendencia"
+        class="cartao-de-pendencia cartao-moderno-de-pendencia"
       >
         <header>
           <div>
             <strong>{{ pendencia.titulo }}</strong>
-            <span
+            <span class="resumo-da-pendencia"
               >{{ pendencia.minutosPendentes }} min ·
               {{ pendencia.decisao.replace(/_/g, ' ') }}</span
             >
@@ -200,7 +241,10 @@ onMounted(() => recalcular())
           </button>
         </header>
         <p>{{ pendencia.justificativa }}</p>
-        <ul v-if="pendencia.fragmentos.length" class="mb-2">
+        <ul
+          v-if="pendencia.fragmentos.length"
+          class="mb-2 fragmentos-do-replanejamento"
+        >
           <li
             v-for="fragmento in pendencia.fragmentos"
             :key="fragmento.sequencia"
@@ -210,7 +254,7 @@ onMounted(() => recalcular())
         </ul>
         <div
           v-if="pendencia.exigeConfirmacao"
-          class="form-check alert alert-warning mb-0"
+          class="form-check alert alert-warning mb-0 confirmacao-da-pendencia"
         >
           <input
             :id="`confirmar-${pendencia.identificadorDoBloco}`"
@@ -235,7 +279,7 @@ onMounted(() => recalcular())
 
       <div
         v-if="previa.resumo.minutosAlocados"
-        class="confirmacao-final form-check mt-4"
+        class="confirmacao-final form-check mt-4 confirmacao-final-moderna"
       >
         <input
           id="confirmacao-final"
@@ -247,7 +291,9 @@ onMounted(() => recalcular())
           Revisei a proposta e confirmo a criação dos novos blocos.
         </label>
       </div>
-      <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+      <div
+        class="d-flex flex-wrap justify-content-end gap-2 mt-4 acoes-do-replanejamento"
+      >
         <button
           class="btn btn-outline-secondary"
           type="button"
@@ -267,52 +313,3 @@ onMounted(() => recalcular())
     </template>
   </GavetaLateral>
 </template>
-
-<style scoped lang="scss">
-.resumo-do-replanejamento {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin: 0;
-  div {
-    padding: 0.75rem;
-    border-radius: 0.75rem;
-    background: var(--cor-superficie-secundaria);
-  }
-  dt {
-    color: var(--bs-secondary-color);
-    font-size: 0.85rem;
-  }
-  dd {
-    margin: 0.2rem 0 0;
-    font-weight: 700;
-  }
-}
-.cartao-de-pendencia {
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.75rem;
-  padding: 1rem;
-  margin-top: 0.75rem;
-  header {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-  header div,
-  header span {
-    display: block;
-  }
-  p {
-    margin: 0.75rem 0;
-    color: var(--bs-secondary-color);
-  }
-}
-@media (max-width: 575.98px) {
-  .resumo-do-replanejamento {
-    grid-template-columns: 1fr;
-  }
-  .cartao-de-pendencia header {
-    align-items: flex-start;
-  }
-}
-</style>

@@ -290,7 +290,7 @@ async function focarPrimeiraPendencia() {
 
 <template>
   <section
-    class="card revisao-da-extracao"
+    class="card revisao-da-extracao painel-da-revisao-da-extracao"
     aria-labelledby="titulo-da-revisao-da-extracao"
   >
     <header class="cabecalho-da-revisao">

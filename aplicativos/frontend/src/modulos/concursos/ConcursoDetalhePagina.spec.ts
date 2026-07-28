@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const chamadas = vi.hoisted(() => ({
   alterarCargo: vi.fn(),
@@ -49,6 +49,8 @@ vi.mock('./apiDeConteudoProgramatico', () => chamadasConteudo)
 
 import ConcursoDetalhePagina from './ConcursoDetalhePagina.vue'
 
+const paginasMontadas: ReturnType<typeof mount>[] = []
+
 const concurso = {
   identificador: 'concurso-1',
   nome: 'Receita Federal',
@@ -77,12 +79,19 @@ async function montar(caminho = '/concursos/concurso-1') {
   const roteador = criarRoteador()
   await roteador.push(caminho)
   await roteador.isReady()
-  return mount(ConcursoDetalhePagina, {
+  const pagina = mount(ConcursoDetalhePagina, {
+    attachTo: document.body,
     global: { plugins: [roteador] },
   })
+  paginasMontadas.push(pagina)
+  return pagina
 }
 
 describe('ConcursoDetalhePagina', () => {
+  afterEach(() => {
+    for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     chamadas.obterConcurso.mockResolvedValue(concurso)
@@ -205,6 +214,22 @@ describe('ConcursoDetalhePagina', () => {
     expect(pagina.text()).toContain('7. Direitos fundamentais.')
     expect(pagina.text()).toContain('Confirmado')
     expect(pagina.text()).toContain('Direitos fundamentais')
+  })
+
+  it('permite navegar entre as abas pelo teclado', async () => {
+    const pagina = await montar()
+    await flushPromises()
+
+    const abaDaVisao = pagina.get('#aba-do-concurso-visao')
+    await abaDaVisao.trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+
+    const abaDoConteudo = pagina.get('#aba-do-concurso-conteudo')
+    expect(abaDoConteudo.attributes('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(abaDoConteudo.element)
+    expect(pagina.get('[role="tabpanel"]').attributes('id')).toBe(
+      'painel-do-conteudo-programatico',
+    )
   })
 
   it('prioriza os gaps e mapeia para topico da materia correspondente', async () => {

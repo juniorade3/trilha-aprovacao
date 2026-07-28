@@ -99,9 +99,12 @@ async function entrar() {
             Preferência apenas visual nesta versão; nenhum dado será salvo.
           </div>
         </div>
-        <button class="btn btn-primary" type="submit" :disabled="enviando">
-          {{ enviando ? 'Entrando...' : 'Entrar' }}</button
-        ><RouterLink class="ms-3" to="/cadastro">Criar conta</RouterLink>
+        <div class="acoes-da-autenticacao">
+          <button class="btn btn-primary" type="submit" :disabled="enviando">
+            {{ enviando ? 'Entrando...' : 'Entrar' }}
+          </button>
+          <RouterLink to="/cadastro">Criar uma conta</RouterLink>
+        </div>
       </form>
     </div>
   </section>

@@ -190,6 +190,15 @@ const ritmoDaSemana = computed(() =>
       .reduce((total, registro) => total + registro.duracaoEmMinutos, 0)
     return {
       dia: ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'][indice],
+      nomeDoDia: [
+        'Segunda-feira',
+        'Terça-feira',
+        'Quarta-feira',
+        'Quinta-feira',
+        'Sexta-feira',
+        'Sábado',
+        'Domingo',
+      ][indice],
       minutos,
     }
   }),
@@ -455,8 +464,14 @@ onBeforeUnmount(() => {
 
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
 
-    <section class="resumo-do-historico" aria-label="Resumo da semana">
-      <article class="card">
+    <section
+      class="resumo-do-historico"
+      aria-labelledby="titulo-resumo-do-historico"
+    >
+      <h2 id="titulo-resumo-do-historico" class="visually-hidden">
+        Resumo da semana
+      </h2>
+      <article class="card indicador-de-tempo-do-historico">
         <span class="mini-icone-da-jornada">
           <i class="bi bi-clock" aria-hidden="true"></i>
         </span>
@@ -465,7 +480,7 @@ onBeforeUnmount(() => {
           <small>nesta semana</small>
         </div>
       </article>
-      <article class="card">
+      <article class="card indicador-de-dias-do-historico">
         <span class="mini-icone-da-jornada">
           <i class="bi bi-calendar-check" aria-hidden="true"></i>
         </span>
@@ -476,7 +491,7 @@ onBeforeUnmount(() => {
           <small>com estudo na semana</small>
         </div>
       </article>
-      <article class="card">
+      <article class="card indicador-de-materias-do-historico">
         <span class="mini-icone-da-jornada">
           <i class="bi bi-book" aria-hidden="true"></i>
         </span>
@@ -494,12 +509,13 @@ onBeforeUnmount(() => {
       class="card mb-4 diagnostico-de-topicos"
       style="order: 2"
       aria-labelledby="titulo-diagnostico-de-topicos"
+      aria-describedby="descricao-diagnostico-de-topicos"
     >
       <header class="cabecalho-do-cartao-da-jornada">
         <div>
           <span class="rotulo-discreto">Evidências objetivas</span>
           <h2 id="titulo-diagnostico-de-topicos">Diagnóstico por tópico</h2>
-          <p class="mb-0">
+          <p id="descricao-diagnostico-de-topicos" class="mb-0">
             A janela recente inclui hoje e os 29 dias anteriores. Registros
             corrigidos ou cancelados não entram nos indicadores.
           </p>
@@ -524,6 +540,7 @@ onBeforeUnmount(() => {
       <div v-show="diagnosticoVisivel" id="conteudo-diagnostico-de-topicos">
         <form
           class="d-flex flex-wrap align-items-end gap-3 mb-3"
+          aria-label="Filtros do diagnóstico por tópico"
           @submit.prevent="carregarDiagnostico()"
         >
           <label class="form-label mb-0">
@@ -652,7 +669,11 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <div class="estrutura-do-historico" style="order: 1">
+    <div
+      class="estrutura-do-historico"
+      style="order: 1"
+      aria-label="Atividade e ritmo de estudos"
+    >
       <section
         class="card linha-do-tempo-de-estudos"
         aria-labelledby="titulo-historico"
@@ -661,8 +682,12 @@ onBeforeUnmount(() => {
           <div>
             <span class="rotulo-discreto">Registros preservados</span>
             <h2 id="titulo-historico">Atividade recente</h2>
+            <p>
+              Consulte, corrija ou cancele registros sem perder a
+              rastreabilidade.
+            </p>
           </div>
-          <span class="badge etiqueta-neutra">
+          <span class="badge etiqueta-neutra" aria-live="polite">
             {{ registrosFiltrados.length }}
             {{ registrosFiltrados.length === 1 ? 'registro' : 'registros' }}
           </span>
@@ -672,6 +697,7 @@ onBeforeUnmount(() => {
           class="btn-group align-self-start mb-3"
           role="group"
           aria-label="Filtrar histórico por período"
+          aria-controls="conteudo-da-linha-do-tempo"
         >
           <button
             class="btn btn-sm btn-outline-secondary"
@@ -702,86 +728,109 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <EstadoDaPagina
-          v-if="carregando"
-          titulo="Carregando estudos..."
-          carregando
-        />
-        <EstadoDaPagina
-          v-else-if="registrosFiltrados.length === 0"
-          titulo="Nenhum estudo neste período"
-          descricao="Escolha outro período ou use a ação Registrar estudo para adicionar uma atividade."
-          icone="bi-clock-history"
-        />
-        <template v-else>
-          <section
-            v-for="[data, registrosDoDia] in registrosAgrupados"
-            :key="data"
-            class="grupo-da-linha-do-tempo"
-          >
-            <h3>{{ data }}</h3>
-            <article
-              v-for="registro in registrosDoDia"
-              :key="registro.identificador"
-              class="registro-na-linha-do-tempo"
+        <div
+          id="conteudo-da-linha-do-tempo"
+          class="conteudo-da-linha-do-tempo"
+          aria-live="polite"
+        >
+          <EstadoDaPagina
+            v-if="carregando"
+            titulo="Carregando estudos..."
+            carregando
+          />
+          <EstadoDaPagina
+            v-else-if="registrosFiltrados.length === 0"
+            titulo="Nenhum estudo neste período"
+            descricao="Escolha outro período ou use a ação Registrar estudo para adicionar uma atividade."
+            icone="bi-clock-history"
+          />
+          <template v-else>
+            <section
+              v-for="[data, registrosDoDia] in registrosAgrupados"
+              :key="data"
+              class="grupo-da-linha-do-tempo"
             >
-              <time>{{ formatarHora(registro.dataHora) }}</time>
-              <span class="marcador-do-registro"></span>
-              <div>
-                <span class="etiqueta-da-materia-no-historico">
-                  {{ nomeDaMateria(registro) }}
-                </span>
-                <h4>{{ registro.nomeDoTopico }}</h4>
-                <small>
-                  {{ registro.tituloDoMaterial || 'Sem material' }}
-                  <span v-if="registro.observacao">
-                    · {{ registro.observacao }}
-                  </span>
-                </small>
-              </div>
-              <b>{{ formatarTempo(registro.duracaoEmMinutos) }}</b>
-              <span
-                v-if="registro.situacao !== 'ATIVO'"
-                class="badge text-bg-secondary"
+              <h3>{{ data }}</h3>
+              <article
+                v-for="registro in registrosDoDia"
+                :key="registro.identificador"
+                class="registro-na-linha-do-tempo"
               >
-                {{ rotuloDaSituacao(registro) }}
-              </span>
-              <details v-else class="acoes-do-registro">
-                <summary class="botao-de-icone" aria-label="Ações do registro">
-                  <i class="bi bi-three-dots" aria-hidden="true"></i>
-                </summary>
+                <time>{{ formatarHora(registro.dataHora) }}</time>
+                <span class="marcador-do-registro" aria-hidden="true"></span>
                 <div>
-                  <button type="button" @click="corrigir(registro)">
-                    Corrigir
-                  </button>
-                  <button
-                    class="text-danger"
-                    type="button"
-                    @click="cancelar(registro)"
-                  >
-                    Cancelar
-                  </button>
+                  <span class="etiqueta-da-materia-no-historico">
+                    {{ nomeDaMateria(registro) }}
+                  </span>
+                  <h4>{{ registro.nomeDoTopico }}</h4>
+                  <small>
+                    {{ registro.tituloDoMaterial || 'Sem material' }}
+                    <span v-if="registro.observacao">
+                      · {{ registro.observacao }}
+                    </span>
+                  </small>
                 </div>
-              </details>
-            </article>
-          </section>
-        </template>
+                <b>{{ formatarTempo(registro.duracaoEmMinutos) }}</b>
+                <span
+                  v-if="registro.situacao !== 'ATIVO'"
+                  class="badge text-bg-secondary"
+                >
+                  {{ rotuloDaSituacao(registro) }}
+                </span>
+                <details v-else class="acoes-do-registro">
+                  <summary
+                    class="botao-de-icone"
+                    :aria-label="`Ações do registro de ${registro.nomeDoTopico}`"
+                  >
+                    <i class="bi bi-three-dots" aria-hidden="true"></i>
+                  </summary>
+                  <div>
+                    <button type="button" @click="corrigir(registro)">
+                      Corrigir
+                    </button>
+                    <button
+                      class="text-danger"
+                      type="button"
+                      @click="cancelar(registro)"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </details>
+              </article>
+            </section>
+          </template>
+        </div>
       </section>
 
       <aside class="card ritmo-real-da-semana">
-        <span class="rotulo-discreto">Ritmo da semana</span>
-        <h2 class="titulo-editorial">Consistência</h2>
-        <div class="grafico-do-ritmo" aria-label="Minutos por dia da semana">
-          <div v-for="(dia, indice) in ritmoDaSemana" :key="indice">
-            <span>
+        <header>
+          <span class="rotulo-discreto">Ritmo da semana</span>
+          <h2 class="titulo-editorial">Consistência</h2>
+          <p>
+            Compare os dias estudados e encontre espaços para manter o ritmo.
+          </p>
+        </header>
+        <div
+          class="grafico-do-ritmo"
+          role="list"
+          aria-label="Minutos estudados por dia da semana"
+        >
+          <div
+            v-for="(dia, indice) in ritmoDaSemana"
+            :key="indice"
+            role="listitem"
+            :aria-label="`${dia.nomeDoDia}: ${dia.minutos} minutos`"
+          >
+            <span aria-hidden="true">
               <i
                 :style="{
                   height: `${Math.round((dia.minutos / maiorRitmo) * 100)}%`,
                 }"
               ></i>
             </span>
-            <b>{{ dia.dia }}</b>
-            <small>{{ dia.minutos || '' }}</small>
+            <b aria-hidden="true">{{ dia.dia }}</b>
+            <small aria-hidden="true">{{ dia.minutos || '' }}</small>
           </div>
         </div>
         <div class="resumo-do-ritmo">

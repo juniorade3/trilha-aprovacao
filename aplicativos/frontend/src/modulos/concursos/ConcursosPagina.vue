@@ -107,8 +107,8 @@ onBeforeUnmount(() => cancelamento?.abort())
 </script>
 
 <template>
-  <main class="pagina-da-jornada pagina-dos-concursos">
-    <header class="cabecalho-da-pagina">
+  <main class="pagina-da-jornada pagina-dos-concursos modulo-concursos-moderno">
+    <header class="cabecalho-da-pagina cabecalho-editorial-dos-concursos">
       <div>
         <p class="sobretitulo-da-pagina">Seu objetivo em foco</p>
         <h1>Meu concurso</h1>
@@ -117,7 +117,7 @@ onBeforeUnmount(() => cancelamento?.abort())
           sem misturar suas estruturas.
         </p>
       </div>
-      <div class="acoes-do-cabecalho">
+      <div class="acoes-do-cabecalho acoes-principais-dos-concursos">
         <RouterLink class="btn btn-outline-primary" to="/concursos/importar">
           <i class="bi bi-file-earmark-arrow-up me-2" aria-hidden="true"></i>
           Importar edital
@@ -131,7 +131,11 @@ onBeforeUnmount(() => cancelamento?.abort())
 
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
 
-    <form class="card barra-da-biblioteca" @submit.prevent="carregar(0)">
+    <form
+      class="card barra-da-biblioteca painel-de-filtros-dos-concursos"
+      role="search"
+      @submit.prevent="carregar(0)"
+    >
       <div class="campo-de-busca">
         <i class="bi bi-search" aria-hidden="true"></i>
         <input
@@ -152,11 +156,18 @@ onBeforeUnmount(() => cancelamento?.abort())
       <button class="btn btn-outline-primary">Buscar</button>
     </form>
 
-    <div v-if="carregando" class="estado-do-catalogo" aria-live="polite">
+    <div
+      v-if="carregando"
+      class="estado-do-catalogo estado-dos-concursos"
+      aria-live="polite"
+    >
       <span class="spinner-border" aria-hidden="true"></span>
       Carregando concursos...
     </div>
-    <section v-else-if="concursos.length === 0" class="card estado-do-catalogo">
+    <section
+      v-else-if="concursos.length === 0"
+      class="card estado-do-catalogo estado-dos-concursos"
+    >
       <i class="bi bi-bullseye" aria-hidden="true"></i>
       <strong>Nenhum concurso encontrado</strong>
       <span>Crie seu primeiro objetivo em quatro etapas guiadas.</span>
@@ -168,8 +179,11 @@ onBeforeUnmount(() => cancelamento?.abort())
       </RouterLink>
     </section>
     <template v-else>
-      <section v-if="concursoAtivo" class="objetivo-ativo-em-destaque">
-        <div>
+      <section
+        v-if="concursoAtivo"
+        class="objetivo-ativo-em-destaque painel-do-objetivo-ativo"
+      >
+        <div class="conteudo-do-objetivo-ativo">
           <p class="sobretitulo-da-pagina">Concurso ativo</p>
           <span class="selo-de-objetivo-ativo mt-2">
             <i aria-hidden="true"></i>
@@ -183,7 +197,7 @@ onBeforeUnmount(() => cancelamento?.abort())
                 .join(' · ') || 'Objetivo em construção'
             }}
           </p>
-          <div>
+          <div class="acoes-do-objetivo-ativo">
             <RouterLink
               class="btn botao-de-contraste"
               :to="`/concursos/${concursoAtivo.identificador}`"
@@ -201,11 +215,17 @@ onBeforeUnmount(() => cancelamento?.abort())
         </span>
       </section>
 
-      <section v-if="outrosConcursos.length" class="mt-4">
+      <section
+        v-if="outrosConcursos.length"
+        class="catalogo-de-concursos"
+        aria-labelledby="titulo-do-catalogo-de-concursos"
+      >
         <div class="titulo-da-secao-dos-concursos">
           <div>
             <p class="sobretitulo-da-pagina">Outras oportunidades</p>
-            <h2 class="titulo-editorial">Seus concursos planejados</h2>
+            <h2 id="titulo-do-catalogo-de-concursos" class="titulo-editorial">
+              Seus concursos planejados
+            </h2>
           </div>
           <span>{{ totalDeItens }} no total</span>
         </div>
@@ -213,9 +233,9 @@ onBeforeUnmount(() => cancelamento?.abort())
           <article
             v-for="concurso in outrosConcursos"
             :key="concurso.identificador"
-            class="card cartao-do-concurso"
+            class="card cartao-do-concurso cartao-de-oportunidade"
           >
-            <div>
+            <div class="conteudo-do-cartao-do-concurso">
               <span class="badge etiqueta-neutra">
                 {{ rotulosDeSituacao[concurso.situacao] }}
               </span>
@@ -226,7 +246,7 @@ onBeforeUnmount(() => cancelamento?.abort())
               </p>
               <small>{{ concurso.descricao || 'Sem descrição.' }}</small>
             </div>
-            <footer>
+            <footer class="acoes-do-cartao-do-concurso">
               <RouterLink
                 class="btn btn-sm btn-outline-primary"
                 :to="`/concursos/${concurso.identificador}`"

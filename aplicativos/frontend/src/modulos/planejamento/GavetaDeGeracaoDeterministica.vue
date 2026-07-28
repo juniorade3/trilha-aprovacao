@@ -353,13 +353,17 @@ onMounted(carregarMaterias)
 
 <template>
   <GavetaLateral
+    class="gaveta-de-geracao-moderna"
     titulo="Gerar semana"
     etiqueta="Geração determinística"
     descricao="Ajuste a estratégia e confira o resultado antes de alterar o plano."
     :larga="true"
     @fechar="emitir('fechar')"
   >
-    <nav class="etapas-da-geracao" aria-label="Etapas da geração">
+    <nav
+      class="etapas-da-geracao navegacao-do-assistente-de-geracao"
+      aria-label="Etapas da geração"
+    >
       <button
         v-for="item in ['PRIORIDADES', 'CONFIGURACAO', 'PREVIA'] as const"
         :key="item"
@@ -385,11 +389,12 @@ onMounted(carregarMaterias)
     <div
       v-if="erro"
       ref="alertaDeErro"
-      class="alert alert-danger"
+      class="alert alert-danger mensagem-da-geracao"
       role="alert"
       tabindex="-1"
     >
-      {{ erro }}
+      <i class="bi bi-exclamation-octagon" aria-hidden="true"></i>
+      <span>{{ erro }}</span>
       <button
         v-if="operacaoParaTentarNovamente"
         class="btn btn-sm btn-outline-danger ms-2"
@@ -400,23 +405,40 @@ onMounted(carregarMaterias)
       </button>
     </div>
 
-    <div v-if="carregando" class="geracao-carregando" role="status">
+    <div
+      v-if="carregando"
+      class="geracao-carregando estado-da-geracao-moderna"
+      role="status"
+    >
       <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       Carregando matérias do concurso…
     </div>
 
     <section
       v-else-if="etapa === 'PRIORIDADES' && materias.length"
+      class="etapa-do-assistente-de-geracao etapa-das-prioridades"
       aria-labelledby="titulo-prioridades"
     >
-      <h3 id="titulo-prioridades">Prioridades desta semana</h3>
-      <p>Matérias ausentes de configuração permanecem com prioridade Normal.</p>
+      <header class="cabecalho-da-etapa-de-geracao">
+        <span>
+          <i class="bi bi-sliders2" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3 id="titulo-prioridades">Prioridades desta semana</h3>
+          <p>
+            Matérias ausentes de configuração permanecem com prioridade Normal.
+          </p>
+        </div>
+      </header>
       <div class="lista-de-prioridades">
         <label
           v-for="materia in materias"
           :key="materia.identificadorDaMateria"
         >
-          <span>{{ materia.nome }}</span>
+          <span class="nome-da-materia-priorizada">
+            <i class="bi bi-journal-text" aria-hidden="true"></i>
+            {{ materia.nome }}
+          </span>
           <select v-model="materia.prioridade" class="form-select">
             <option
               v-for="(rotulo, valor) in rotulos"
@@ -429,7 +451,7 @@ onMounted(carregarMaterias)
         </label>
       </div>
       <button
-        class="btn btn-primary w-100"
+        class="btn btn-primary w-100 acao-principal-da-etapa"
         type="button"
         :disabled="processando"
         @click="salvarPrioridades"
@@ -440,13 +462,21 @@ onMounted(carregarMaterias)
 
     <section
       v-else-if="etapa === 'CONFIGURACAO' && materias.length"
+      class="etapa-do-assistente-de-geracao etapa-da-configuracao"
       aria-labelledby="titulo-configuracao"
     >
-      <h3 id="titulo-configuracao">Configuração dos blocos</h3>
-      <p>
-        O cálculo respeita a disponibilidade, os blocos já existentes e reserva
-        automaticamente as revisões devidas em blocos de 20 minutos.
-      </p>
+      <header class="cabecalho-da-etapa-de-geracao">
+        <span>
+          <i class="bi bi-calendar2-range" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3 id="titulo-configuracao">Configuração dos blocos</h3>
+          <p>
+            O cálculo respeita a disponibilidade, os blocos já existentes e
+            reserva automaticamente as revisões devidas em blocos de 20 minutos.
+          </p>
+        </div>
+      </header>
       <div class="grade-da-configuracao">
         <label>
           <span>Duração principal</span>
@@ -477,7 +507,7 @@ onMounted(carregarMaterias)
           </small>
         </label>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 acoes-da-etapa-de-geracao">
         <button
           class="btn btn-outline-primary"
           type="button"
@@ -498,6 +528,7 @@ onMounted(carregarMaterias)
 
     <section
       v-else-if="etapa === 'PREVIA' && previa"
+      class="etapa-do-assistente-de-geracao etapa-da-previa"
       aria-labelledby="titulo-previa"
     >
       <div class="cabecalho-da-previa">
@@ -515,7 +546,7 @@ onMounted(carregarMaterias)
       </div>
       <div
         v-if="previaDesatualizada"
-        class="alert alert-warning"
+        class="alert alert-warning mensagem-da-previa"
         role="status"
         aria-live="polite"
       >
@@ -524,7 +555,7 @@ onMounted(carregarMaterias)
       </div>
       <div
         v-if="avisoDePreviaRecalculada"
-        class="alert alert-warning"
+        class="alert alert-warning mensagem-da-previa"
         role="status"
         aria-live="assertive"
       >
@@ -542,7 +573,7 @@ onMounted(carregarMaterias)
         <article
           v-for="dia in previa.dias"
           :key="dia.data"
-          class="dia-da-previa"
+          class="dia-da-previa cartao-do-dia-da-previa"
         >
           <header>
             <strong>{{ formatarData(dia.data) }}</strong>
@@ -611,7 +642,7 @@ onMounted(carregarMaterias)
           </p>
         </article>
       </div>
-      <div class="acoes-da-aplicacao-da-geracao">
+      <div class="acoes-da-aplicacao-da-geracao painel-de-aplicacao-da-geracao">
         <p class="mb-0">
           O servidor recalculará esta proposta antes de salvar os blocos.
         </p>
@@ -669,167 +700,3 @@ onMounted(carregarMaterias)
     </template>
   </ModalDaAplicacao>
 </template>
-
-<style scoped lang="scss">
-.etapas-da-geracao {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-.etapa-da-geracao {
-  border: 0;
-  border-bottom: 3px solid var(--cor-borda);
-  background: transparent;
-  padding: 0.75rem 0.4rem;
-  color: var(--cor-texto-secundario);
-  font-weight: 700;
-}
-.etapa-da-geracao.ativa {
-  border-color: var(--bs-primary);
-  color: var(--bs-primary);
-}
-.geracao-carregando {
-  display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 3rem;
-}
-.lista-de-prioridades {
-  display: grid;
-  gap: 0.75rem;
-  margin: 1.25rem 0;
-}
-.lista-de-prioridades label {
-  display: grid;
-  grid-template-columns: 1fr minmax(140px, 190px);
-  align-items: center;
-  gap: 1rem;
-  border: 1px solid var(--cor-borda);
-  border-radius: 0.75rem;
-  padding: 0.85rem 1rem;
-}
-.grade-da-configuracao {
-  display: grid;
-  grid-template-columns: minmax(0, 28rem);
-  gap: 1rem;
-  margin: 1.5rem 0;
-}
-.grade-da-configuracao label {
-  display: grid;
-  gap: 0.4rem;
-}
-.cabecalho-da-previa,
-.dia-da-previa header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.dias-da-previa {
-  display: grid;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-.dia-da-previa {
-  border: 1px solid var(--cor-borda);
-  border-radius: 1rem;
-  padding: 1rem;
-  background: var(--cor-papel);
-}
-.dia-da-previa header span {
-  color: var(--cor-texto-secundario);
-  font-size: 0.875rem;
-}
-.barra-de-capacidade {
-  height: 6px;
-  background: var(--cor-superficie-secundaria);
-  border-radius: 999px;
-  margin: 0.75rem 0;
-  overflow: hidden;
-}
-.barra-de-capacidade span {
-  display: block;
-  height: 100%;
-  background: var(--bs-primary);
-}
-.bloco-da-previa {
-  display: grid;
-  grid-template-columns: 90px 1fr auto;
-  gap: 0.5rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.65rem;
-  margin-top: 0.5rem;
-}
-.bloco-da-previa.preservado {
-  background: var(--cor-superficie-secundaria);
-}
-.bloco-da-previa.sugerido {
-  background: var(--cor-destaque-clara);
-}
-.bloco-da-previa > span {
-  color: var(--cor-texto-secundario);
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-.contexto-do-bloco,
-.justificativas-do-bloco {
-  grid-column: 2 / -1;
-}
-.contexto-do-bloco {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--cor-texto-secundario);
-  font-size: 0.8125rem;
-}
-.justificativas-do-bloco {
-  margin: 0;
-  padding-left: 1rem;
-  color: var(--cor-texto-secundario);
-  font-size: 0.8125rem;
-}
-.aviso-do-dia {
-  color: var(--cor-ambar);
-  font-size: 0.85rem;
-  margin: 0.6rem 0 0;
-}
-.acoes-da-aplicacao-da-geracao {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border: 1px solid var(--cor-borda);
-  border-radius: 0.85rem;
-  background: var(--cor-destaque-clara);
-  padding: 1rem;
-}
-@media (max-width: 576px) {
-  .etapas-da-geracao {
-    grid-template-columns: 1fr;
-  }
-  .lista-de-prioridades label,
-  .grade-da-configuracao {
-    grid-template-columns: 1fr;
-  }
-  .cabecalho-da-previa,
-  .dia-da-previa header {
-    flex-direction: column;
-  }
-  .bloco-da-previa {
-    grid-template-columns: 1fr auto;
-  }
-  .bloco-da-previa > span {
-    grid-column: 1 / -1;
-  }
-  .contexto-do-bloco,
-  .justificativas-do-bloco {
-    grid-column: 1 / -1;
-  }
-  .acoes-da-aplicacao-da-geracao {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-</style>

@@ -107,27 +107,48 @@ function salvar() {
 
 <template>
   <GavetaLateral
+    class="gaveta-do-editor-de-bloco"
     :titulo="bloco ? 'Editar bloco' : 'Adicionar bloco'"
     etiqueta="Planejamento da semana"
     descricao="Organize uma intenção concreta de estudo."
     :larga="true"
     @fechar="emitir('fechar')"
   >
-    <div v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</div>
+    <div
+      v-if="erro"
+      class="alert alert-danger mensagem-do-editor-de-bloco"
+      role="alert"
+    >
+      <i class="bi bi-exclamation-octagon" aria-hidden="true"></i>
+      <span>{{ erro }}</span>
+    </div>
     <div
       v-if="bloco?.origem === 'GERADO_DETERMINISTICAMENTE'"
-      class="alert alert-info"
+      class="alert alert-info mensagem-do-editor-de-bloco"
       role="status"
     >
-      Ao salvar, este bloco será preservado como “Gerado e ajustado” nas
-      próximas regenerações.
+      <i class="bi bi-shield-check" aria-hidden="true"></i>
+      <span>
+        Ao salvar, este bloco será preservado como “Gerado e ajustado” nas
+        próximas regenerações.
+      </span>
     </div>
     <form
       id="formulario-bloco"
-      class="formulario-da-aplicacao"
+      class="formulario-da-aplicacao editor-moderno-de-bloco"
       @submit.prevent="salvar"
     >
-      <div>
+      <header class="cabecalho-da-secao-do-editor">
+        <span>
+          <i class="bi bi-card-text" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3>Identificação</h3>
+          <p>Defina o propósito, o tipo de atividade e o dia.</p>
+        </div>
+      </header>
+
+      <div class="campo-principal-do-editor">
         <label for="titulo-bloco" class="form-label">Título</label>
         <input
           id="titulo-bloco"
@@ -140,7 +161,7 @@ function salvar() {
         />
       </div>
 
-      <div class="duas-colunas-do-formulario">
+      <div class="duas-colunas-do-formulario grade-da-identificacao-do-bloco">
         <div>
           <label for="tipo-bloco" class="form-label">Tipo de atividade</label>
           <select
@@ -174,7 +195,17 @@ function salvar() {
         </div>
       </div>
 
-      <div class="duas-colunas-do-formulario">
+      <header class="cabecalho-da-secao-do-editor">
+        <span>
+          <i class="bi bi-diagram-3" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3>Conteúdo vinculado</h3>
+          <p>Associe o bloco ao catálogo ou mantenha uma atividade livre.</p>
+        </div>
+      </header>
+
+      <div class="duas-colunas-do-formulario grade-do-conteudo-do-bloco">
         <div>
           <label for="materia-bloco" class="form-label"
             >Matéria <span class="text-secondary">opcional</span></label
@@ -216,7 +247,17 @@ function salvar() {
         </div>
       </div>
 
-      <div class="tres-colunas-do-formulario">
+      <header class="cabecalho-da-secao-do-editor">
+        <span>
+          <i class="bi bi-calendar2-week" aria-hidden="true"></i>
+        </span>
+        <div>
+          <h3>Distribuição</h3>
+          <p>Ajuste duração, posição no dia e horário opcional.</p>
+        </div>
+      </header>
+
+      <div class="tres-colunas-do-formulario grade-da-distribuicao-do-bloco">
         <div>
           <label for="duracao-bloco" class="form-label"
             >Duração prevista (min)</label
@@ -257,7 +298,7 @@ function salvar() {
         </div>
       </div>
 
-      <div>
+      <div class="campo-de-observacao-do-bloco">
         <label for="observacao-bloco" class="form-label"
           >Observação <span class="text-secondary">opcional</span></label
         >
@@ -270,7 +311,7 @@ function salvar() {
         ></textarea>
       </div>
 
-      <div class="d-flex justify-content-end gap-2">
+      <div class="d-flex justify-content-end gap-2 acoes-do-editor-de-bloco">
         <button
           class="btn btn-outline-secondary"
           type="button"

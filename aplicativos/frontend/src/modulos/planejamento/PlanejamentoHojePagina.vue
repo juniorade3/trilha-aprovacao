@@ -107,6 +107,30 @@ const revisoesDeHoje = computed(() =>
   ),
 )
 
+const diaComPlanoAtivo = computed(() => {
+  const estado = planejamento.value?.estado
+  return estado === 'DIA_PLANEJADO' || estado === 'DIA_SEM_BLOCOS'
+})
+
+const percentualDaCargaPlanejada = computed(() => {
+  const minutosDisponiveis = planejamento.value?.minutosDisponiveis ?? 0
+  if (minutosDisponiveis <= 0) return 0
+  return Math.min(
+    100,
+    Math.round(
+      ((planejamento.value?.minutosPlanejados ?? 0) / minutosDisponiveis) * 100,
+    ),
+  )
+})
+
+const minutosLivres = computed(() =>
+  Math.max(
+    0,
+    (planejamento.value?.minutosDisponiveis ?? 0) -
+      (planejamento.value?.minutosPlanejados ?? 0),
+  ),
+)
+
 const linkDaSemana = computed(() => ({
   path: '/planejamento/semana',
   query: planejamento.value?.dataInicialDoPlano
@@ -690,442 +714,537 @@ onBeforeUnmount(() => {
   <main
     class="pagina-comum pagina-de-planejamento pagina-do-planejamento-de-hoje"
   >
-    <NavegacaoDoPlanejamento />
-
-    <CabecalhoDaPagina
-      etiqueta="Planejamento diário"
-      titulo="Hoje"
-      :descricao="dataFormatada"
-    >
-      <template #acoes>
-        <RouterLink class="btn btn-outline-primary" :to="linkDaSemana">
-          <i class="bi bi-calendar-week me-2" aria-hidden="true"></i>
-          Ver Semana
-        </RouterLink>
-      </template>
-    </CabecalhoDaPagina>
-
-    <div v-if="erro" class="alert alert-danger" role="alert">
-      {{ erro }}
-      <button
-        v-if="conflito"
-        class="btn btn-sm btn-outline-danger ms-2"
-        type="button"
-        @click="carregar"
+    <div class="topo-do-planejamento-de-hoje">
+      <CabecalhoDaPagina
+        etiqueta="Planejamento diário"
+        titulo="Hoje"
+        :descricao="dataFormatada"
       >
-        Recarregar dados
-      </button>
-    </div>
-    <div v-if="aviso" class="alert alert-success" role="status">
-      {{ aviso }}
-      <RouterLink
-        v-if="ultimoResultado?.estudo"
-        class="alert-link ms-2"
-        to="/estudos"
-      >
-        Ver no Histórico
-      </RouterLink>
+        <template #acoes>
+          <RouterLink class="btn btn-outline-primary" :to="linkDaSemana">
+            <i class="bi bi-calendar-week me-2" aria-hidden="true"></i>
+            Ver Semana
+          </RouterLink>
+        </template>
+      </CabecalhoDaPagina>
+
+      <NavegacaoDoPlanejamento />
     </div>
 
-    <section
-      class="card fila-de-revisoes-de-hoje"
-      aria-labelledby="titulo-das-revisoes-de-hoje"
-      aria-live="polite"
+    <div
+      v-if="erro || aviso"
+      class="mensagens-do-planejamento-de-hoje"
+      aria-label="Mensagens do planejamento"
     >
-      <header>
-        <div>
-          <p class="sobretitulo-da-pagina">Memória em dia</p>
-          <h2
-            id="titulo-das-revisoes-de-hoje"
-            ref="tituloDasRevisoes"
-            tabindex="-1"
-          >
-            Revisões de hoje
-          </h2>
-        </div>
-        <span v-if="!carregandoRevisoes" class="quantidade-de-revisoes">
-          {{ revisoesDeHoje.length }}
-        </span>
-      </header>
-
-      <p v-if="carregandoRevisoes" class="estado-das-revisoes">
-        <span
-          class="spinner-border spinner-border-sm"
-          aria-hidden="true"
-        ></span>
-        Calculando sua fila...
-      </p>
-
-      <div v-else-if="erroDasRevisoes" class="alert alert-danger mb-0">
-        {{ erroDasRevisoes }}
+      <div v-if="erro" class="alert alert-danger" role="alert">
+        {{ erro }}
         <button
-          v-if="!erroDasRevisoes.includes('sessão expirou')"
-          ref="botaoDeRepetirRevisoes"
+          v-if="conflito"
           class="btn btn-sm btn-outline-danger ms-2"
           type="button"
-          @click="repetirConsultaDasRevisoes"
+          @click="carregar"
         >
-          Tentar novamente
+          Recarregar dados
         </button>
       </div>
-
-      <div
-        v-else-if="contextoDasRevisoesIncompleto"
-        class="estado-das-revisoes"
-      >
-        <i class="bi bi-bullseye" aria-hidden="true"></i>
-        <p>
-          <strong>Complete o contexto do concurso.</strong>
-          <span>
-            Ative um concurso, selecione o cargo e defina o edital principal
-            para calcular as revisões exigidas.
-          </span>
-        </p>
-        <RouterLink class="btn btn-sm btn-outline-primary" to="/concursos">
-          Revisar concurso
+      <div v-if="aviso" class="alert alert-success" role="status">
+        {{ aviso }}
+        <RouterLink
+          v-if="ultimoResultado?.estudo"
+          class="alert-link ms-2"
+          to="/estudos"
+        >
+          Ver no Histórico
         </RouterLink>
       </div>
+    </div>
 
-      <p v-else-if="revisoesDeHoje.length === 0" class="estado-das-revisoes">
-        <i class="bi bi-check2-circle" aria-hidden="true"></i>
-        Nenhuma revisão vencida ou devida hoje.
-      </p>
+    <div
+      class="row g-4 align-items-start grade-superior-do-planejamento-de-hoje"
+    >
+      <div class="col-lg-8 coluna-de-foco-do-planejamento-de-hoje">
+        <EstadoDaPagina
+          v-if="carregando"
+          titulo="Carregando seu dia"
+          descricao="Buscando os blocos planejados para hoje."
+          :carregando="true"
+        />
 
-      <ol v-else class="lista-de-revisoes-de-hoje">
-        <li
-          v-for="revisao in revisoesDeHoje"
-          :key="revisao.identificadorDoTopico"
+        <EstadoDaPagina
+          v-else-if="!planejamento"
+          titulo="Não foi possível carregar seu dia"
+          :descricao="erro"
+          icone="bi-cloud-slash"
         >
-          <div class="identificacao-da-revisao">
-            <span
-              class="situacao-da-revisao"
-              :class="`situacao-${revisao.situacao.toLowerCase()}`"
-            >
-              {{ descricaoDaSituacaoDaRevisao(revisao) }}
-            </span>
-            <strong>{{ revisao.nomeDoTopico }}</strong>
-            <small>
-              {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
-              intervalo de {{ revisao.intervaloEmDias }} dias
-            </small>
-            <small v-if="revisao.ultimaRecordacao">
-              Última recordação: {{ revisao.ultimaRecordacao }}/5
-            </small>
-          </div>
           <button
-            v-if="!revisao.blocoAberto"
-            class="btn btn-sm btn-primary"
+            class="btn btn-outline-primary mt-3"
             type="button"
-            :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
-            @click="abrirRegistroDaRevisao(revisao)"
+            @click="carregar"
           >
-            Revisar agora
+            Tentar novamente
           </button>
-          <button
-            v-else
-            class="btn btn-sm btn-outline-primary"
-            type="button"
-            :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
-            @click="irParaBlocoDaRevisao(revisao)"
+        </EstadoDaPagina>
+
+        <EstadoDaPagina
+          v-else-if="planejamento.estado === 'SEM_PLANO'"
+          titulo="Você ainda não planejou esta semana"
+          descricao="Abra a Semana para informar sua disponibilidade e organizar os blocos."
+          icone="bi-calendar-plus"
+        >
+          <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana"
+            >Planejar minha semana</RouterLink
           >
-            Ir para o bloco
-          </button>
-        </li>
-      </ol>
-    </section>
+        </EstadoDaPagina>
 
-    <EstadoDaPagina
-      v-if="carregando"
-      titulo="Carregando seu dia"
-      descricao="Buscando os blocos planejados para hoje."
-      :carregando="true"
-    />
-
-    <EstadoDaPagina
-      v-else-if="!planejamento"
-      titulo="Não foi possível carregar seu dia"
-      :descricao="erro"
-      icone="bi-cloud-slash"
-    >
-      <button
-        class="btn btn-outline-primary mt-3"
-        type="button"
-        @click="carregar"
-      >
-        Tentar novamente
-      </button>
-    </EstadoDaPagina>
-
-    <EstadoDaPagina
-      v-else-if="planejamento.estado === 'SEM_PLANO'"
-      titulo="Você ainda não planejou esta semana"
-      descricao="Abra a Semana para informar sua disponibilidade e organizar os blocos."
-      icone="bi-calendar-plus"
-    >
-      <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana"
-        >Planejar minha semana</RouterLink
-      >
-    </EstadoDaPagina>
-
-    <EstadoDaPagina
-      v-else-if="planejamento.estado === 'PLANO_EM_RASCUNHO'"
-      titulo="Seu plano ainda precisa ser ativado"
-      descricao="Revise a disponibilidade e os blocos na Semana antes de começar."
-      icone="bi-pencil-square"
-    >
-      <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana"
-        >Revisar e ativar plano</RouterLink
-      >
-    </EstadoDaPagina>
-
-    <EstadoDaPagina
-      v-else-if="planejamento.estado === 'PLANO_ENCERRADO'"
-      titulo="Esta semana foi encerrada"
-      descricao="Consulte na Semana os blocos realizados e os que ficaram não realizados."
-      icone="bi-calendar-check"
-    >
-      <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana">
-        Ver semana encerrada
-      </RouterLink>
-    </EstadoDaPagina>
-
-    <EstadoDaPagina
-      v-else-if="planejamento.estado === 'PLANO_CANCELADO'"
-      titulo="Este plano foi cancelado"
-      descricao="Execuções e estudos realizados antes do cancelamento foram preservados."
-      icone="bi-calendar-x"
-    >
-      <RouterLink class="btn btn-outline-primary mt-3" :to="linkDaSemana">
-        Ver plano cancelado
-      </RouterLink>
-    </EstadoDaPagina>
-
-    <template v-else>
-      <section
-        class="resumo-do-planejamento-de-hoje"
-        aria-label="Resumo de hoje"
-      >
-        <div>
-          <span>Disponível</span
-          ><strong>{{ planejamento.minutosDisponiveis }} min</strong>
-        </div>
-        <div>
-          <span>Planejado</span
-          ><strong>{{ planejamento.minutosPlanejados }} min</strong>
-        </div>
-        <div>
-          <span>Blocos</span
-          ><strong>{{ planejamento.quantidadeDeBlocos }}</strong>
-        </div>
-      </section>
-
-      <section
-        v-if="execucaoAtual"
-        class="card proximo-bloco-do-dia bloco-em-andamento"
-        aria-live="polite"
-      >
-        <p class="sobretitulo-da-pagina">Em andamento</p>
-        <h2>{{ execucaoAtual.bloco.titulo }}</h2>
-        <p>
-          {{ rotuloDoTipo(execucaoAtual.bloco) }} ·
-          {{ execucaoAtual.bloco.duracaoPrevistaEmMinutos }} min planejados
-        </p>
-        <strong class="cronometro-da-execucao" aria-label="Tempo decorrido">{{
-          cronometro
-        }}</strong>
-        <span v-if="pausado" class="mt-2">Cronômetro pausado</span>
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          <button
-            class="btn botao-de-contraste"
-            type="button"
-            :disabled="processando"
-            @click="alternarPausa"
+        <EstadoDaPagina
+          v-else-if="planejamento.estado === 'PLANO_EM_RASCUNHO'"
+          titulo="Seu plano ainda precisa ser ativado"
+          descricao="Revise a disponibilidade e os blocos na Semana antes de começar."
+          icone="bi-pencil-square"
+        >
+          <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana"
+            >Revisar e ativar plano</RouterLink
           >
-            <i
-              class="bi"
-              :class="pausado ? 'bi-play-fill' : 'bi-pause-fill'"
-              aria-hidden="true"
-            ></i>
-            {{ pausado ? 'Retomar' : 'Pausar' }}
-          </button>
-          <button
-            class="btn btn-primary"
-            type="button"
-            :disabled="processando"
-            @click="abrirFinalizacao('CONCLUIR')"
-          >
-            Concluir
-          </button>
-          <button
-            class="btn btn-outline-primary"
-            type="button"
-            :disabled="processando"
-            @click="abrirFinalizacao('INTERROMPER')"
-          >
-            Interromper
-          </button>
-        </div>
-      </section>
+        </EstadoDaPagina>
 
-      <EstadoDaPagina
-        v-if="planejamento.estado === 'DIA_SEM_BLOCOS' && !execucaoAtual"
-        titulo="Hoje não há blocos planejados"
-        descricao="Sua semana está ativa, mas este dia ficou livre."
-        icone="bi-cup-hot"
-      />
+        <EstadoDaPagina
+          v-else-if="planejamento.estado === 'PLANO_ENCERRADO'"
+          titulo="Esta semana foi encerrada"
+          descricao="Consulte na Semana os blocos realizados e os que ficaram não realizados."
+          icone="bi-calendar-check"
+        >
+          <RouterLink class="btn btn-primary mt-3" :to="linkDaSemana">
+            Ver semana encerrada
+          </RouterLink>
+        </EstadoDaPagina>
 
-      <section
-        v-if="planejamento.atrasados.length"
-        class="card sequencia-do-dia blocos-atrasados-do-dia"
-      >
-        <header>
-          <p class="sobretitulo-da-pagina">Atenção</p>
-          <h2>Pendentes de dias anteriores</h2>
-        </header>
-        <ol>
-          <li
-            v-for="bloco in planejamento.atrasados"
-            :key="bloco.identificador"
+        <EstadoDaPagina
+          v-else-if="planejamento.estado === 'PLANO_CANCELADO'"
+          titulo="Este plano foi cancelado"
+          descricao="Execuções e estudos realizados antes do cancelamento foram preservados."
+          icone="bi-calendar-x"
+        >
+          <RouterLink class="btn btn-outline-primary mt-3" :to="linkDaSemana">
+            Ver plano cancelado
+          </RouterLink>
+        </EstadoDaPagina>
+
+        <template v-else>
+          <section
+            v-if="execucaoAtual"
+            class="card proximo-bloco-do-dia bloco-em-andamento cartao-de-foco-do-dia"
+            aria-live="polite"
           >
-            <span><i class="bi bi-clock-history" aria-hidden="true"></i></span>
-            <div>
-              <strong>{{ bloco.titulo }}</strong
-              ><small
-                >{{ bloco.data }} ·
-                {{ bloco.duracaoPrevistaEmMinutos }} min</small
-              >
+            <div class="identificacao-do-foco-do-dia">
+              <p class="sobretitulo-da-pagina">Em andamento</p>
+              <h2>{{ execucaoAtual.bloco.titulo }}</h2>
+              <p>
+                {{ rotuloDoTipo(execucaoAtual.bloco) }} ·
+                {{ execucaoAtual.bloco.duracaoPrevistaEmMinutos }} min
+                planejados
+              </p>
             </div>
-            <button
-              class="btn btn-sm btn-outline-primary"
-              type="button"
-              :disabled="processando || !!execucaoAtual"
-              @click="iniciar(bloco)"
-            >
-              Iniciar
-            </button>
-            <button
-              class="btn btn-sm btn-outline-secondary"
-              type="button"
-              :disabled="processando"
-              :aria-label="`Reagendar ${bloco.titulo}`"
-              @click="abrirReagendamento(bloco)"
-            >
-              Reagendar
-            </button>
-            <button
-              class="btn btn-sm btn-outline-danger"
-              type="button"
-              :disabled="processando"
-              :aria-label="`Cancelar ${bloco.titulo}`"
-              @click="blocoParaCancelar = bloco"
-            >
-              Cancelar
-            </button>
-          </li>
-        </ol>
-      </section>
+            <div class="tempo-do-foco-do-dia">
+              <strong
+                class="cronometro-da-execucao"
+                aria-label="Tempo decorrido"
+                >{{ cronometro }}</strong
+              >
+              <span v-if="pausado">Cronômetro pausado</span>
+            </div>
+            <div class="acoes-do-foco-do-dia d-flex flex-wrap gap-2">
+              <button
+                class="btn botao-de-contraste"
+                type="button"
+                :disabled="processando"
+                @click="alternarPausa"
+              >
+                <i
+                  class="bi"
+                  :class="pausado ? 'bi-play-fill' : 'bi-pause-fill'"
+                  aria-hidden="true"
+                ></i>
+                {{ pausado ? 'Retomar' : 'Pausar' }}
+              </button>
+              <button
+                class="btn btn-primary"
+                type="button"
+                :disabled="processando"
+                @click="abrirFinalizacao('CONCLUIR')"
+              >
+                Concluir
+              </button>
+              <button
+                class="btn btn-outline-danger"
+                type="button"
+                :disabled="processando"
+                @click="abrirFinalizacao('INTERROMPER')"
+              >
+                Interromper
+              </button>
+            </div>
+          </section>
 
-      <div
-        v-if="planejamento.estado === 'DIA_PLANEJADO'"
-        class="conteudo-do-planejamento-de-hoje"
+          <section
+            v-else-if="
+              planejamento.estado === 'DIA_PLANEJADO' &&
+              planejamento.proximoBloco
+            "
+            class="card proximo-bloco-do-dia cartao-de-foco-do-dia"
+          >
+            <div class="identificacao-do-foco-do-dia">
+              <p class="sobretitulo-da-pagina">Próximo bloco</p>
+              <h2>{{ planejamento.proximoBloco.titulo }}</h2>
+              <p>
+                {{ rotuloDoTipo(planejamento.proximoBloco) }} ·
+                {{ planejamento.proximoBloco.duracaoPrevistaEmMinutos }} min
+              </p>
+            </div>
+            <div class="acoes-do-foco-do-dia d-flex flex-wrap gap-2">
+              <button
+                class="btn btn-primary"
+                type="button"
+                :disabled="processando"
+                @click="iniciar(planejamento.proximoBloco)"
+              >
+                Iniciar estudo
+              </button>
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                :aria-label="`Reagendar ${planejamento.proximoBloco.titulo}`"
+                @click="abrirReagendamento(planejamento.proximoBloco)"
+              >
+                Reagendar
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                :aria-label="`Cancelar ${planejamento.proximoBloco.titulo}`"
+                @click="blocoParaCancelar = planejamento.proximoBloco"
+              >
+                Cancelar
+              </button>
+            </div>
+          </section>
+
+          <EstadoDaPagina
+            v-else-if="planejamento.estado === 'DIA_SEM_BLOCOS'"
+            titulo="Hoje não há blocos planejados"
+            descricao="Sua semana está ativa, mas este dia ficou livre."
+            icone="bi-cup-hot"
+          />
+        </template>
+      </div>
+
+      <aside
+        class="col-lg-4 coluna-lateral-do-planejamento-de-hoje"
+        aria-label="Resumo e revisões de hoje"
       >
         <section
-          v-if="planejamento.proximoBloco && !execucaoAtual"
-          class="card proximo-bloco-do-dia"
+          v-if="diaComPlanoAtivo && planejamento"
+          class="card resumo-do-planejamento-de-hoje painel-da-carga-do-dia"
+          aria-label="Resumo de hoje"
         >
-          <p class="sobretitulo-da-pagina">Próximo bloco</p>
-          <h2>{{ planejamento.proximoBloco.titulo }}</h2>
-          <p>
-            {{ rotuloDoTipo(planejamento.proximoBloco) }} ·
-            {{ planejamento.proximoBloco.duracaoPrevistaEmMinutos }} min
-          </p>
-          <button
-            class="btn btn-primary mt-3"
-            type="button"
-            :disabled="processando"
-            @click="iniciar(planejamento.proximoBloco)"
+          <header class="cabecalho-do-painel-da-carga">
+            <div>
+              <p class="sobretitulo-da-pagina">Carga de hoje</p>
+              <h2>Seu ritmo</h2>
+            </div>
+            <strong class="percentual-da-carga-planejada">
+              {{ percentualDaCargaPlanejada }}%
+            </strong>
+          </header>
+
+          <progress
+            class="progresso-da-carga-planejada"
+            :value="percentualDaCargaPlanejada"
+            max="100"
+            aria-label="Percentual da carga planejada"
           >
-            Iniciar estudo
-          </button>
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <button
-              class="btn btn-sm btn-outline-secondary"
-              type="button"
-              :aria-label="`Reagendar ${planejamento.proximoBloco.titulo}`"
-              @click="abrirReagendamento(planejamento.proximoBloco)"
-            >
-              Reagendar
-            </button>
-            <button
-              class="btn btn-sm btn-outline-danger"
-              type="button"
-              :aria-label="`Cancelar ${planejamento.proximoBloco.titulo}`"
-              @click="blocoParaCancelar = planejamento.proximoBloco"
-            >
-              Cancelar
-            </button>
-          </div>
+            {{ percentualDaCargaPlanejada }}%
+          </progress>
+
+          <dl class="indicadores-da-carga-do-dia">
+            <div>
+              <dt>Disponível</dt>
+              <dd>{{ planejamento.minutosDisponiveis }} min</dd>
+            </div>
+            <div>
+              <dt>Planejado</dt>
+              <dd>{{ planejamento.minutosPlanejados }} min</dd>
+            </div>
+            <div>
+              <dt>Livre</dt>
+              <dd>{{ minutosLivres }} min</dd>
+            </div>
+            <div>
+              <dt>Blocos</dt>
+              <dd>{{ planejamento.quantidadeDeBlocos }}</dd>
+            </div>
+          </dl>
         </section>
 
         <section
-          v-if="planejamento.sequencia.length"
-          class="card sequencia-do-dia"
+          class="card fila-de-revisoes-de-hoje painel-de-revisoes-do-dia"
+          aria-labelledby="titulo-das-revisoes-de-hoje"
+          aria-live="polite"
         >
           <header>
-            <p class="sobretitulo-da-pagina">Depois</p>
-            <h2>Sequência do dia</h2>
+            <div>
+              <p class="sobretitulo-da-pagina">Memória em dia</p>
+              <h2
+                id="titulo-das-revisoes-de-hoje"
+                ref="tituloDasRevisoes"
+                tabindex="-1"
+              >
+                Revisões de hoje
+              </h2>
+            </div>
+            <span v-if="!carregandoRevisoes" class="quantidade-de-revisoes">
+              {{ revisoesDeHoje.length }}
+            </span>
           </header>
-          <ol>
-            <li
-              v-for="bloco in planejamento.sequencia"
-              :key="bloco.identificador"
+
+          <p v-if="carregandoRevisoes" class="estado-das-revisoes">
+            <span
+              class="spinner-border spinner-border-sm"
+              aria-hidden="true"
+            ></span>
+            Calculando sua fila...
+          </p>
+
+          <div v-else-if="erroDasRevisoes" class="alert alert-danger mb-0">
+            {{ erroDasRevisoes }}
+            <button
+              v-if="!erroDasRevisoes.includes('sessão expirou')"
+              ref="botaoDeRepetirRevisoes"
+              class="btn btn-sm btn-outline-danger ms-2"
+              type="button"
+              @click="repetirConsultaDasRevisoes"
             >
-              <span>{{ bloco.ordem }}</span>
-              <div>
-                <strong>{{ bloco.titulo }}</strong
-                ><small
-                  >{{ rotuloDoTipo(bloco) }} ·
-                  {{ bloco.duracaoPrevistaEmMinutos }} min</small
+              Tentar novamente
+            </button>
+          </div>
+
+          <div
+            v-else-if="contextoDasRevisoesIncompleto"
+            class="estado-das-revisoes"
+          >
+            <i class="bi bi-bullseye" aria-hidden="true"></i>
+            <p>
+              <strong>Complete o contexto do concurso.</strong>
+              <span>
+                Ative um concurso, selecione o cargo e defina o edital principal
+                para calcular as revisões exigidas.
+              </span>
+            </p>
+            <RouterLink class="btn btn-sm btn-outline-primary" to="/concursos">
+              Revisar concurso
+            </RouterLink>
+          </div>
+
+          <p
+            v-else-if="revisoesDeHoje.length === 0"
+            class="estado-das-revisoes"
+          >
+            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            Nenhuma revisão vencida ou devida hoje.
+          </p>
+
+          <ol v-else class="lista-de-revisoes-de-hoje">
+            <li
+              v-for="revisao in revisoesDeHoje"
+              :key="revisao.identificadorDoTopico"
+            >
+              <div class="identificacao-da-revisao">
+                <span
+                  class="situacao-da-revisao"
+                  :class="`situacao-${revisao.situacao.toLowerCase()}`"
                 >
+                  {{ descricaoDaSituacaoDaRevisao(revisao) }}
+                </span>
+                <strong>{{ revisao.nomeDoTopico }}</strong>
+                <small>
+                  {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+                  intervalo de {{ revisao.intervaloEmDias }} dias
+                </small>
+                <small v-if="revisao.ultimaRecordacao">
+                  Última recordação: {{ revisao.ultimaRecordacao }}/5
+                </small>
               </div>
-              <div class="d-flex gap-2">
-                <button
-                  class="btn btn-sm btn-outline-secondary"
-                  type="button"
-                  :aria-label="`Reagendar ${bloco.titulo}`"
-                  @click="abrirReagendamento(bloco)"
-                >
-                  Reagendar
-                </button>
-                <button
-                  class="btn btn-sm btn-outline-danger"
-                  type="button"
-                  :aria-label="`Cancelar ${bloco.titulo}`"
-                  @click="blocoParaCancelar = bloco"
-                >
-                  Cancelar
-                </button>
-              </div>
+              <button
+                v-if="!revisao.blocoAberto"
+                class="btn btn-sm btn-primary"
+                type="button"
+                :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
+                @click="abrirRegistroDaRevisao(revisao)"
+              >
+                Revisar agora
+              </button>
+              <button
+                v-else
+                class="btn btn-sm btn-outline-primary"
+                type="button"
+                :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
+                @click="irParaBlocoDaRevisao(revisao)"
+              >
+                Ir para o bloco
+              </button>
             </li>
           </ol>
         </section>
-      </div>
+      </aside>
+    </div>
+
+    <template v-if="diaComPlanoAtivo && planejamento">
+      <section
+        v-if="
+          planejamento.atrasados.length ||
+          (planejamento.estado === 'DIA_PLANEJADO' &&
+            planejamento.sequencia.length)
+        "
+        class="agenda-do-planejamento-de-hoje"
+        aria-labelledby="titulo-da-agenda-do-dia"
+      >
+        <header class="cabecalho-da-agenda-do-dia">
+          <div>
+            <p class="sobretitulo-da-pagina">Seu roteiro</p>
+            <h2 id="titulo-da-agenda-do-dia">Agenda do dia</h2>
+          </div>
+        </header>
+
+        <div class="conteudo-do-planejamento-de-hoje fluxo-da-agenda-do-dia">
+          <section
+            v-if="planejamento.atrasados.length"
+            class="card sequencia-do-dia blocos-atrasados-do-dia grupo-da-agenda-do-dia"
+          >
+            <header>
+              <p class="sobretitulo-da-pagina">Atenção</p>
+              <h2>Pendentes de dias anteriores</h2>
+            </header>
+            <ol>
+              <li
+                v-for="bloco in planejamento.atrasados"
+                :key="bloco.identificador"
+                class="item-da-agenda-do-dia"
+              >
+                <span class="marcador-do-item-da-agenda"
+                  ><i class="bi bi-clock-history" aria-hidden="true"></i
+                ></span>
+                <div class="conteudo-do-item-da-agenda">
+                  <strong>{{ bloco.titulo }}</strong
+                  ><small
+                    >{{ bloco.data }} ·
+                    {{ bloco.duracaoPrevistaEmMinutos }} min</small
+                  >
+                </div>
+                <div class="acoes-do-item-da-agenda d-flex flex-wrap gap-2">
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    type="button"
+                    :disabled="processando || !!execucaoAtual"
+                    @click="iniciar(bloco)"
+                  >
+                    Iniciar
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    :disabled="processando"
+                    :aria-label="`Reagendar ${bloco.titulo}`"
+                    @click="abrirReagendamento(bloco)"
+                  >
+                    Reagendar
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-danger"
+                    type="button"
+                    :disabled="processando"
+                    :aria-label="`Cancelar ${bloco.titulo}`"
+                    @click="blocoParaCancelar = bloco"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section
+            v-if="
+              planejamento.estado === 'DIA_PLANEJADO' &&
+              planejamento.sequencia.length
+            "
+            class="card sequencia-do-dia grupo-da-agenda-do-dia"
+          >
+            <header>
+              <p class="sobretitulo-da-pagina">Depois</p>
+              <h2>Sequência do dia</h2>
+            </header>
+            <ol>
+              <li
+                v-for="bloco in planejamento.sequencia"
+                :key="bloco.identificador"
+                class="item-da-agenda-do-dia"
+              >
+                <span class="marcador-do-item-da-agenda">{{
+                  bloco.ordem
+                }}</span>
+                <div class="conteudo-do-item-da-agenda">
+                  <strong>{{ bloco.titulo }}</strong
+                  ><small
+                    >{{ rotuloDoTipo(bloco) }} ·
+                    {{ bloco.duracaoPrevistaEmMinutos }} min</small
+                  >
+                </div>
+                <div class="acoes-do-item-da-agenda d-flex flex-wrap gap-2">
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    :aria-label="`Reagendar ${bloco.titulo}`"
+                    @click="abrirReagendamento(bloco)"
+                  >
+                    Reagendar
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-danger"
+                    type="button"
+                    :aria-label="`Cancelar ${bloco.titulo}`"
+                    @click="blocoParaCancelar = bloco"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </li>
+            </ol>
+          </section>
+        </div>
+      </section>
 
       <section
         v-if="planejamento.realizados.length"
-        class="card sequencia-do-dia blocos-realizados-do-dia"
+        class="card sequencia-do-dia blocos-realizados-do-dia linha-do-tempo-dos-estudos-do-dia"
       >
-        <header>
-          <p class="sobretitulo-da-pagina">Progresso</p>
-          <h2>Realizados hoje</h2>
+        <header class="cabecalho-da-linha-do-tempo-do-dia">
+          <div>
+            <p class="sobretitulo-da-pagina">Progresso</p>
+            <h2>Realizados hoje</h2>
+          </div>
+          <span class="quantidade-de-estudos-realizados">
+            {{ planejamento.realizados.length }}
+          </span>
         </header>
-        <ol>
+        <ol class="lista-da-linha-do-tempo-do-dia">
           <li
             v-for="bloco in planejamento.realizados"
             :key="bloco.identificador"
+            class="item-da-linha-do-tempo-do-dia"
           >
-            <span><i class="bi bi-check2" aria-hidden="true"></i></span>
-            <div>
+            <span class="marcador-da-linha-do-tempo"
+              ><i class="bi bi-check2" aria-hidden="true"></i
+            ></span>
+            <div class="conteudo-da-linha-do-tempo">
               <strong>{{ bloco.titulo }}</strong
               ><small>{{
                 bloco.estado === 'CONCLUIDO'
@@ -1133,28 +1252,30 @@ onBeforeUnmount(() => {
                   : 'Parcialmente concluído'
               }}</small>
             </div>
-            <button
-              v-if="
-                execucoesRealizadas[bloco.identificador] &&
-                !execucoesRealizadas[bloco.identificador]?.execucao
-                  .identificadorDoRegistroDeEstudo &&
-                (bloco.identificadorDoTopico || bloco.identificadorDaMateria)
-              "
-              class="btn btn-sm btn-outline-primary"
-              type="button"
-              @click="abrirRegistroNoHistorico(bloco)"
-            >
-              Registrar no Histórico
-            </button>
-            <button
-              v-if="execucoesRealizadas[bloco.identificador]"
-              class="btn btn-sm btn-outline-secondary"
-              type="button"
-              :aria-label="`Corrigir execução de ${bloco.titulo}`"
-              @click="abrirCorrecao(bloco)"
-            >
-              Corrigir execução
-            </button>
+            <div class="acoes-da-linha-do-tempo d-flex flex-wrap gap-2">
+              <button
+                v-if="
+                  execucoesRealizadas[bloco.identificador] &&
+                  !execucoesRealizadas[bloco.identificador]?.execucao
+                    .identificadorDoRegistroDeEstudo &&
+                  (bloco.identificadorDoTopico || bloco.identificadorDaMateria)
+                "
+                class="btn btn-sm btn-outline-primary"
+                type="button"
+                @click="abrirRegistroNoHistorico(bloco)"
+              >
+                Registrar no Histórico
+              </button>
+              <button
+                v-if="execucoesRealizadas[bloco.identificador]"
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                :aria-label="`Corrigir execução de ${bloco.titulo}`"
+                @click="abrirCorrecao(bloco)"
+              >
+                Corrigir execução
+              </button>
+            </div>
           </li>
         </ol>
       </section>

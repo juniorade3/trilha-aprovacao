@@ -692,17 +692,19 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
 
 <template>
   <main class="pagina-comum pagina-de-planejamento">
-    <NavegacaoDoPlanejamento />
+    <div class="topo-da-area-de-planejamento">
+      <CabecalhoDaPagina
+        etiqueta="Planejamento manual"
+        titulo="Sua semana"
+        :descricao="
+          plano?.estado === 'ATIVO'
+            ? 'Consulte o compromisso de estudo ativo desta semana.'
+            : 'Defina quanto tempo você tem disponível em cada dia.'
+        "
+      />
 
-    <CabecalhoDaPagina
-      etiqueta="Planejamento manual"
-      titulo="Sua semana"
-      :descricao="
-        plano?.estado === 'ATIVO'
-          ? 'Consulte o compromisso de estudo ativo desta semana.'
-          : 'Defina quanto tempo você tem disponível em cada dia.'
-      "
-    />
+      <NavegacaoDoPlanejamento />
+    </div>
 
     <section class="seletor-da-semana" aria-label="Selecionar semana">
       <button
@@ -1457,6 +1459,45 @@ watch(() => rota.query.foco, focarBlocoSolicitado, { flush: 'post' })
   dd {
     margin: 0.2rem 0 0;
     font-weight: 700;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .resumo-do-plano-semanal {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    > div {
+      min-width: 0;
+    }
+
+    > div:not(.acoes-do-plano-semanal) strong {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .acoes-do-plano-semanal {
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    width: 100%;
+
+    .btn {
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+  }
+}
+
+@media (max-width: 575.98px) {
+  .acoes-do-plano-semanal {
+    align-items: stretch;
+    flex-direction: column;
+
+    .btn {
+      flex: 0 0 auto;
+      width: 100%;
+    }
   }
 }
 

@@ -373,6 +373,7 @@ onBeforeUnmount(() => cancelamento?.abort())
 <template>
   <main class="pagina-da-jornada pagina-de-conteudos">
     <CabecalhoDaPagina
+      class="cabecalho-de-catalogo-moderno"
       etiqueta="Catálogo reutilizável"
       titulo="Conteúdos"
       descricao="Organize matérias e tópicos uma única vez. O mesmo estudo pode valer para todos os concursos que exigem o assunto."
@@ -387,24 +388,55 @@ onBeforeUnmount(() => cancelamento?.abort())
 
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
 
-    <div class="faixa-resumo-de-conteudos" aria-label="Resumo do catálogo">
-      <span
-        ><b>{{ totalDeItens }}</b> matérias</span
-      >
-      <span
-        ><b>{{ topicos.length }}</b> tópicos na matéria selecionada</span
-      >
-      <span
-        ><b>{{ quantidadeComEstudo }}</b> com estudo ativo</span
-      >
-      <span
-        ><b>{{ coberturaDaMateria }}%</b> de cobertura</span
-      >
-    </div>
+    <section
+      class="faixa-resumo-de-conteudos resumo-moderno-do-catalogo"
+      aria-label="Resumo do catálogo"
+    >
+      <article>
+        <i class="bi bi-journals" aria-hidden="true"></i>
+        <span
+          ><b>{{ totalDeItens }}</b
+          ><small>matérias</small></span
+        >
+      </article>
+      <article>
+        <i class="bi bi-diagram-3" aria-hidden="true"></i>
+        <span
+          ><b>{{ topicos.length }}</b
+          ><small>tópicos selecionados</small></span
+        >
+      </article>
+      <article>
+        <i class="bi bi-check2-circle" aria-hidden="true"></i>
+        <span
+          ><b>{{ quantidadeComEstudo }}</b
+          ><small>com estudo ativo</small></span
+        >
+      </article>
+      <article>
+        <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+        <span
+          ><b>{{ coberturaDaMateria }}%</b><small>de cobertura</small></span
+        >
+      </article>
+    </section>
 
-    <section class="catalogo-mestre-detalhe">
+    <section class="catalogo-mestre-detalhe catalogo-de-conteudos-moderno">
       <aside class="card painel-mestre-de-materias">
-        <form class="campo-de-busca" @submit.prevent="carregar(0)">
+        <header class="cabecalho-do-painel-mestre">
+          <div>
+            <span class="rotulo-discreto">Suas matérias</span>
+            <h2>Catálogo</h2>
+          </div>
+          <span class="badge etiqueta-neutra">
+            {{ materias.length }} nesta página
+          </span>
+        </header>
+
+        <form
+          class="campo-de-busca busca-do-catalogo-moderno"
+          @submit.prevent="carregar(0)"
+        >
           <i class="bi bi-search" aria-hidden="true"></i>
           <input
             v-model="pesquisa"
@@ -452,11 +484,17 @@ onBeforeUnmount(() => cancelamento?.abort())
               ativo:
                 materia.identificador === materiaSelecionada?.identificador,
             }"
+            :aria-pressed="
+              materia.identificador === materiaSelecionada?.identificador
+            "
             @click="selecionarMateria(materia)"
           >
             <i
               class="cor-da-materia"
-              :style="{ background: materia.cor ?? '#128f83' }"
+              :style="{
+                '--cor-identificadora-da-materia':
+                  materia.cor ?? 'var(--cor-violeta)',
+              }"
             ></i>
             <span>
               <b>{{ materia.nome }}</b>
@@ -500,12 +538,12 @@ onBeforeUnmount(() => cancelamento?.abort())
         </div>
         <template v-else>
           <header class="cabecalho-do-detalhe-da-materia">
-            <div>
+            <div class="identidade-da-materia-selecionada">
               <span
                 class="etiqueta-da-materia"
                 :style="{
                   '--cor-identificadora-da-materia':
-                    materiaSelecionada.cor ?? '#A78BFA',
+                    materiaSelecionada.cor ?? 'var(--cor-violeta)',
                 }"
               >
                 {{
@@ -515,7 +553,7 @@ onBeforeUnmount(() => cancelamento?.abort())
               <h2>{{ materiaSelecionada.nome }}</h2>
               <p>{{ materiaSelecionada.descricao || 'Sem descrição.' }}</p>
             </div>
-            <div>
+            <div class="acoes-do-detalhe-do-catalogo">
               <button
                 class="btn btn-sm btn-outline-primary"
                 type="button"
@@ -545,7 +583,7 @@ onBeforeUnmount(() => cancelamento?.abort())
             <BarraDeProgresso
               :valor="coberturaDaMateria"
               :rotulo="`Cobertura de estudo em ${materiaSelecionada.nome}`"
-              :cor="materiaSelecionada.cor ?? '#128f83'"
+              :cor="materiaSelecionada.cor ?? 'var(--cor-violeta)'"
             />
             <strong>{{ coberturaDaMateria }}%</strong>
           </div>
@@ -574,7 +612,14 @@ onBeforeUnmount(() => cancelamento?.abort())
               v-for="topico in topicosOrdenados"
               :key="topico.identificador"
               class="linha-do-topico-no-catalogo"
-              :style="{ paddingLeft: `${1 + nivelDoTopico(topico) * 1.4}rem` }"
+              :style="{
+                '--recuo-do-topico': `${
+                  Math.min(nivelDoTopico(topico), 5) * 0.85
+                }rem`,
+                '--recuo-do-topico-mobile': `${
+                  Math.min(nivelDoTopico(topico), 4) * 0.45
+                }rem`,
+              }"
             >
               <span
                 :class="{
@@ -617,7 +662,7 @@ onBeforeUnmount(() => cancelamento?.abort())
               Gerenciar árvore completa
               <i class="bi bi-arrow-right" aria-hidden="true"></i>
             </RouterLink>
-            <div>
+            <div class="acoes-administrativas-da-materia">
               <button
                 class="btn btn-sm btn-link text-secondary"
                 type="button"

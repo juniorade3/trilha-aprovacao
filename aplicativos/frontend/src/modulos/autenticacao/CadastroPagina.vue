@@ -73,9 +73,13 @@ async function cadastrar() {
           class="form-control mb-3"
           type="password"
           required
-        /><button class="btn btn-primary" :disabled="enviando">
-          {{ enviando ? 'Cadastrando...' : 'Cadastrar' }}</button
-        ><RouterLink class="ms-3" to="/login">Ja tenho conta</RouterLink>
+        />
+        <div class="acoes-da-autenticacao">
+          <button class="btn btn-primary" :disabled="enviando">
+            {{ enviando ? 'Cadastrando...' : 'Cadastrar' }}
+          </button>
+          <RouterLink to="/login">Já tenho uma conta</RouterLink>
+        </div>
       </form>
     </div>
   </section>

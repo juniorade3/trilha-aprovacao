@@ -1,0 +1,1612 @@
+/* Redesign do domínio de concursos.
+ * Importe esta parcial depois das camadas legadas para que os componentes
+ * preservados recebam a nova composição sem depender de cores locais.
+ */
+
+[data-bs-theme='dark'] {
+  .modulo-concursos-moderno {
+    margin-inline: auto;
+    max-width: 96rem;
+    width: 100%;
+  }
+
+  .modulo-concursos-moderno .cabecalho-da-pagina {
+    border-bottom: 0;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0;
+  }
+
+  .modulo-concursos-moderno .cabecalho-da-pagina > div:first-child {
+    max-width: 48rem;
+  }
+
+  .modulo-concursos-moderno .cabecalho-da-pagina h1 {
+    font-size: clamp(2.25rem, 5vw, 4.4rem);
+    letter-spacing: -0.055em;
+    line-height: 0.98;
+  }
+
+  .modulo-concursos-moderno
+    .cabecalho-da-pagina
+    > div:first-child
+    > p:last-child {
+    color: var(--cor-texto-secundario);
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 42rem;
+  }
+
+  .acao-de-retorno-dos-concursos {
+    align-items: center;
+    color: var(--cor-texto-secundario);
+    display: inline-flex;
+    font-weight: 650;
+    gap: 0.45rem;
+    min-height: 2.75rem;
+  }
+
+  .acao-de-retorno-dos-concursos:hover {
+    color: var(--cor-link);
+  }
+
+  .modulo-concursos-moderno .card {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    box-shadow: none;
+  }
+
+  .modulo-concursos-moderno .card:hover {
+    box-shadow: none;
+  }
+
+  /* Catálogo */
+
+  .cabecalho-editorial-dos-concursos {
+    align-items: end;
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .acoes-principais-dos-concursos {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: end;
+  }
+
+  .painel-de-filtros-dos-concursos {
+    align-items: center;
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: minmax(16rem, 1fr) auto auto;
+    margin-bottom: 1.5rem;
+    padding: 0.8rem;
+  }
+
+  .painel-de-filtros-dos-concursos .campo-de-busca {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-height: 3.15rem;
+  }
+
+  .painel-de-filtros-dos-concursos .campo-de-busca:focus-within {
+    border-color: var(--cor-foco);
+    box-shadow: 0 0 0 0.2rem rgb(var(--cor-violeta-rgb) / 18%);
+  }
+
+  .painel-de-filtros-dos-concursos .campo-de-busca input {
+    color: var(--cor-texto);
+    min-height: 3rem;
+  }
+
+  .painel-de-filtros-dos-concursos .filtro-da-biblioteca {
+    align-items: center;
+    border-radius: var(--raio-md);
+    color: var(--cor-texto-secundario);
+    display: inline-flex;
+    gap: 0.55rem;
+    min-height: 3rem;
+    padding-inline: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .estado-dos-concursos {
+    background: var(--cor-superficie-1);
+    border: 1px dashed var(--cor-borda-forte);
+    min-height: 19rem;
+    padding: 2.5rem;
+  }
+
+  .estado-dos-concursos > i {
+    align-items: center;
+    background: rgb(var(--cor-violeta-rgb) / 14%);
+    border-radius: 1rem;
+    color: var(--cor-link);
+    display: inline-flex;
+    font-size: 1.65rem;
+    height: 3.75rem;
+    justify-content: center;
+    width: 3.75rem;
+  }
+
+  .painel-do-objetivo-ativo {
+    align-items: center;
+    background: var(--cor-superficie-2);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 38%);
+    border-radius: var(--raio-xl);
+    box-shadow: inset 0.25rem 0 0 var(--cor-violeta);
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    position: relative;
+  }
+
+  .painel-do-objetivo-ativo::after {
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    border-radius: 50%;
+    content: '';
+    height: 16rem;
+    pointer-events: none;
+    position: absolute;
+    right: -7rem;
+    top: -9rem;
+    width: 16rem;
+  }
+
+  .conteudo-do-objetivo-ativo {
+    display: grid;
+    justify-items: start;
+    max-width: 54rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .painel-do-objetivo-ativo h2 {
+    color: var(--cor-texto);
+    font-size: clamp(2rem, 4vw, 3.35rem);
+    letter-spacing: -0.05em;
+    line-height: 1.04;
+    margin: 1rem 0 0.55rem;
+  }
+
+  .painel-do-objetivo-ativo
+    .conteudo-do-objetivo-ativo
+    > p:not(.sobretitulo-da-pagina) {
+    color: var(--cor-texto-secundario);
+    font-size: 1.05rem;
+  }
+
+  .acoes-do-objetivo-ativo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.15rem;
+  }
+
+  .painel-do-objetivo-ativo .botao-de-contraste {
+    background: var(--cor-violeta);
+    border: 1px solid var(--cor-violeta);
+    color: var(--cor-texto-botao);
+  }
+
+  .painel-do-objetivo-ativo .botao-transparente {
+    background: transparent;
+    border: 1px solid var(--cor-borda-interativa);
+    color: var(--cor-texto);
+  }
+
+  .painel-do-objetivo-ativo .botao-transparente:hover {
+    background: var(--cor-superficie-3);
+    border-color: var(--cor-foco);
+    color: var(--cor-texto);
+  }
+
+  .icone-do-objetivo-ativo {
+    align-items: center;
+    background: rgb(var(--cor-violeta-rgb) / 13%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 28%);
+    border-radius: 1.5rem;
+    color: var(--cor-link);
+    display: inline-flex;
+    font-size: 2.6rem;
+    height: 6rem;
+    justify-content: center;
+    position: relative;
+    width: 6rem;
+    z-index: 1;
+  }
+
+  .catalogo-de-concursos {
+    margin-top: 2.5rem;
+  }
+
+  .titulo-da-secao-dos-concursos {
+    align-items: end;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .titulo-da-secao-dos-concursos h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    letter-spacing: -0.035em;
+    margin: 0;
+  }
+
+  .titulo-da-secao-dos-concursos > span {
+    color: var(--cor-texto-secundario);
+    font-size: 0.875rem;
+  }
+
+  .grade-dos-concursos {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  }
+
+  .cartao-de-oportunidade {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-rows: 1fr auto;
+    min-height: 15rem;
+    padding: 1.35rem;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .cartao-de-oportunidade:hover {
+    background: var(--cor-superficie-3);
+    border-color: rgb(var(--cor-violeta-rgb) / 42%);
+    transform: translateY(-2px);
+  }
+
+  .conteudo-do-cartao-do-concurso {
+    align-content: start;
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .conteudo-do-cartao-do-concurso h3 {
+    color: var(--cor-texto);
+    font-size: 1.35rem;
+    letter-spacing: -0.025em;
+    margin: 0.35rem 0 0;
+  }
+
+  .conteudo-do-cartao-do-concurso p,
+  .conteudo-do-cartao-do-concurso small {
+    color: var(--cor-texto-secundario);
+    margin: 0;
+  }
+
+  .acoes-do-cartao-do-concurso {
+    align-items: center;
+    border-top: 1px solid var(--cor-borda);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    padding-top: 1rem;
+  }
+
+  .acoes-do-cartao-do-concurso .acoes-do-material {
+    margin-left: auto;
+  }
+
+  .paginacao-dos-concursos {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    margin-top: 1.5rem;
+    padding: 0.65rem;
+  }
+
+  /* Assistente de criação */
+
+  .pagina-do-novo-concurso {
+    max-width: 88rem;
+  }
+
+  .cabecalho-do-assistente-de-concurso {
+    margin-bottom: 1.25rem;
+  }
+
+  .trilho-de-etapas-do-concurso,
+  .trilho-da-importacao-de-edital {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    gap: 0.65rem;
+    margin: 0 0 1.5rem;
+    padding: 0;
+  }
+
+  .trilho-de-etapas-do-concurso li,
+  .trilho-da-importacao-de-edital li {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-width: 0;
+    padding: 0.75rem;
+  }
+
+  .trilho-de-etapas-do-concurso li.atual,
+  .trilho-da-importacao-de-edital li.atual {
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    border-color: rgb(var(--cor-violeta-rgb) / 52%);
+  }
+
+  .trilho-de-etapas-do-concurso li.concluido,
+  .trilho-da-importacao-de-edital li.concluido {
+    border-color: rgb(var(--cor-sucesso-rgb) / 28%);
+  }
+
+  .trilho-de-etapas-do-concurso li > i,
+  .trilho-da-importacao-de-edital li > i {
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda-forte);
+    color: var(--cor-texto-secundario);
+    flex: 0 0 auto;
+  }
+
+  .trilho-de-etapas-do-concurso li.atual > i,
+  .trilho-da-importacao-de-edital li.atual > i {
+    background: var(--cor-violeta);
+    border-color: var(--cor-violeta);
+    color: var(--cor-texto-botao);
+  }
+
+  .trilho-de-etapas-do-concurso li b,
+  .trilho-da-importacao-de-edital li b {
+    color: var(--cor-texto);
+  }
+
+  .trilho-de-etapas-do-concurso li small {
+    color: var(--cor-texto-suave);
+  }
+
+  .grade-do-assistente-de-concurso {
+    align-items: start;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+
+  .painel-da-etapa-do-concurso {
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .etapa-do-assistente-de-concurso {
+    min-height: 30rem;
+    padding: clamp(1.4rem, 4vw, 2.25rem);
+  }
+
+  .etapa-do-assistente-de-concurso > .titulo-editorial {
+    color: var(--cor-texto);
+    font-size: clamp(1.6rem, 3vw, 2.15rem);
+    letter-spacing: -0.035em;
+  }
+
+  .etapa-do-assistente-de-concurso > .text-secondary {
+    color: var(--cor-texto-secundario) !important;
+    line-height: 1.65;
+  }
+
+  .painel-da-etapa-do-concurso .formulario-da-aplicacao {
+    gap: 1.1rem;
+  }
+
+  .painel-da-etapa-do-concurso .formulario-da-aplicacao label > span,
+  .painel-da-etapa-do-concurso fieldset legend {
+    color: var(--cor-texto);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .painel-da-etapa-do-concurso .formulario-da-aplicacao em {
+    color: var(--cor-texto-suave);
+    font-size: 0.78rem;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .painel-da-etapa-do-concurso .nota-contextual {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda-forte);
+  }
+
+  .selecao-do-assistente {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-height: 4.25rem;
+    padding: 0.85rem;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .selecao-do-assistente:has(input:checked) {
+    background: rgb(var(--cor-violeta-rgb) / 10%);
+    border-color: rgb(var(--cor-violeta-rgb) / 45%);
+  }
+
+  .etapa-de-revisao-do-concurso {
+    align-content: start;
+  }
+
+  .etapa-de-revisao-do-concurso dl > div {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+  }
+
+  .etapa-de-revisao-do-concurso dt {
+    color: var(--cor-texto-suave);
+  }
+
+  .etapa-de-revisao-do-concurso dd {
+    color: var(--cor-texto);
+  }
+
+  .acoes-da-etapa-do-concurso {
+    background: var(--cor-superficie-1);
+    border-top: 1px solid var(--cor-borda);
+    margin: 0;
+    padding: 1rem clamp(1.4rem, 4vw, 2.25rem);
+  }
+
+  .contexto-do-assistente-de-concurso {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    box-shadow: none;
+    padding: 1.35rem;
+    position: sticky;
+    top: calc(var(--altura-topo) + 1rem);
+  }
+
+  .contexto-do-assistente-de-concurso h2 {
+    color: var(--cor-texto);
+    font-size: 1.35rem;
+  }
+
+  .contexto-do-assistente-de-concurso p,
+  .contexto-do-assistente-de-concurso li {
+    color: var(--cor-texto-secundario);
+  }
+
+  .contexto-do-assistente-de-concurso .icone-redondo-da-jornada {
+    background: rgb(var(--cor-violeta-rgb) / 13%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 28%);
+    color: var(--cor-link);
+  }
+
+  /* Detalhe e visão do concurso */
+
+  .pagina-do-detalhe-do-concurso {
+    max-width: 100rem;
+  }
+
+  .cabecalho-do-detalhe-do-concurso {
+    align-items: end;
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-xl);
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: clamp(1.4rem, 4vw, 2.25rem);
+  }
+
+  .cabecalho-do-detalhe-do-concurso h1 {
+    font-size: clamp(2.2rem, 5vw, 4rem);
+  }
+
+  .estados-do-concurso {
+    margin-block: 0.75rem !important;
+  }
+
+  .acoes-do-detalhe-do-concurso {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    justify-content: end;
+  }
+
+  .estado-de-carregamento-do-concurso {
+    align-items: center;
+    background: var(--cor-superficie-1);
+    border: 1px dashed var(--cor-borda-forte);
+    border-radius: var(--raio-lg);
+    color: var(--cor-texto-secundario);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 22rem;
+  }
+
+  .marcos-do-detalhe-do-concurso {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 1rem 0 1.5rem;
+    padding: 0;
+  }
+
+  .marcos-do-detalhe-do-concurso > * {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    color: var(--cor-texto-secundario);
+    min-width: 0;
+    padding: 0.75rem;
+  }
+
+  .marcos-do-detalhe-do-concurso > *.atual {
+    background: rgb(var(--cor-violeta-rgb) / 11%);
+    border-color: rgb(var(--cor-violeta-rgb) / 45%);
+    color: var(--cor-link);
+  }
+
+  .marcos-do-detalhe-do-concurso > *.concluido {
+    border-color: rgb(var(--cor-sucesso-rgb) / 28%);
+  }
+
+  .marcos-do-detalhe-do-concurso > * > i {
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda-forte);
+    color: var(--cor-texto-secundario);
+  }
+
+  .marcos-do-detalhe-do-concurso > *.atual > i {
+    background: var(--cor-violeta);
+    border-color: var(--cor-violeta);
+    color: var(--cor-texto-botao);
+  }
+
+  .abas-modernas-do-concurso {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    display: inline-flex;
+    gap: 0.3rem;
+    margin-bottom: 1.25rem;
+    padding: 0.3rem;
+  }
+
+  .abas-modernas-do-concurso button {
+    border: 0;
+    border-radius: calc(var(--raio-lg) - 0.25rem);
+    color: var(--cor-texto-secundario);
+    min-height: 2.8rem;
+    padding: 0.65rem 1rem;
+  }
+
+  .abas-modernas-do-concurso button.ativo {
+    background: var(--cor-superficie-3);
+    box-shadow: inset 0 0 0 1px var(--cor-borda-forte);
+    color: var(--cor-texto);
+  }
+
+  .abas-modernas-do-concurso button span {
+    background: rgb(var(--cor-violeta-rgb) / 15%);
+    color: var(--cor-link);
+  }
+
+  .painel-da-visao-do-concurso {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .painel-da-visao-do-concurso > article {
+    min-width: 0;
+    padding: 1.4rem;
+  }
+
+  .cartao-de-proximo-passo-do-concurso {
+    background: var(--cor-superficie-3);
+    border-color: rgb(var(--cor-violeta-rgb) / 38%);
+    box-shadow: inset 0.22rem 0 0 var(--cor-violeta);
+    grid-column: span 8;
+    min-height: 18rem;
+  }
+
+  .cartao-de-proximo-passo-do-concurso h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.7rem, 3vw, 2.45rem);
+    letter-spacing: -0.04em;
+  }
+
+  .cartao-de-proximo-passo-do-concurso > p:not(.sobretitulo-da-pagina) {
+    color: var(--cor-texto-secundario);
+    line-height: 1.65;
+    max-width: 42rem;
+  }
+
+  .cartao-de-proximo-passo-do-concurso .btn-primary {
+    background: var(--cor-violeta);
+    border-color: var(--cor-violeta);
+    color: var(--cor-texto-botao);
+  }
+
+  .cartao-de-dados-do-concurso {
+    grid-column: span 4;
+  }
+
+  .cartao-de-dados-do-concurso dl {
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cartao-de-dados-do-concurso dl > div {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    padding: 0.8rem;
+  }
+
+  .cartao-de-dados-do-concurso dt {
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  .cartao-de-dados-do-concurso dd {
+    color: var(--cor-texto);
+    margin: 0.25rem 0 0;
+  }
+
+  .cartao-da-estrutura-do-concurso {
+    grid-column: span 8;
+  }
+
+  .cartao-da-cobertura-do-concurso {
+    grid-column: span 4;
+  }
+
+  .cabecalho-do-cartao-da-jornada {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+
+  .cabecalho-do-cartao-da-jornada h2 {
+    color: var(--cor-texto);
+    font-size: 1.35rem;
+    letter-spacing: -0.025em;
+  }
+
+  .arvore-resumida-do-concurso {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+
+  .arvore-resumida-do-concurso > div {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-height: 4.25rem;
+    padding: 0.75rem;
+  }
+
+  .arvore-resumida-do-concurso > div > span {
+    background: rgb(var(--cor-violeta-rgb) / 13%);
+    border: 1px solid rgb(var(--cor-violeta-rgb) / 22%);
+    color: var(--cor-link);
+  }
+
+  .arvore-resumida-do-concurso b {
+    color: var(--cor-texto);
+  }
+
+  .arvore-resumida-do-concurso small {
+    color: var(--cor-texto-secundario);
+  }
+
+  .cartao-da-cobertura-do-concurso .anel-de-mapeamento {
+    background:
+      radial-gradient(
+        closest-side,
+        var(--cor-superficie-2) 78%,
+        transparent 79% 100%
+      ),
+      conic-gradient(
+        var(--cor-violeta) var(--valor-do-anel),
+        var(--cor-superficie-4) 0
+      );
+  }
+
+  .cartao-da-cobertura-do-concurso .anel-de-mapeamento strong {
+    color: var(--cor-texto);
+  }
+
+  .cartao-da-cobertura-do-concurso li {
+    border-color: var(--cor-borda);
+  }
+
+  .painel-do-conteudo-programatico {
+    align-items: start;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(17rem, 0.3fr) minmax(0, 1fr);
+  }
+
+  .navegador-das-materias-do-edital {
+    max-height: calc(100vh - var(--altura-topo) - 2rem);
+    overflow: auto;
+    padding: 1rem;
+    position: sticky;
+    top: calc(var(--altura-topo) + 1rem);
+  }
+
+  .navegador-das-materias-do-edital > button:not(.btn) {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--raio-md);
+    color: var(--cor-texto-secundario);
+    min-height: 4.25rem;
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  .navegador-das-materias-do-edital > button:not(.btn):hover {
+    background: var(--cor-superficie-3);
+    border-color: var(--cor-borda);
+  }
+
+  .navegador-das-materias-do-edital > button.ativo {
+    background: rgb(var(--cor-violeta-rgb) / 13%);
+    border-color: rgb(var(--cor-violeta-rgb) / 38%);
+    color: var(--cor-texto);
+  }
+
+  .navegador-das-materias-do-edital em {
+    color: var(--cor-aviso);
+    font-size: 0.75rem;
+  }
+
+  .painel-dos-itens-oficiais {
+    min-width: 0;
+    padding: 1.25rem;
+  }
+
+  .lista-de-itens-oficiais {
+    border: 0;
+    display: grid;
+    gap: 0.75rem;
+    overflow: visible;
+  }
+
+  .lista-de-itens-oficiais > article {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 1rem;
+  }
+
+  .lista-de-itens-oficiais > article.pendente {
+    background: color-mix(in srgb, var(--cor-aviso) 5%, transparent);
+    border-color: color-mix(in srgb, var(--cor-aviso) 25%, transparent);
+  }
+
+  .lista-de-itens-oficiais > article.mapeado {
+    border-color: rgb(var(--cor-sucesso-rgb) / 22%);
+  }
+
+  .estado-do-item-oficial {
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda);
+    color: var(--cor-texto-secundario);
+  }
+
+  .lista-de-itens-oficiais > article.mapeado .estado-do-item-oficial {
+    background: rgb(var(--cor-sucesso-rgb) / 12%);
+    border-color: rgb(var(--cor-sucesso-rgb) / 25%);
+    color: var(--cor-sucesso);
+  }
+
+  .lista-de-itens-oficiais h3 {
+    color: var(--cor-texto);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .mapeamentos-do-item-oficial span {
+    background: rgb(var(--cor-sucesso-rgb) / 10%);
+    border: 1px solid rgb(var(--cor-sucesso-rgb) / 22%);
+    color: var(--cor-sucesso);
+  }
+
+  .acoes-do-item-oficial {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: end;
+  }
+
+  /* Edição hierárquica no detalhe */
+
+  .dados-gerais-do-concurso {
+    background: var(--cor-superficie-2) !important;
+    border: 1px solid var(--cor-borda) !important;
+    box-shadow: none !important;
+  }
+
+  .cabecalho-do-cartao-contextual h2 {
+    color: var(--cor-texto);
+  }
+
+  .resumo-dos-dados-do-concurso {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+  }
+
+  .ramo-da-estrutura {
+    border-left-color: rgb(var(--cor-violeta-rgb) / 30%) !important;
+  }
+
+  .item-da-estrutura {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    gap: 0.8rem;
+    padding: 0.8rem;
+  }
+
+  .item-da-estrutura strong {
+    color: var(--cor-texto);
+  }
+
+  .item-da-estrutura p {
+    color: var(--cor-texto-secundario) !important;
+  }
+
+  .acoes-da-estrutura {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  #formularios-da-estrutura {
+    background: transparent;
+    box-shadow: none !important;
+  }
+
+  #formularios-da-estrutura .accordion-item {
+    background: var(--cor-superficie-2);
+    border-color: var(--cor-borda);
+  }
+
+  #formularios-da-estrutura .accordion-button {
+    background: var(--cor-superficie-2);
+    color: var(--cor-texto);
+    min-height: 3.5rem;
+  }
+
+  #formularios-da-estrutura .accordion-button:not(.collapsed) {
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    color: var(--cor-link);
+  }
+
+  #formularios-da-estrutura .accordion-body {
+    background: var(--cor-superficie-1);
+    border-top: 1px solid var(--cor-borda);
+  }
+
+  #formulario-mapeamento .nota-contextual {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda-forte);
+  }
+
+  /* Fluxo de importação */
+
+  .pagina-da-importacao-de-edital {
+    max-width: 90rem;
+  }
+
+  .cabecalho-da-importacao-de-edital {
+    margin-bottom: 1.25rem;
+  }
+
+  .trilho-da-importacao-de-edital {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .trilho-da-importacao-de-edital li {
+    min-height: 3.75rem;
+  }
+
+  .fluxo-da-importacao-de-edital {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .painel-de-estado-da-importacao,
+  .painel-de-preparacao-da-importacao,
+  .painel-do-recibo-da-importacao {
+    align-content: center;
+    justify-items: start;
+    min-height: 18rem;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+  }
+
+  .painel-de-estado-da-importacao h2,
+  .painel-de-preparacao-da-importacao h2,
+  .painel-do-recibo-da-importacao h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.55rem, 3vw, 2.1rem);
+    letter-spacing: -0.035em;
+  }
+
+  .painel-de-estado-da-importacao p,
+  .painel-de-preparacao-da-importacao p,
+  .painel-do-recibo-da-importacao p {
+    color: var(--cor-texto-secundario);
+    line-height: 1.65;
+    max-width: 52rem;
+  }
+
+  .acoes-do-status-da-importacao {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .painel-de-recebimento-do-edital {
+    display: grid;
+    gap: 1.5rem;
+    padding: clamp(1.35rem, 4vw, 2.25rem);
+  }
+
+  .painel-de-recebimento-do-edital .grupo-da-importacao {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    padding: 1rem;
+  }
+
+  .painel-de-recebimento-do-edital .grupo-da-importacao legend {
+    color: var(--cor-texto);
+    font-size: 0.95rem;
+    padding-inline: 0.35rem;
+  }
+
+  .painel-de-recebimento-do-edital .opcoes-da-importacao label {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    min-height: 5.5rem;
+    padding: 0.9rem;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .painel-de-recebimento-do-edital .opcoes-da-importacao label:hover {
+    background: var(--cor-superficie-3);
+    border-color: var(--cor-borda-forte);
+  }
+
+  .painel-de-recebimento-do-edital
+    .opcoes-da-importacao
+    label:has(input:checked) {
+    background: rgb(var(--cor-violeta-rgb) / 12%);
+    border-color: rgb(var(--cor-violeta-rgb) / 48%);
+  }
+
+  .painel-de-recebimento-do-edital .opcoes-da-importacao strong {
+    color: var(--cor-texto);
+  }
+
+  .painel-de-recebimento-do-edital .opcoes-da-importacao small,
+  .painel-de-recebimento-do-edital .formulario-da-aplicacao > small {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-previa-da-importacao {
+    display: grid;
+    gap: 1.25rem;
+    padding: clamp(1.35rem, 4vw, 2.25rem);
+  }
+
+  .painel-da-previa-da-importacao > header h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+  }
+
+  .painel-da-previa-da-importacao > header p {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-previa-da-importacao .contagens-da-previa,
+  .painel-do-recibo-da-importacao .contagens-do-recibo {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
+
+  .painel-da-previa-da-importacao .contagens-da-previa > div,
+  .painel-do-recibo-da-importacao .contagens-do-recibo > div {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    padding: 0.8rem;
+  }
+
+  .painel-da-previa-da-importacao dt,
+  .painel-do-recibo-da-importacao dt {
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .painel-da-previa-da-importacao dd,
+  .painel-do-recibo-da-importacao dd {
+    color: var(--cor-texto);
+  }
+
+  .painel-da-previa-da-importacao .colunas-da-previa {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .painel-da-previa-da-importacao .colunas-da-previa > section,
+  .painel-da-previa-da-importacao .confirmacao-da-importacao {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    padding: 1rem;
+  }
+
+  .painel-da-previa-da-importacao .colunas-da-previa h3,
+  .painel-da-previa-da-importacao .confirmacao-da-importacao h3 {
+    color: var(--cor-texto);
+    font-size: 1rem;
+  }
+
+  .painel-da-previa-da-importacao .colunas-da-previa p,
+  .painel-da-previa-da-importacao .colunas-da-previa li,
+  .painel-da-previa-da-importacao .confirmacao-da-importacao p,
+  .painel-da-previa-da-importacao .confirmacao-da-importacao small {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-previa-da-importacao .confirmacao-da-importacao {
+    border-color: rgb(var(--cor-violeta-rgb) / 45%);
+    box-shadow: inset 0.2rem 0 0 var(--cor-violeta);
+  }
+
+  .painel-da-previa-da-importacao .frase-de-confirmacao {
+    background: var(--cor-canvas);
+    border: 1px solid var(--cor-borda-forte);
+    color: var(--cor-link);
+  }
+
+  .painel-da-revisao-da-extracao {
+    display: grid;
+    gap: 1.25rem;
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
+
+  .painel-da-revisao-da-extracao .cabecalho-da-revisao {
+    align-items: end;
+    border-bottom: 1px solid var(--cor-borda);
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+  }
+
+  .painel-da-revisao-da-extracao .cabecalho-da-revisao h2 {
+    color: var(--cor-texto);
+    font-size: clamp(1.6rem, 3vw, 2.15rem);
+  }
+
+  .painel-da-revisao-da-extracao .cabecalho-da-revisao p,
+  .painel-da-revisao-da-extracao .orientacao-da-selecao {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-revisao-da-extracao .filtros-da-revisao label {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-revisao-da-extracao .selecao-do-cargo {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    padding: 1rem;
+  }
+
+  .painel-da-revisao-da-extracao .cargo-extraido {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+  }
+
+  .painel-da-revisao-da-extracao .cargo-extraido:hover {
+    border-color: var(--cor-borda-forte);
+  }
+
+  .painel-da-revisao-da-extracao .cargo-extraido.selecionado {
+    background: rgb(var(--cor-violeta-rgb) / 10%);
+    border-color: rgb(var(--cor-violeta-rgb) / 48%);
+    box-shadow: none;
+  }
+
+  .painel-da-revisao-da-extracao .cargo-extraido strong {
+    color: var(--cor-texto);
+  }
+
+  .painel-da-revisao-da-extracao .cargo-extraido small {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-revisao-da-extracao .extracao-assistida {
+    background: color-mix(in srgb, var(--cor-informacao) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cor-informacao) 22%, transparent);
+    border-radius: var(--raio-lg);
+    padding: 1rem;
+  }
+
+  .painel-da-revisao-da-extracao .extracao-assistida h3 {
+    color: var(--cor-texto);
+  }
+
+  .painel-da-revisao-da-extracao .extracao-assistida p {
+    color: var(--cor-texto-secundario);
+  }
+
+  .painel-da-revisao-da-extracao .grupo-de-problemas {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-inline-start: 0.25rem solid var(--cor-texto-suave);
+    border-radius: var(--raio-md);
+    padding: 0.9rem;
+  }
+
+  .painel-da-revisao-da-extracao .grupo-de-problemas.severidade-bloqueante {
+    border-inline-start-color: var(--cor-perigo);
+  }
+
+  .painel-da-revisao-da-extracao .grupo-de-problemas.severidade-exige_decisao {
+    border-inline-start-color: var(--cor-aviso);
+  }
+
+  .painel-da-revisao-da-extracao footer {
+    background: color-mix(in srgb, var(--cor-superficie-1) 94%, transparent);
+    backdrop-filter: blur(0.75rem);
+    border-top: 1px solid var(--cor-borda);
+  }
+
+  /* Editor do staging */
+
+  .editor-moderno-da-estrutura-do-edital {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-editavel {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    overflow: clip;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-editavel > summary {
+    background: var(--cor-superficie-2);
+    min-height: 3.75rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-editavel[open] > summary {
+    background: var(--cor-superficie-3);
+    border-bottom: 1px solid var(--cor-borda);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-editavel > summary strong,
+  .editor-moderno-da-estrutura-do-edital .cabecalho-da-lista h3 {
+    color: var(--cor-texto);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-editavel > summary small,
+  .editor-moderno-da-estrutura-do-edital .cabecalho-da-lista p {
+    color: var(--cor-texto-secundario);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-do-cargo {
+    border-color: rgb(var(--cor-violeta-rgb) / 32%);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .secao-da-prova,
+  .editor-moderno-da-estrutura-do-edital .secao-da-materia {
+    background: var(--cor-superficie-2);
+    border-color: var(--cor-borda);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .conteudo-da-secao {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    padding: 1rem;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .campo > span {
+    color: var(--cor-texto);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .campo input,
+  .editor-moderno-da-estrutura-do-edital .campo select,
+  .editor-moderno-da-estrutura-do-edital .campo textarea,
+  .painel-da-revisao-da-extracao .campo-do-alvo input,
+  .painel-da-revisao-da-extracao .politica-de-reutilizacao select {
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda-interativa);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto);
+    min-height: 2.75rem;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .campo input:focus,
+  .editor-moderno-da-estrutura-do-edital .campo select:focus,
+  .editor-moderno-da-estrutura-do-edital .campo textarea:focus,
+  .painel-da-revisao-da-extracao .campo-do-alvo input:focus,
+  .painel-da-revisao-da-extracao .politica-de-reutilizacao select:focus {
+    border-color: var(--cor-foco);
+    box-shadow: 0 0 0 0.2rem rgb(var(--cor-violeta-rgb) / 18%);
+    outline: 0;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .lista-interna {
+    border-color: var(--cor-borda);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .linha-editavel {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    padding: 0.85rem;
+  }
+
+  .editor-moderno-da-estrutura-do-edital .conversor-de-linhas {
+    background: var(--cor-superficie-2);
+    border: 1px dashed var(--cor-borda-forte);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .estado-vazio-da-estrutura {
+    background: var(--cor-superficie-1);
+    border: 1px dashed var(--cor-borda-forte);
+    border-radius: var(--raio-lg);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .estado-vazio-da-estrutura h4 {
+    color: var(--cor-texto);
+  }
+
+  .editor-moderno-da-estrutura-do-edital .estado-vazio-da-estrutura p {
+    color: var(--cor-texto-secundario);
+  }
+
+  .situacao-moderna-do-campo-extraido .mensagem-do-campo,
+  .situacao-moderna-do-campo-extraido .confirmacao-indisponivel {
+    color: var(--cor-perigo);
+  }
+
+  .situacao-moderna-do-campo-extraido .dado-inferido {
+    color: var(--cor-aviso);
+  }
+
+  .situacao-moderna-do-campo-extraido .confirmacao-do-campo {
+    background: color-mix(in srgb, var(--cor-aviso) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cor-aviso) 24%, transparent);
+    color: var(--cor-aviso);
+    min-height: 2.5rem;
+  }
+
+  /* Responsividade */
+
+  @media (max-width: 1199.98px) {
+    .grade-do-assistente-de-concurso {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+
+    .painel-da-visao-do-concurso {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cartao-de-proximo-passo-do-concurso,
+    .cartao-de-dados-do-concurso,
+    .cartao-da-estrutura-do-concurso,
+    .cartao-da-cobertura-do-concurso {
+      grid-column: auto;
+    }
+  }
+
+  @media (max-width: 991.98px) {
+    .cabecalho-editorial-dos-concursos,
+    .cabecalho-do-detalhe-do-concurso {
+      align-items: start;
+      grid-template-columns: 1fr;
+    }
+
+    .acoes-principais-dos-concursos,
+    .acoes-do-detalhe-do-concurso {
+      justify-content: start;
+    }
+
+    .painel-de-filtros-dos-concursos {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .painel-de-filtros-dos-concursos .campo-de-busca {
+      grid-column: 1 / -1;
+    }
+
+    .grade-do-assistente-de-concurso {
+      grid-template-columns: 1fr;
+    }
+
+    .contexto-do-assistente-de-concurso {
+      position: static;
+    }
+
+    .marcos-do-detalhe-do-concurso {
+      display: flex;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      padding-bottom: 0.25rem;
+      scroll-snap-type: inline proximity;
+    }
+
+    .marcos-do-detalhe-do-concurso > * {
+      flex: 0 0 16rem;
+      scroll-snap-align: start;
+    }
+
+    .painel-do-conteudo-programatico {
+      grid-template-columns: 1fr;
+    }
+
+    .navegador-das-materias-do-edital {
+      max-height: none;
+      position: static;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .modulo-concursos-moderno .cabecalho-da-pagina h1 {
+      font-size: clamp(2rem, 12vw, 3.15rem);
+    }
+
+    .painel-do-objetivo-ativo {
+      grid-template-columns: 1fr;
+    }
+
+    .icone-do-objetivo-ativo {
+      display: none;
+    }
+
+    .acoes-do-objetivo-ativo,
+    .acoes-do-cartao-do-concurso,
+    .acoes-do-status-da-importacao {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .acoes-do-objetivo-ativo .btn,
+    .acoes-do-cartao-do-concurso > .btn,
+    .acoes-do-status-da-importacao .btn {
+      width: 100%;
+    }
+
+    .acoes-do-cartao-do-concurso .acoes-do-material {
+      margin-left: 0;
+      position: absolute;
+      right: 1rem;
+      top: 1rem;
+    }
+
+    .cartao-de-oportunidade {
+      position: relative;
+    }
+
+    .trilho-de-etapas-do-concurso,
+    .trilho-da-importacao-de-edital {
+      display: flex;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      padding-bottom: 0.25rem;
+      scroll-snap-type: inline proximity;
+    }
+
+    .trilho-de-etapas-do-concurso li,
+    .trilho-da-importacao-de-edital li {
+      flex: 0 0 13rem;
+      scroll-snap-align: start;
+    }
+
+    .painel-da-visao-do-concurso {
+      grid-template-columns: 1fr;
+    }
+
+    .cartao-de-dados-do-concurso dl {
+      grid-template-columns: 1fr;
+    }
+
+    .abas-modernas-do-concurso {
+      display: flex;
+      width: 100%;
+    }
+
+    .abas-modernas-do-concurso button {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .lista-de-itens-oficiais > article {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .lista-de-itens-oficiais .acoes-do-item-oficial {
+      grid-column: 1 / -1;
+      justify-content: stretch;
+      padding-left: 0;
+    }
+
+    .lista-de-itens-oficiais .acoes-do-item-oficial .link-da-jornada {
+      flex: 1;
+      justify-content: center;
+    }
+
+    .painel-da-previa-da-importacao .colunas-da-previa {
+      grid-template-columns: 1fr;
+    }
+
+    .painel-da-revisao-da-extracao .cabecalho-da-revisao {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .painel-da-revisao-da-extracao footer {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .painel-da-revisao-da-extracao footer .btn {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .acoes-principais-dos-concursos,
+    .acoes-do-detalhe-do-concurso {
+      align-items: stretch;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .acoes-principais-dos-concursos .btn,
+    .acoes-do-detalhe-do-concurso .btn {
+      width: 100%;
+    }
+
+    .painel-de-filtros-dos-concursos {
+      grid-template-columns: 1fr;
+    }
+
+    .painel-de-filtros-dos-concursos .campo-de-busca {
+      grid-column: auto;
+    }
+
+    .painel-de-filtros-dos-concursos .filtro-da-biblioteca {
+      padding-inline: 0;
+    }
+
+    .painel-do-objetivo-ativo {
+      padding: 1.25rem;
+    }
+
+    .titulo-da-secao-dos-concursos {
+      align-items: start;
+      flex-direction: column;
+    }
+
+    .etapa-do-assistente-de-concurso {
+      min-height: 0;
+      padding: 1.15rem;
+    }
+
+    .acoes-da-etapa-do-concurso {
+      align-items: stretch;
+      flex-direction: column-reverse;
+      padding: 1rem 1.15rem;
+    }
+
+    .acoes-da-etapa-do-concurso .btn {
+      width: 100%;
+    }
+
+    .cabecalho-do-detalhe-do-concurso {
+      padding: 1.2rem;
+    }
+
+    .abas-modernas-do-concurso {
+      overflow-x: auto;
+    }
+
+    .abas-modernas-do-concurso button {
+      flex: 0 0 auto;
+    }
+
+    .painel-da-visao-do-concurso > article,
+    .painel-dos-itens-oficiais {
+      padding: 1rem;
+    }
+
+    .cabecalho-do-cartao-da-jornada {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .cabecalho-do-cartao-da-jornada > .btn {
+      width: 100%;
+    }
+
+    .painel-de-recebimento-do-edital .opcoes-da-importacao {
+      grid-template-columns: 1fr;
+    }
+
+    .painel-de-recebimento-do-edital .busca-do-concurso {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .item-da-estrutura {
+      align-items: stretch;
+    }
+
+    .acoes-da-estrutura {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cartao-de-oportunidade,
+    .trilho-de-etapas-do-concurso li,
+    .trilho-da-importacao-de-edital li {
+      transition: none;
+    }
+
+    .cartao-de-oportunidade:hover {
+      transform: none;
+    }
+  }
+}
