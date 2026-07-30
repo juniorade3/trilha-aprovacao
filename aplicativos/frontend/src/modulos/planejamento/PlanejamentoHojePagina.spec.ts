@@ -93,6 +93,11 @@ function revisaoEspacada(
   }
 }
 
+const capacidadeDaFila = {
+  limiteDePrioridades: 3,
+  duracaoEstimadaPorRevisaoEmMinutos: 20,
+}
+
 const paginasMontadas: ReturnType<typeof mount>[] = []
 
 async function montar() {
@@ -136,6 +141,7 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [],
     })
   })
@@ -176,6 +182,7 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [
         revisaoEspacada('VENCIDA'),
         {
@@ -211,14 +218,69 @@ describe('PlanejamentoHojePagina', () => {
     ])
   })
 
-  it('navega para a semana e informa o bloco que deve receber foco', async () => {
+  it('prioriza tres revisoes e deixa a fila de recuperacao explicita', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T15:00:00Z'))
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
+      revisoes: Array.from({ length: 14 }, (_, indice) => ({
+        ...revisaoEspacada(indice < 8 ? 'VENCIDA' : 'DEVIDA_HOJE'),
+        identificadorDoTopico: `topico-${indice + 1}`,
+        nomeDoTopico: `Tópico ${indice + 1}`,
+        dataDevida: indice < 8 ? '2026-07-18' : '2026-07-21',
+      })),
+    })
+
+    const pagina = await montar()
+    const botoesDeRevisao = () =>
+      pagina
+        .findAll('[aria-label^="Revisar agora:"]')
+        .filter((item) => item.isVisible())
+
+    expect(pagina.text()).toContain('14 para acompanhar hoje')
+    expect(pagina.text()).toContain('8 vencidas')
+    expect(pagina.text()).toContain('6 devidas hoje')
+    expect(botoesDeRevisao()).toHaveLength(3)
+    expect(pagina.text()).toContain('11 revisões continuam pendentes')
+    expect(
+      pagina
+        .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+        .attributes('aria-expanded'),
+    ).toBe('false')
+    expect(pagina.get('#itens-da-fila-de-recuperacao').isVisible()).toBe(false)
+
+    await pagina
+      .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+      .trigger('click')
+
+    expect(
+      pagina
+        .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+        .attributes('aria-expanded'),
+    ).toBe('true')
+    expect(pagina.get('#itens-da-fila-de-recuperacao').isVisible()).toBe(true)
+    expect(botoesDeRevisao()).toHaveLength(14)
+    expect(
+      pagina.find('a[href="/planejamento/semana?inicio=2026-07-20"]').exists(),
+    ).toBe(true)
+  })
+
+  it('navega para a semana e informa o bloco que deve receber foco', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T15:00:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [
         {
           ...revisaoEspacada('JA_PLANEJADA'),
+          dataDevida: '2026-07-18',
+          diasEmAtraso: 3,
           blocoAberto: {
             identificador: 'bloco-revisao',
             identificadorDoPlano: 'plano-1',
@@ -231,7 +293,12 @@ describe('PlanejamentoHojePagina', () => {
     })
     const pagina = await montar()
 
-    expect(pagina.text()).toContain('Já planejada para 23 de jul.')
+    expect(pagina.text()).toContain(
+      'Vencida há 3 dias · planejada para 23 de jul.',
+    )
+    expect(pagina.get('.situacao-vencida').text()).toContain(
+      'Vencida há 3 dias',
+    )
     expect(
       pagina.get('[aria-label="Ir para o bloco: Direitos fundamentais"]'),
     ).toBeTruthy()
@@ -263,6 +330,7 @@ describe('PlanejamentoHojePagina', () => {
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [],
       })
     const rede = await montar()
@@ -298,11 +366,13 @@ describe('PlanejamentoHojePagina', () => {
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [revisaoEspacada()],
       })
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [],
       })
     const atualizada = await montar()
