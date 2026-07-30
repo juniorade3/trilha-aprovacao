@@ -166,6 +166,9 @@ class RevisoesEspacadasIntegracaoTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dataDeReferencia").value(REFERENCIA.toString()))
                 .andExpect(jsonPath("$.ate").value(REFERENCIA.plusDays(3).toString()))
+                .andExpect(jsonPath("$.capacidadeDaFila.limiteDePrioridades").value(3))
+                .andExpect(jsonPath("$.capacidadeDaFila.duracaoEstimadaPorRevisaoEmMinutos")
+                        .value(20))
                 .andExpect(jsonPath("$.revisoes.length()").value(7))
                 .andReturn().getResponse().getContentAsString();
         JsonNode agenda = mapeador.readTree(resposta);

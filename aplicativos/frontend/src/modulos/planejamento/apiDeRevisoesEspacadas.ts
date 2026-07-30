@@ -26,9 +26,15 @@ export interface RevisaoEspacada {
   blocoAberto?: BlocoAbertoDaRevisao
 }
 
+export interface CapacidadeDaFilaDeRevisoes {
+  limiteDePrioridades: number
+  duracaoEstimadaPorRevisaoEmMinutos: number
+}
+
 export interface AgendaDeRevisoesEspacadas {
   dataDeReferencia: string
   ate: string
+  capacidadeDaFila: CapacidadeDaFilaDeRevisoes
   revisoes: RevisaoEspacada[]
 }
 

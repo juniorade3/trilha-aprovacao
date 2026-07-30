@@ -1,6 +1,7 @@
 package br.com.trilhaaprovacao.revisoes.api;
 
 import br.com.trilhaaprovacao.revisoes.aplicacao.ResultadoDaAgendaDeRevisoes;
+import br.com.trilhaaprovacao.revisoes.dominio.ConfiguracaoDaFilaDeRevisoes;
 import br.com.trilhaaprovacao.revisoes.dominio.SituacaoDaRevisaoEspacada;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -11,12 +12,22 @@ import java.util.UUID;
 public record RespostaDeRevisoesEspacadas(
         LocalDate dataDeReferencia,
         LocalDate ate,
+        CapacidadeDaFila capacidadeDaFila,
         List<Revisao> revisoes) {
 
     public static RespostaDeRevisoesEspacadas de(ResultadoDaAgendaDeRevisoes resultado) {
         return new RespostaDeRevisoesEspacadas(resultado.dataDeReferencia(), resultado.ate(),
+                new CapacidadeDaFila(ConfiguracaoDaFilaDeRevisoes.LIMITE_DE_PRIORIDADES_DA_FILA,
+                        ConfiguracaoDaFilaDeRevisoes
+                                .DURACAO_ESTIMADA_POR_REVISAO_EM_MINUTOS),
                 resultado.revisoes().stream().map(RespostaDeRevisoesEspacadas::revisao)
                         .toList());
+    }
+
+    @Schema(name = "CapacidadeDaFilaDeRevisoes")
+    public record CapacidadeDaFila(
+            int limiteDePrioridades,
+            int duracaoEstimadaPorRevisaoEmMinutos) {
     }
 
     private static Revisao revisao(ResultadoDaAgendaDeRevisoes.Revisao revisao) {
