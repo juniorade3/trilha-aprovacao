@@ -122,6 +122,8 @@ Responsabilidade:
 - agenda de revisões;
 - revisões vencidas, devidas e futuras;
 - integração com blocos já abertos.
+- capacidade de apresentação da fila diária, sem alterar datas, etapas ou o
+  agendador de revisões.
 
 ### `dashboard`
 
