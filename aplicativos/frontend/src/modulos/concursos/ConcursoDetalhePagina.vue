@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import GavetaLateral from '@/compartilhado/componentes/GavetaLateral.vue'
@@ -79,8 +86,33 @@ const gavetaDaEstruturaAberta = ref(false)
 const abaDoConcurso = ref<'visao' | 'conteudo'>(
   rota.query.foco === 'mapeamentos' ? 'conteudo' : 'visao',
 )
+const abasDoConcurso = ['visao', 'conteudo'] as const
 const identificadorDaMateriaSelecionada = ref('')
 const cancelamento = new AbortController()
+
+async function navegarEntreAbas(evento: KeyboardEvent) {
+  const indiceAtual = abasDoConcurso.indexOf(abaDoConcurso.value)
+  let proximoIndice: number
+
+  if (evento.key === 'ArrowRight' || evento.key === 'ArrowDown') {
+    proximoIndice = (indiceAtual + 1) % abasDoConcurso.length
+  } else if (evento.key === 'ArrowLeft' || evento.key === 'ArrowUp') {
+    proximoIndice =
+      (indiceAtual - 1 + abasDoConcurso.length) % abasDoConcurso.length
+  } else if (evento.key === 'Home') {
+    proximoIndice = 0
+  } else if (evento.key === 'End') {
+    proximoIndice = abasDoConcurso.length - 1
+  } else {
+    return
+  }
+
+  evento.preventDefault()
+  const proximaAba = abasDoConcurso[proximoIndice] ?? 'visao'
+  abaDoConcurso.value = proximaAba
+  await nextTick()
+  document.getElementById(`aba-do-concurso-${proximaAba}`)?.focus()
+}
 
 const rotulosDaSituacao: Record<string, string> = {
   PLANEJADO: 'Planejado',
@@ -1042,20 +1074,36 @@ onBeforeUnmount(() => cancelamento.abort())
         Restaure o concurso para alterar sua estrutura.
       </section>
 
-      <nav class="abas-do-concurso" aria-label="Visualização do concurso">
+      <nav
+        class="abas-do-concurso abas-modernas-do-concurso"
+        aria-label="Visualização do concurso"
+        role="tablist"
+      >
         <button
+          id="aba-do-concurso-visao"
           type="button"
+          role="tab"
           :class="{ ativo: abaDoConcurso === 'visao' }"
           :aria-current="abaDoConcurso === 'visao' ? 'page' : undefined"
+          :aria-selected="abaDoConcurso === 'visao'"
+          aria-controls="painel-da-visao-do-concurso"
+          :tabindex="abaDoConcurso === 'visao' ? 0 : -1"
           @click="abaDoConcurso = 'visao'"
+          @keydown="navegarEntreAbas"
         >
           Visão do concurso
         </button>
         <button
+          id="aba-do-concurso-conteudo"
           type="button"
+          role="tab"
           :class="{ ativo: abaDoConcurso === 'conteudo' }"
           :aria-current="abaDoConcurso === 'conteudo' ? 'page' : undefined"
+          :aria-selected="abaDoConcurso === 'conteudo'"
+          aria-controls="painel-do-conteudo-programatico"
+          :tabindex="abaDoConcurso === 'conteudo' ? 0 : -1"
           @click="abaDoConcurso = 'conteudo'"
+          @keydown="navegarEntreAbas"
         >
           Conteúdo programático
           <span>{{ itensSemMapeamento.length }}</span>
@@ -1064,7 +1112,10 @@ onBeforeUnmount(() => cancelamento.abort())
 
       <section
         v-if="abaDoConcurso === 'visao'"
-        class="grade-da-visao-do-concurso"
+        id="painel-da-visao-do-concurso"
+        class="grade-da-visao-do-concurso painel-da-visao-do-concurso"
+        role="tabpanel"
+        aria-labelledby="aba-do-concurso-visao"
       >
         <article class="card proximo-passo-do-concurso">
           <p class="sobretitulo-da-pagina">{{ proximoPasso.etiqueta }}</p>
@@ -1202,8 +1253,11 @@ onBeforeUnmount(() => cancelamento.abort())
 
       <section
         v-else
-        class="conteudo-programatico-do-concurso"
+        id="painel-do-conteudo-programatico"
+        class="conteudo-programatico-do-concurso painel-do-conteudo-programatico"
         aria-label="Conteúdo programático"
+        role="tabpanel"
+        aria-labelledby="aba-do-concurso-conteudo"
       >
         <aside class="card navegador-do-conteudo-programatico">
           <span class="rotulo-discreto">Estrutura da prova</span>

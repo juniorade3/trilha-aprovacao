@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAuditoriaMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeCadastroAssistidoDeConcursos;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeConsultasMcp;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeImportacaoCompletaDoEditalMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesCriticasMcp;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDePreparacoesMcp;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -21,6 +22,7 @@ class CatalogoDeFerramentasMcpSchemaTest {
                 mock(ServicoDePreparacoesMcp.class),
                 mock(ServicoDeCadastroAssistidoDeConcursos.class),
                 mock(ServicoDeOperacoesCriticasMcp.class),
+                mock(ServicoDeImportacaoCompletaDoEditalMcp.class),
                 mock(ServicoDeAuditoriaMcp.class),
                 mock(ObjectMapper.class));
 
