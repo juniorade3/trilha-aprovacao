@@ -697,7 +697,10 @@ defineExpose({ focarPrimeiraPendencia })
 </script>
 
 <template>
-  <section ref="raiz" class="editor-da-estrutura">
+  <section
+    ref="raiz"
+    class="editor-da-estrutura editor-moderno-da-estrutura-do-edital"
+  >
     <details
       v-show="exibirSecao(problemasDaIdentificacao)"
       class="secao-editavel"

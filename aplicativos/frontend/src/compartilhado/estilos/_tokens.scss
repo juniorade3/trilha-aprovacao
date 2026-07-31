@@ -1,50 +1,73 @@
 :root {
   color-scheme: dark;
 
-  /* Paleta dark-only */
-  --cor-canvas: #0b1017;
-  --cor-superficie-1: #101720;
-  --cor-superficie-2: #141d28;
-  --cor-superficie-3: #1a2532;
-  --cor-texto: #f4f7fb;
-  --cor-texto-secundario: #b3becc;
-  --cor-violeta: #a78bfa;
-  --cor-link: #c4b5fd;
+  /* Neutros azulados com separação perceptível entre os planos. */
+  --cor-canvas: #070b12;
+  --cor-superficie-1: #0d141e;
+  --cor-superficie-2: #131e2c;
+  --cor-superficie-3: #1c2a3d;
+  --cor-superficie-4: #263850;
+  --cor-texto: #f7f9fc;
+  --cor-texto-secundario: #aab5c4;
+  --cor-texto-suave: #78869a;
+  --cor-violeta: #7c3aed;
+  --cor-violeta-rgb: 124 58 237;
+  --cor-violeta-hover: #6d28d9;
+  --cor-violeta-profundo: #4c1d95;
+  --cor-link: #bdaeff;
   --cor-foco: #c4b5fd;
-  --cor-texto-botao: #0d0816;
-  --cor-borda: #2a3746;
-  --cor-borda-interativa: #60738b;
-  --cor-sucesso: #65d6a5;
-  --cor-aviso: #f4c15d;
-  --cor-perigo: #ff8492;
-  --cor-informacao: #7bb8ff;
+  --cor-texto-botao: #ffffff;
+  --cor-borda: rgb(255 255 255 / 9%);
+  --cor-borda-forte: rgb(255 255 255 / 15%);
+  --cor-borda-interativa: #667892;
+  --cor-sucesso: #5fdaa7;
+  --cor-sucesso-rgb: 95 218 167;
+  --cor-aviso: #f5c451;
+  --cor-perigo: #ff7f90;
+  --cor-informacao: #71b7ff;
+  --cor-azul-acento: #38bdf8;
 
-  /* Aliases mantidos para componentes e estilos locais existentes. */
+  /* Compatibilidade com os componentes existentes durante a remodelagem. */
   --cor-primaria: var(--cor-texto);
   --cor-primaria-profunda: var(--cor-superficie-3);
   --cor-destaque: var(--cor-violeta);
-  --cor-destaque-clara: rgb(167 139 250 / 14%);
+  --cor-destaque-clara: rgb(124 58 237 / 16%);
   --cor-ambar: var(--cor-aviso);
-  --cor-ambar-clara: rgb(244 193 93 / 14%);
+  --cor-ambar-clara: rgb(245 196 81 / 14%);
   --cor-fundo: var(--cor-canvas);
   --cor-papel: var(--cor-superficie-2);
   --cor-superficie-secundaria: var(--cor-superficie-3);
   --cor-tinta: var(--cor-texto);
-  --sombra-suave: 0 1px 0 rgb(255 255 255 / 3%);
-  --sombra-elevada: 0 1.5rem 4rem rgb(0 0 0 / 38%);
+  --sombra-suave:
+    0 1px 0 rgb(255 255 255 / 4%), 0 0.75rem 2rem rgb(0 0 0 / 18%);
+  --sombra-card:
+    inset 0 1px 0 rgb(255 255 255 / 4%), 0 1.25rem 3.5rem rgb(0 0 0 / 18%);
+  --sombra-cartao: var(--sombra-card);
+  --sombra-destaque:
+    inset 0 1px 0 rgb(255 255 255 / 7%), 0 1.5rem 4.5rem rgb(54 20 110 / 26%);
+  --sombra-interativa:
+    inset 0 1px 0 rgb(255 255 255 / 6%), 0 1rem 2.5rem rgb(0 0 0 / 24%);
+  --sombra-elevada:
+    inset 0 1px 0 rgb(255 255 255 / 6%), 0 2rem 5rem rgb(0 0 0 / 42%);
   --fonte-titulos:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     sans-serif;
   --fonte-editorial: var(--fonte-titulos);
-  --raio-sm: 0.5rem;
-  --raio-md: 0.75rem;
-  --raio-lg: 1rem;
+  --raio-sm: 0.625rem;
+  --raio-md: 0.875rem;
+  --raio-lg: 1.25rem;
+  --raio-xl: 1.5rem;
   --espaco-1: 0.25rem;
   --espaco-2: 0.5rem;
   --espaco-3: 0.75rem;
   --espaco-4: 1rem;
+  --espaco-4-5: 1.25rem;
   --espaco-5: 1.5rem;
   --espaco-6: 2rem;
-  --largura-barra-lateral: 16rem;
-  --altura-topo: 4rem;
+  --espaco-7: 2.5rem;
+  --espaco-8: 3rem;
+  --espaco-9: 4rem;
+  --largura-barra-lateral: 17.5rem;
+  --largura-maxima-conteudo: 110rem;
+  --altura-topo: 4.25rem;
 }

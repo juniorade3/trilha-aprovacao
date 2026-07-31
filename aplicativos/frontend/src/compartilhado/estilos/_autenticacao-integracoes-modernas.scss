@@ -1,0 +1,442 @@
+/* Autenticação */
+[data-bs-theme='dark'] .layout-de-autenticacao {
+  background: var(--cor-canvas);
+  grid-template-columns: minmax(30rem, 1.05fr) minmax(32rem, 0.95fr);
+  position: relative;
+}
+
+[data-bs-theme='dark'] .apresentacao-da-autenticacao {
+  background:
+    radial-gradient(
+      circle at 12% 95%,
+      rgb(56 189 248 / 18%),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 93% 7%,
+      rgb(var(--cor-violeta-rgb) / 34%),
+      transparent 30rem
+    ),
+    linear-gradient(145deg, #0c111a 0%, #151128 45%, #24114d 100%);
+  border-right: 1px solid rgb(255 255 255 / 10%);
+  min-height: 100vh;
+  padding: clamp(2rem, 5vw, 5rem);
+  position: relative;
+}
+
+[data-bs-theme='dark'] .apresentacao-da-autenticacao::after {
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 50%;
+  content: '';
+  height: 30rem;
+  pointer-events: none;
+  position: absolute;
+  right: -15rem;
+  top: 18%;
+  width: 30rem;
+}
+
+[data-bs-theme='dark'] .apresentacao-da-autenticacao > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-bs-theme='dark'] .marca-da-autenticacao {
+  font-size: 1.05rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+[data-bs-theme='dark'] .marca-da-autenticacao .simbolo-da-marca {
+  align-items: center;
+  background: linear-gradient(145deg, var(--cor-link), var(--cor-violeta));
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 0.75rem;
+  color: #fff;
+  display: inline-flex;
+  filter: none;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+[data-bs-theme='dark'] .apresentacao-da-autenticacao h2 {
+  color: #fff;
+  font-size: clamp(3rem, 5vw, 5.75rem);
+  font-weight: 700;
+  letter-spacing: -0.065em;
+  line-height: 0.95;
+  margin: 1rem 0 1.5rem;
+  max-width: 10ch;
+}
+
+[data-bs-theme='dark']
+  .apresentacao-da-autenticacao
+  p:not(.rotulo-da-autenticacao, .nota-da-autenticacao) {
+  color: rgb(255 255 255 / 68%);
+  font-size: 1.075rem;
+  line-height: 1.65;
+  max-width: 36rem;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao {
+  display: grid;
+  gap: 0.7rem;
+  list-style: none;
+  margin: 2.25rem 0 0;
+  max-width: 37rem;
+  padding: 0;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao li {
+  align-items: center;
+  backdrop-filter: blur(1rem);
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: var(--raio-lg);
+  display: flex;
+  gap: 0.9rem;
+  min-height: 4.5rem;
+  padding: 0.8rem 1rem;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao li > i {
+  align-items: center;
+  background: rgb(var(--cor-violeta-rgb) / 23%);
+  border: 1px solid rgb(189 174 255 / 22%);
+  border-radius: var(--raio-md);
+  color: var(--cor-link);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 1.1rem;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao li > span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao strong {
+  color: #fff;
+  font-size: 0.9375rem;
+}
+
+[data-bs-theme='dark'] .beneficios-da-autenticacao small {
+  color: rgb(255 255 255 / 58%);
+  font-size: 0.8125rem !important;
+}
+
+[data-bs-theme='dark'] .nota-da-autenticacao {
+  color: rgb(255 255 255 / 56%) !important;
+  font-size: 0.875rem !important;
+}
+
+[data-bs-theme='dark'] .conteudo-da-autenticacao {
+  background:
+    radial-gradient(
+      circle at 80% 8%,
+      rgb(var(--cor-violeta-rgb) / 9%),
+      transparent 25rem
+    ),
+    var(--cor-canvas);
+  padding: clamp(1.5rem, 6vw, 6rem);
+}
+
+[data-bs-theme='dark'] .cartao-de-autenticacao {
+  background:
+    linear-gradient(rgb(255 255 255 / 1.5%), rgb(255 255 255 / 1.5%)),
+    var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-elevada);
+  max-width: 34rem;
+  padding: clamp(1.75rem, 4vw, 3rem);
+}
+
+[data-bs-theme='dark'] .cartao-de-autenticacao h1 {
+  color: var(--cor-texto);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 720;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  margin-bottom: 0.8rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-autenticacao form {
+  border-top: 1px solid var(--cor-borda);
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-autenticacao .form-control,
+[data-bs-theme='dark'] .cartao-de-autenticacao .input-group .btn {
+  min-height: 3.25rem;
+}
+
+[data-bs-theme='dark'] .acoes-da-autenticacao {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+[data-bs-theme='dark'] .acoes-da-autenticacao .btn {
+  min-width: 10rem;
+}
+
+[data-bs-theme='dark'] .acoes-da-autenticacao a {
+  color: var(--cor-link);
+  font-weight: 680;
+  text-decoration: none;
+}
+
+[data-bs-theme='dark'] .acoes-da-autenticacao a:hover {
+  color: var(--cor-foco);
+  text-decoration: underline;
+}
+
+/* Telegram */
+[data-bs-theme='dark'] .grade-da-integracao-telegram {
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1.65fr) minmax(20rem, 0.75fr);
+}
+
+[data-bs-theme='dark'] .cartao-do-vinculo-telegram {
+  background:
+    radial-gradient(circle at 100% 0, rgb(56 189 248 / 10%), transparent 24rem),
+    radial-gradient(
+      circle at 0 100%,
+      rgb(var(--cor-violeta-rgb) / 8%),
+      transparent 22rem
+    ),
+    var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-cartao);
+  min-height: 24rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+[data-bs-theme='dark'] .cartao-do-vinculo-telegram > header h2,
+[data-bs-theme='dark'] .historico-de-operacoes-assistidas > header h2 {
+  color: var(--cor-texto);
+  font-size: clamp(1.65rem, 2.7vw, 2.4rem);
+  letter-spacing: -0.045em;
+}
+
+[data-bs-theme='dark'] .dados-do-vinculo-telegram {
+  gap: 0.85rem;
+  margin: 1.5rem 0;
+}
+
+[data-bs-theme='dark'] .dados-do-vinculo-telegram > div {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  min-height: 5rem;
+  padding: 1rem;
+}
+
+[data-bs-theme='dark'] .dados-do-vinculo-telegram dt {
+  color: var(--cor-texto-suave);
+  font-size: 0.75rem !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-bs-theme='dark'] .dados-do-vinculo-telegram dd {
+  color: var(--cor-texto);
+  font-size: 0.9375rem;
+}
+
+[data-bs-theme='dark'] .codigo-do-vinculo-telegram {
+  background: rgb(var(--cor-violeta-rgb) / 8%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 20%);
+  border-radius: var(--raio-lg);
+  gap: 0.85rem;
+  padding: 1.25rem;
+}
+
+[data-bs-theme='dark'] .codigo-do-vinculo-telegram output {
+  background: var(--cor-superficie-1);
+  border: 1px dashed rgb(189 174 255 / 35%);
+  border-radius: var(--raio-md);
+  color: var(--cor-texto);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  padding: 1rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram {
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgb(var(--cor-violeta-rgb) / 24%),
+      transparent 18rem
+    ),
+    linear-gradient(145deg, #151e2b, #111720);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 20%);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-destaque);
+  padding: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram > i {
+  align-items: center;
+  background: rgb(var(--cor-violeta-rgb) / 16%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 24%);
+  border-radius: var(--raio-md);
+  color: var(--cor-link);
+  display: inline-flex;
+  height: 3.25rem;
+  justify-content: center;
+  width: 3.25rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram h2 {
+  color: var(--cor-texto);
+  font-size: 1.75rem;
+  letter-spacing: -0.035em;
+}
+
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram p,
+[data-bs-theme='dark'] .cartao-de-privacidade-do-telegram li {
+  color: var(--cor-texto-secundario);
+  font-size: 0.9375rem;
+}
+
+[data-bs-theme='dark'] .historico-de-operacoes-assistidas {
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-cartao);
+  margin-top: 1.5rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+[data-bs-theme='dark'] .lista-de-operacoes-assistidas li + li {
+  border-top-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .lista-de-operacoes-assistidas button {
+  border: 1px solid transparent;
+  border-radius: var(--raio-md);
+  gap: 1rem;
+  min-height: 5.5rem;
+  padding: 0.9rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+[data-bs-theme='dark'] .lista-de-operacoes-assistidas button:hover {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda);
+  transform: translateX(0.15rem);
+}
+
+[data-bs-theme='dark'] .icone-da-operacao-assistida {
+  background: rgb(var(--cor-violeta-rgb) / 13%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 20%);
+  border-radius: var(--raio-md);
+  color: var(--cor-link);
+  height: 2.75rem;
+  width: 2.75rem;
+}
+
+[data-bs-theme='dark'] .paginacao-das-operacoes-assistidas {
+  border-top-color: var(--cor-borda);
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+@media (max-width: 991.98px) {
+  [data-bs-theme='dark'] .layout-de-autenticacao {
+    display: block;
+  }
+
+  [data-bs-theme='dark'] .apresentacao-da-autenticacao {
+    display: none;
+  }
+
+  [data-bs-theme='dark'] .conteudo-da-autenticacao {
+    align-items: center;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: clamp(1.5rem, 6vw, 3rem);
+  }
+
+  [data-bs-theme='dark'] .marca-da-autenticacao-movel {
+    align-self: flex-start;
+    display: inline-flex;
+    margin-bottom: 1rem;
+  }
+
+  [data-bs-theme='dark'] .cartao-de-autenticacao {
+    margin-block: auto;
+    width: min(100%, 34rem);
+  }
+
+  [data-bs-theme='dark'] .grade-da-integracao-telegram {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark'] .conteudo-da-autenticacao {
+    align-items: stretch;
+    box-sizing: border-box;
+    padding: 1.25rem;
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .marca-da-autenticacao-movel {
+    align-self: auto;
+  }
+
+  [data-bs-theme='dark'] .cartao-de-autenticacao {
+    box-shadow: var(--sombra-cartao);
+    margin-block: auto;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .cartao-de-autenticacao {
+    box-sizing: border-box;
+    max-width: calc(100vw - 2.5rem);
+    padding: 1.5rem;
+    width: calc(100vw - 2.5rem);
+  }
+
+  [data-bs-theme='dark'] .acoes-da-autenticacao {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  [data-bs-theme='dark'] .acoes-da-autenticacao .btn {
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .acoes-da-autenticacao a {
+    text-align: center;
+  }
+
+  [data-bs-theme='dark'] .dados-do-vinculo-telegram {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .lista-de-operacoes-assistidas button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  [data-bs-theme='dark'] .lista-de-operacoes-assistidas button > .badge {
+    grid-column: 2;
+  }
+}

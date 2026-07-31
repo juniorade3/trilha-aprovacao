@@ -99,6 +99,17 @@ const materiaisExibidos = computed(() => {
   })
 })
 
+const quantidadeDeMateriaisAtivos = computed(
+  () => materiais.value.filter((material) => !material.arquivado).length,
+)
+
+const quantidadeTotalDeCoberturas = computed(() =>
+  Object.values(quantidadesDeCoberturas).reduce(
+    (total, quantidade) => total + quantidade,
+    0,
+  ),
+)
+
 const topicosDisponiveis = computed(() => {
   const vinculados = new Set(
     coberturas.value.map((item) => item.identificadorDoTopico),
@@ -442,6 +453,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="pagina-da-jornada pagina-de-materiais">
     <CabecalhoDaPagina
+      class="cabecalho-de-catalogo-moderno"
       etiqueta="Sua biblioteca de apoio"
       titulo="Materiais"
       descricao="Encontre rapidamente o que estudar e veja quais tópicos cada fonte realmente cobre."
@@ -468,8 +480,38 @@ onBeforeUnmount(() => {
       planejamento.
     </p>
 
-    <form class="card barra-da-biblioteca" @submit.prevent="carregar">
-      <div class="campo-de-busca">
+    <section
+      class="resumo-moderno-do-catalogo resumo-moderno-dos-materiais"
+      aria-label="Resumo da biblioteca"
+    >
+      <article>
+        <i class="bi bi-collection" aria-hidden="true"></i>
+        <span
+          ><b>{{ materiais.length }}</b
+          ><small>materiais encontrados</small></span
+        >
+      </article>
+      <article>
+        <i class="bi bi-play-circle" aria-hidden="true"></i>
+        <span
+          ><b>{{ quantidadeDeMateriaisAtivos }}</b
+          ><small>fontes ativas</small></span
+        >
+      </article>
+      <article>
+        <i class="bi bi-diagram-2" aria-hidden="true"></i>
+        <span
+          ><b>{{ quantidadeTotalDeCoberturas }}</b
+          ><small>vínculos com tópicos</small></span
+        >
+      </article>
+    </section>
+
+    <form
+      class="card barra-da-biblioteca filtros-modernos-da-biblioteca"
+      @submit.prevent="carregar"
+    >
+      <div class="campo-de-busca busca-principal-da-biblioteca">
         <i class="bi bi-search" aria-hidden="true"></i>
         <label class="visually-hidden" for="pesquisa-material">
           Pesquisar materiais por título ou fonte
@@ -481,11 +523,8 @@ onBeforeUnmount(() => {
           placeholder="Buscar por título ou fonte"
         />
       </div>
-      <div class="d-flex flex-wrap align-items-end gap-2">
-        <label
-          class="d-grid gap-1 small text-secondary"
-          for="tipo-material-filtro"
-        >
+      <div class="opcoes-dos-filtros-da-biblioteca">
+        <label class="controle-do-filtro" for="tipo-material-filtro">
           <span>Tipo</span>
           <select
             id="tipo-material-filtro"
@@ -498,10 +537,7 @@ onBeforeUnmount(() => {
             <option value="OUTRO">Outro</option>
           </select>
         </label>
-        <label
-          class="d-grid gap-1 small text-secondary"
-          for="ordenacao-materiais"
-        >
+        <label class="controle-do-filtro" for="ordenacao-materiais">
           <span>Ordenar por</span>
           <select
             id="ordenacao-materiais"
@@ -512,7 +548,10 @@ onBeforeUnmount(() => {
             <option value="TITULO">Título</option>
           </select>
         </label>
-        <label class="filtro-da-biblioteca pb-2" for="materiais-arquivados">
+        <label
+          class="filtro-da-biblioteca alternador-de-arquivados"
+          for="materiais-arquivados"
+        >
           <input
             id="materiais-arquivados"
             v-model="incluirArquivados"
@@ -549,85 +588,107 @@ onBeforeUnmount(() => {
       "
       icone="bi-file-earmark-plus"
     />
-    <section v-else class="grade-da-biblioteca" aria-label="Materiais">
-      <article
-        v-for="material in materiaisExibidos"
-        :key="material.identificador"
-        class="card cartao-do-material"
-        :aria-labelledby="`titulo-do-material-${material.identificador}`"
-      >
-        <div
-          class="capa-do-material"
-          :class="`tipo-${material.tipo.toLowerCase()}`"
+    <section v-else class="secao-da-biblioteca-moderna">
+      <header class="cabecalho-da-grade-do-catalogo">
+        <div>
+          <span class="rotulo-discreto">Biblioteca organizada</span>
+          <h2>Fontes de estudo</h2>
+        </div>
+        <span class="badge etiqueta-neutra">
+          {{ materiaisExibidos.length }}
+          {{ materiaisExibidos.length === 1 ? 'resultado' : 'resultados' }}
+        </span>
+      </header>
+
+      <div class="grade-da-biblioteca" role="list" aria-label="Materiais">
+        <article
+          v-for="material in materiaisExibidos"
+          :key="material.identificador"
+          class="card cartao-do-material"
+          role="listitem"
+          :class="{ 'material-arquivado': material.arquivado }"
+          :aria-labelledby="`titulo-do-material-${material.identificador}`"
         >
-          <i
-            class="bi"
-            :class="iconeDoMaterial(material.tipo)"
-            aria-hidden="true"
-          ></i>
-          <span>{{ nomeDoTipoDeMaterial(material.tipo) }}</span>
-        </div>
-        <div class="corpo-do-cartao-do-material">
-          <span class="rotulo-discreto">
-            {{ material.fonte || 'Fonte não informada' }}
-          </span>
-          <h2 :id="`titulo-do-material-${material.identificador}`">
-            {{ material.titulo }}
-          </h2>
-          <p>{{ material.descricao || 'Sem descrição.' }}</p>
-          <div class="dados-do-material">
-            <span>
-              <i class="bi bi-collection" aria-hidden="true"></i>
-              {{ quantidadesDeCoberturas[material.identificador] ?? 0 }}
-              tópicos cobertos
-            </span>
-            <span v-if="material.duracaoEstimadaEmMinutos">
-              <i class="bi bi-clock" aria-hidden="true"></i>
-              {{ material.duracaoEstimadaEmMinutos }} min
-            </span>
-            <span>
-              <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-              Atualizado em
-              <time :datetime="material.atualizadoEm">
-                {{ formatarDataDeAtualizacao(material.atualizadoEm) }}
-              </time>
-            </span>
+          <div
+            class="capa-do-material"
+            :class="`tipo-${material.tipo.toLowerCase()}`"
+          >
+            <i
+              class="bi"
+              :class="iconeDoMaterial(material.tipo)"
+              aria-hidden="true"
+            ></i>
+            <span>{{ nomeDoTipoDeMaterial(material.tipo) }}</span>
           </div>
-          <footer>
-            <button
-              class="link-da-jornada"
-              type="button"
-              :disabled="material.arquivado"
-              :aria-label="`Ver cobertura de ${material.titulo}`"
-              @click="selecionarMaterial(material)"
-            >
-              Ver cobertura
-              <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </button>
-            <details class="acoes-do-material">
-              <summary
-                class="botao-de-icone"
-                :aria-label="`Ações de ${material.titulo}`"
+          <div class="corpo-do-cartao-do-material">
+            <div class="identidade-do-material">
+              <span class="rotulo-discreto">
+                {{ material.fonte || 'Fonte não informada' }}
+              </span>
+              <span v-if="material.arquivado" class="badge etiqueta-neutra">
+                Arquivado
+              </span>
+            </div>
+            <h2 :id="`titulo-do-material-${material.identificador}`">
+              {{ material.titulo }}
+            </h2>
+            <p>{{ material.descricao || 'Sem descrição.' }}</p>
+            <div class="dados-do-material">
+              <span>
+                <i class="bi bi-collection" aria-hidden="true"></i>
+                {{ quantidadesDeCoberturas[material.identificador] ?? 0 }}
+                tópicos cobertos
+              </span>
+              <span v-if="material.duracaoEstimadaEmMinutos">
+                <i class="bi bi-clock" aria-hidden="true"></i>
+                {{ material.duracaoEstimadaEmMinutos }} min
+              </span>
+              <span>
+                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                Atualizado em
+                <time :datetime="material.atualizadoEm">
+                  {{ formatarDataDeAtualizacao(material.atualizadoEm) }}
+                </time>
+              </span>
+            </div>
+            <footer>
+              <button
+                class="link-da-jornada"
+                type="button"
+                :disabled="material.arquivado"
+                :aria-label="`Ver cobertura de ${material.titulo}`"
+                @click="selecionarMaterial(material)"
               >
-                <i class="bi bi-three-dots" aria-hidden="true"></i>
-              </summary>
-              <div class="menu-de-acoes-do-material">
-                <button type="button" @click="editar(material)">Editar</button>
-                <button type="button" @click="alternarArquivamento(material)">
-                  {{ material.arquivado ? 'Reativar' : 'Arquivar' }}
-                </button>
-                <button
-                  class="text-danger"
-                  type="button"
-                  @click="excluir(material)"
+                Ver cobertura
+                <i class="bi bi-arrow-right" aria-hidden="true"></i>
+              </button>
+              <details class="acoes-do-material">
+                <summary
+                  class="botao-de-icone"
+                  :aria-label="`Ações de ${material.titulo}`"
                 >
-                  Excluir
-                </button>
-              </div>
-            </details>
-          </footer>
-        </div>
-      </article>
+                  <i class="bi bi-three-dots" aria-hidden="true"></i>
+                </summary>
+                <div class="menu-de-acoes-do-material">
+                  <button type="button" @click="editar(material)">
+                    Editar
+                  </button>
+                  <button type="button" @click="alternarArquivamento(material)">
+                    {{ material.arquivado ? 'Reativar' : 'Arquivar' }}
+                  </button>
+                  <button
+                    class="text-danger"
+                    type="button"
+                    @click="excluir(material)"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </details>
+            </footer>
+          </div>
+        </article>
+      </div>
     </section>
 
     <ModalDaAplicacao
@@ -705,6 +766,7 @@ onBeforeUnmount(() => {
 
     <GavetaLateral
       v-if="coberturaAberta && materialSelecionado"
+      class="gaveta-de-cobertura-moderna"
       etiqueta="Cobertura real"
       :titulo="materialSelecionado.titulo"
       descricao="Escolha somente tópicos realmente cobertos por esta fonte."
@@ -720,7 +782,10 @@ onBeforeUnmount(() => {
         Abrir material
         <i class="bi bi-box-arrow-up-right ms-2" aria-hidden="true"></i>
       </a>
-      <form class="formulario-da-aplicacao" @submit.prevent="vincularTopico">
+      <form
+        class="formulario-da-aplicacao formulario-de-cobertura-moderna"
+        @submit.prevent="vincularTopico"
+      >
         <label>
           <span>Matéria</span>
           <select
@@ -758,7 +823,7 @@ onBeforeUnmount(() => {
         </label>
         <button class="btn btn-primary" type="submit">Vincular tópico</button>
       </form>
-      <div class="topicos-cobertos">
+      <div class="topicos-cobertos lista-moderna-de-coberturas">
         <p class="sobretitulo-da-pagina">Tópicos já cobertos</p>
         <p v-if="coberturas.length === 0" class="text-secondary">
           Nenhum tópico vinculado.

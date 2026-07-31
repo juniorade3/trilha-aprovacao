@@ -1,0 +1,258 @@
+[data-bs-theme='dark'] .registro-estudo-moderno {
+  min-width: 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__formulario {
+  display: grid;
+  gap: 1rem;
+}
+
+[data-bs-theme='dark']
+  .registro-estudo-moderno__formulario
+  .formulario-da-aplicacao {
+  display: grid;
+  gap: 1rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__estado {
+  align-items: center;
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  display: flex;
+  gap: 1rem;
+  min-height: 8rem;
+  padding: 1.25rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__estado > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__estado strong {
+  color: var(--cor-texto);
+  font-size: 1rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__estado span,
+[data-bs-theme='dark'] .registro-estudo-moderno__estado p {
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__icone-de-estado,
+[data-bs-theme='dark'] .registro-estudo-moderno__icone-de-secao {
+  align-items: center;
+  background: rgb(var(--cor-violeta-rgb) / 14%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 24%);
+  border-radius: var(--raio-md);
+  color: var(--cor-link);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 3rem;
+  justify-content: center;
+  width: 3rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__estado--erro {
+  background: rgb(255 127 144 / 7%);
+  border-color: rgb(255 127 144 / 22%);
+}
+
+[data-bs-theme='dark']
+  .registro-estudo-moderno__estado--erro
+  .registro-estudo-moderno__icone-de-estado {
+  background: rgb(255 127 144 / 12%);
+  border-color: rgb(255 127 144 / 24%);
+  color: var(--cor-perigo);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__secao,
+[data-bs-theme='dark'] .registro-estudo-moderno .campos-de-evidencia {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: clamp(1rem, 2.5vw, 1.4rem);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__secao--principal {
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgb(var(--cor-violeta-rgb) / 10%),
+      transparent 17rem
+    ),
+    var(--cor-superficie-1);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__cabecalho-de-secao {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.85rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__cabecalho-de-secao > div {
+  min-width: 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__cabecalho-de-secao h3 {
+  color: var(--cor-texto);
+  font-size: 1.2rem;
+  letter-spacing: -0.025em;
+  margin: 0.2rem 0 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__cabecalho-de-secao p {
+  color: var(--cor-texto-secundario);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin: 0.25rem 0 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__etapa {
+  color: var(--cor-link);
+  font-size: 0.75rem;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__grade,
+[data-bs-theme='dark'] .registro-estudo-moderno .duas-colunas-do-formulario {
+  gap: 0.9rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__grade--duas-colunas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno label > span,
+[data-bs-theme='dark'] .registro-estudo-moderno legend {
+  color: var(--cor-texto);
+  font-size: 0.8125rem;
+  font-weight: 680;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno label em {
+  color: var(--cor-texto-suave);
+  font-style: normal;
+  font-weight: 500;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno input,
+[data-bs-theme='dark'] .registro-estudo-moderno select,
+[data-bs-theme='dark'] .registro-estudo-moderno textarea {
+  background: var(--cor-superficie-3);
+  border-color: var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  color: var(--cor-texto);
+  min-height: 3rem;
+  padding: 0.65rem 0.75rem;
+  width: 100%;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno textarea {
+  min-height: 7.25rem;
+  resize: vertical;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__duracoes {
+  border: 0;
+  border-top: 1px solid var(--cor-borda);
+  margin: 0.25rem 0 0;
+  padding: 1rem 0 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__duracoes legend {
+  margin-bottom: 0.65rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .duracoes-rapidas {
+  gap: 0.5rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .botao-de-duracao {
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  color: var(--cor-texto-secundario);
+  min-height: 2.5rem;
+  padding-inline: 0.8rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .botao-de-duracao.ativo {
+  background: rgb(var(--cor-violeta-rgb) / 16%);
+  border-color: rgb(var(--cor-violeta-rgb) / 48%);
+  color: var(--cor-link);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .campos-de-evidencia {
+  border-color: rgb(56 189 248 / 20%);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .campos-de-evidencia > legend {
+  color: var(--cor-texto);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  padding: 0;
+}
+
+[data-bs-theme='dark']
+  .registro-estudo-moderno
+  .campos-de-evidencia
+  .form-text {
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno .padroes-de-erro-do-formulario {
+  background: rgb(255 127 144 / 5%);
+  border: 1px solid rgb(255 127 144 / 13%);
+  border-radius: var(--raio-md);
+  padding: 0.9rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__aviso {
+  background: rgb(var(--cor-violeta-rgb) / 8%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 17%);
+  border-radius: var(--raio-md);
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__salvar {
+  min-width: 10rem;
+}
+
+[data-bs-theme='dark'] .registro-estudo-moderno__cancelar {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .registro-estudo-moderno__grade--duas-colunas,
+  [data-bs-theme='dark'] .registro-estudo-moderno .duas-colunas-do-formulario {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .registro-estudo-moderno__secao,
+  [data-bs-theme='dark'] .registro-estudo-moderno .campos-de-evidencia {
+    padding: 1rem;
+  }
+
+  [data-bs-theme='dark'] .registro-estudo-moderno__cabecalho-de-secao {
+    gap: 0.7rem;
+  }
+
+  [data-bs-theme='dark'] .registro-estudo-moderno__icone-de-secao {
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+}

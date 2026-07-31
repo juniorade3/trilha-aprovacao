@@ -290,7 +290,7 @@ async function focarPrimeiraPendencia() {
 
 <template>
   <section
-    class="card revisao-da-extracao"
+    class="card revisao-da-extracao painel-da-revisao-da-extracao"
     aria-labelledby="titulo-da-revisao-da-extracao"
   >
     <header class="cabecalho-da-revisao">
@@ -500,7 +500,7 @@ async function focarPrimeiraPendencia() {
         <summary>
           <h3 :id="`titulo-${severidade}`">
             {{ rotulosDasSeveridades[severidade] }}
-            <span class="badge text-bg-light">
+            <span class="badge etiqueta-neutra">
               {{ problemasPorSeveridade[severidade].length }}
             </span>
           </h3>

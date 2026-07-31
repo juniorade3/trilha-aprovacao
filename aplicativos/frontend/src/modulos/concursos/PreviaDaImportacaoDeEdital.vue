@@ -21,7 +21,7 @@ function formatarDataHora(valor?: string | null) {
 
 <template>
   <section
-    class="card previa-da-importacao"
+    class="card previa-da-importacao painel-da-previa-da-importacao"
     aria-labelledby="titulo-previa-importacao"
   >
     <header>
@@ -202,7 +202,7 @@ function formatarDataHora(valor?: string | null) {
 
 .frase-de-confirmacao {
   display: block;
-  background: var(--bs-light);
+  background: var(--cor-canvas);
   border-radius: 0.5rem;
   font-family: monospace;
   font-weight: 700;

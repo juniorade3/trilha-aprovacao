@@ -69,7 +69,7 @@ function alterar() {
   <div
     v-if="problemas.length || dadoInferido"
     :id="identificador"
-    class="situacao-do-campo"
+    class="situacao-do-campo situacao-moderna-do-campo-extraido"
     :data-com-pendencia="problemas.length ? 'true' : undefined"
     tabindex="-1"
   >

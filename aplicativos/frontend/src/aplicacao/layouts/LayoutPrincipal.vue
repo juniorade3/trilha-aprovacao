@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { usarSessao } from '@/aplicacao/estado/sessao'
 import { assistenteTelegramEstaHabilitado } from '@/aplicacao/configuracao/funcionalidades'
@@ -16,6 +16,7 @@ interface DadosIniciaisDoRegistroRapido {
 }
 
 const sessao = usarSessao()
+const rotaAtual = useRoute()
 const roteador = useRouter()
 const assistenteTelegramHabilitado = assistenteTelegramEstaHabilitado()
 const menuAberto = ref(false)
@@ -24,6 +25,33 @@ const registroRapidoAberto = ref(false)
 const dadosIniciaisDoRegistroRapido = ref<DadosIniciaisDoRegistroRapido>()
 const aviso = ref('')
 let temporizadorDoAviso: number | undefined
+
+const contextoDoTopo = computed(() => {
+  const caminho = rotaAtual.path
+
+  if (caminho === '/planejamento/hoje')
+    return { secao: 'Planejamento', titulo: 'Hoje' }
+  if (caminho === '/planejamento/semana')
+    return { secao: 'Planejamento', titulo: 'Planejamento semanal' }
+  if (caminho === '/planejamento/prioridades')
+    return { secao: 'Planejamento', titulo: 'Prioridades' }
+  if (caminho === '/estudos/novo')
+    return { secao: 'Histórico', titulo: 'Registrar estudo' }
+  if (caminho.startsWith('/estudos'))
+    return { secao: 'Sua trilha', titulo: 'Histórico de estudos' }
+  if (caminho.startsWith('/materias'))
+    return { secao: 'Organização', titulo: 'Conteúdos' }
+  if (caminho.startsWith('/materiais'))
+    return { secao: 'Organização', titulo: 'Biblioteca de materiais' }
+  if (caminho === '/concursos/novo')
+    return { secao: 'Meu concurso', titulo: 'Novo concurso' }
+  if (caminho.startsWith('/concursos'))
+    return { secao: 'Organização', titulo: 'Meu concurso' }
+  if (caminho.startsWith('/integracoes/telegram'))
+    return { secao: 'Assistente', titulo: 'Integração Telegram' }
+
+  return { secao: 'Sua trilha', titulo: 'Visão geral' }
+})
 
 const { raizDoDialogo: raizDoMenu } = usarDialogoAcessivel(
   fecharMenu,
@@ -157,6 +185,11 @@ onBeforeUnmount(() => {
           </svg>
           <span>Trilha da Aprovação</span>
         </RouterLink>
+
+        <div class="contexto-do-topo" aria-live="polite" aria-atomic="true">
+          <span class="trilha-do-topo">{{ contextoDoTopo.secao }}</span>
+          <strong class="titulo-do-topo">{{ contextoDoTopo.titulo }}</strong>
+        </div>
 
         <div class="acoes-do-topo d-flex align-items-center gap-3 ms-auto">
           <button

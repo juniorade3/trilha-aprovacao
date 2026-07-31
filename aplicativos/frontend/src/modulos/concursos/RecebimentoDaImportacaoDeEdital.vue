@@ -96,7 +96,7 @@ function enviar() {
 <template>
   <form
     ref="formulario"
-    class="card cartao-do-assistente"
+    class="card cartao-do-assistente painel-de-recebimento-do-edital"
     @submit.prevent="enviar"
   >
     <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>

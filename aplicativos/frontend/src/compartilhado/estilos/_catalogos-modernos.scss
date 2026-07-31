@@ -1,0 +1,1401 @@
+/* Catálogos de conteúdos e materiais.
+ * Esta camada é carregada por último para substituir a composição legada sem
+ * alterar os contratos dos componentes e das páginas.
+ */
+
+[data-bs-theme='dark'] {
+  .pagina-de-conteudos,
+  .pagina-de-materiais,
+  .pagina-de-detalhe-da-materia {
+    min-width: 0;
+  }
+
+  .cabecalho-de-catalogo-moderno {
+    margin-bottom: clamp(1.5rem, 2.5vw, 2.5rem);
+  }
+
+  .resumo-moderno-do-catalogo {
+    color: var(--cor-texto);
+    display: grid;
+    font-size: 1rem;
+    gap: 0.75rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 0 1.5rem;
+
+    article {
+      align-items: center;
+      background: var(--cor-superficie-1);
+      border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-md);
+      display: flex;
+      gap: 0.85rem;
+      min-height: 5.25rem;
+      min-width: 0;
+      padding: 0.9rem 1rem;
+    }
+
+    article > i {
+      align-items: center;
+      background: rgb(var(--cor-violeta-rgb) / 14%);
+      border: 1px solid rgb(var(--cor-violeta-rgb) / 22%);
+      border-radius: var(--raio-sm);
+      color: var(--cor-link);
+      display: inline-flex;
+      flex: 0 0 auto;
+      font-size: 1.05rem;
+      height: 2.45rem;
+      justify-content: center;
+      width: 2.45rem;
+    }
+
+    article > span,
+    b,
+    small {
+      display: block;
+      min-width: 0;
+    }
+
+    b {
+      color: var(--cor-texto);
+      font-size: 1.25rem;
+      font-weight: 720;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    small {
+      color: var(--cor-texto-secundario);
+      line-height: 1.25;
+      margin-top: 0.25rem;
+    }
+  }
+
+  .resumo-moderno-dos-materiais {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Conteúdos: navegação mestre-detalhe. */
+  .catalogo-de-conteudos-moderno {
+    align-items: start;
+    gap: 1.25rem;
+    grid-template-columns: minmax(19rem, 22rem) minmax(0, 1fr);
+  }
+
+  .catalogo-de-conteudos-moderno > .painel-mestre-de-materias {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    max-height: calc(100dvh - var(--altura-topo) - 2rem);
+    overflow: hidden auto;
+    padding: 1rem;
+    position: sticky;
+    scrollbar-color: var(--cor-borda-interativa) transparent;
+    top: calc(var(--altura-topo) + 1rem);
+  }
+
+  .cabecalho-do-painel-mestre,
+  .cabecalho-da-grade-do-catalogo {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    min-width: 0;
+
+    > div {
+      min-width: 0;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      letter-spacing: -0.025em;
+      margin: 0.2rem 0 0;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+    }
+  }
+
+  .busca-do-catalogo-moderno,
+  .busca-principal-da-biblioteca {
+    background: var(--cor-superficie-2);
+    border-color: var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto-secundario);
+    min-height: 2.9rem;
+
+    &:focus-within {
+      border-color: var(--cor-foco);
+      box-shadow: 0 0 0 0.2rem rgb(var(--cor-violeta-rgb) / 18%);
+    }
+
+    input {
+      color: var(--cor-texto);
+      min-height: 2.75rem;
+    }
+
+    input::placeholder {
+      color: var(--cor-texto-suave);
+      opacity: 1;
+    }
+  }
+
+  .catalogo-de-conteudos-moderno .filtros-do-catalogo {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    display: grid;
+    gap: 0.25rem;
+    grid-template-columns: 1fr 1fr;
+    margin: 0.75rem 0 1rem;
+    padding: 0.25rem;
+
+    button {
+      border-radius: calc(var(--raio-sm) - 0.2rem);
+      color: var(--cor-texto-secundario);
+      font-size: 0.875rem !important;
+      min-height: 2.75rem;
+      padding: 0.5rem;
+    }
+
+    button.ativo {
+      background: rgb(var(--cor-violeta-rgb) / 18%);
+      box-shadow: inset 0 0 0 1px rgb(var(--cor-violeta-rgb) / 24%);
+      color: var(--cor-link);
+    }
+  }
+
+  .catalogo-de-conteudos-moderno .lista-mestre-de-materias {
+    gap: 0.35rem;
+
+    > button {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--raio-sm);
+      color: var(--cor-texto);
+      gap: 0.75rem;
+      grid-template-columns: 0.25rem minmax(0, 1fr) auto;
+      min-height: 4.5rem;
+      padding: 0.75rem;
+      transition:
+        background-color 160ms ease,
+        border-color 160ms ease;
+    }
+
+    > button:hover {
+      background: var(--cor-superficie-2);
+      border-color: var(--cor-borda);
+    }
+
+    > button.ativo {
+      background: rgb(var(--cor-violeta-rgb) / 14%);
+      border-color: rgb(var(--cor-violeta-rgb) / 32%);
+      box-shadow: none;
+    }
+
+    .cor-da-materia {
+      background: var(--cor-identificadora-da-materia);
+      border-radius: 999px;
+      min-height: 3rem;
+    }
+
+    b {
+      color: var(--cor-texto);
+      font-size: 0.95rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    small {
+      color: var(--cor-texto-secundario);
+      display: -webkit-box;
+      line-height: 1.35;
+      margin-top: 0.2rem;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    em {
+      color: var(--cor-aviso);
+      font-size: 0.8125rem;
+      margin-top: 0.25rem;
+    }
+
+    > button > .bi-chevron-right {
+      color: var(--cor-texto-suave);
+    }
+
+    > button.ativo > .bi-chevron-right {
+      color: var(--cor-link);
+    }
+  }
+
+  .catalogo-de-conteudos-moderno .paginacao-do-catalogo {
+    border-color: var(--cor-borda);
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+
+    button {
+      align-items: center;
+      border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-sm);
+      color: var(--cor-link);
+      display: inline-flex;
+      height: 2.75rem;
+      justify-content: center;
+      width: 2.75rem;
+    }
+
+    button:hover:not(:disabled) {
+      background: rgb(var(--cor-violeta-rgb) / 14%);
+      border-color: rgb(var(--cor-violeta-rgb) / 35%);
+    }
+
+    button:disabled {
+      color: var(--cor-texto-suave);
+      opacity: 0.45;
+    }
+
+    span {
+      color: var(--cor-texto-secundario);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .catalogo-de-conteudos-moderno > .detalhe-da-materia-no-catalogo {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    min-height: 39rem;
+    min-width: 0;
+    padding: clamp(1.15rem, 2vw, 1.75rem);
+  }
+
+  .cabecalho-do-detalhe-da-materia {
+    gap: 1.5rem;
+
+    h2 {
+      color: var(--cor-texto);
+      font-size: clamp(1.75rem, 3vw, 2.6rem);
+      line-height: 1.08;
+      margin: 0.65rem 0 0.45rem;
+      max-width: 22ch;
+    }
+
+    p {
+      color: var(--cor-texto-secundario);
+      line-height: 1.55;
+      max-width: 65ch;
+    }
+  }
+
+  .identidade-da-materia-selecionada {
+    min-width: 0;
+  }
+
+  .etiqueta-da-materia {
+    background: color-mix(
+      in srgb,
+      var(--cor-identificadora-da-materia) 16%,
+      var(--cor-superficie-2)
+    );
+    border: 1px solid
+      color-mix(
+        in srgb,
+        var(--cor-identificadora-da-materia) 48%,
+        var(--cor-borda)
+      );
+    color: var(--cor-texto);
+  }
+
+  .acoes-do-detalhe-do-catalogo {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .progresso-da-materia {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-md);
+    gap: 1rem;
+    grid-template-columns: minmax(9rem, 12rem) minmax(8rem, 1fr) auto;
+    margin: 1.5rem 0 1rem;
+    padding: 1rem;
+
+    b {
+      color: var(--cor-texto);
+      font-size: 0.875rem !important;
+      line-height: 1.25;
+    }
+
+    small {
+      color: var(--cor-texto-secundario);
+      margin-top: 0.25rem;
+    }
+
+    > strong {
+      color: var(--cor-link);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .arvore-de-topicos-do-catalogo {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    border-radius: var(--raio-md);
+  }
+
+  .pasta-dos-topicos {
+    background: var(--cor-superficie-2);
+    border-bottom: 0;
+    color: var(--cor-texto);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 3.5rem;
+    padding: 0.8rem 1rem;
+
+    > span {
+      color: var(--cor-link);
+    }
+
+    b {
+      overflow-wrap: anywhere;
+    }
+
+    em {
+      color: var(--cor-texto-secundario);
+    }
+  }
+
+  .linha-do-topico-no-catalogo {
+    border-color: var(--cor-borda);
+    color: var(--cor-texto);
+    gap: 0.75rem;
+    grid-template-columns: 1.55rem minmax(0, 1fr) auto 2.75rem;
+    min-height: 4.5rem;
+    padding-block: 0.7rem;
+    padding-inline-end: 0.65rem;
+    padding-inline-start: clamp(
+      0.75rem,
+      calc(0.75rem + var(--recuo-do-topico, 0rem)),
+      5rem
+    );
+
+    > span:first-child {
+      background: var(--cor-superficie-2);
+      border-color: var(--cor-borda-interativa);
+      flex: 0 0 auto;
+    }
+
+    > span.estudado {
+      background: var(--cor-violeta);
+      border-color: var(--cor-violeta);
+      color: var(--cor-texto-botao);
+    }
+
+    b {
+      color: var(--cor-texto);
+      font-size: 0.9rem !important;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    small {
+      color: var(--cor-texto-secundario);
+      line-height: 1.35;
+      margin-top: 0.2rem;
+    }
+
+    > .badge {
+      max-width: 8rem;
+    }
+
+    > .botao-de-icone {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
+  .acoes-secundarias-da-materia {
+    border-top: 1px solid var(--cor-borda);
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+
+    > a {
+      align-items: center;
+      color: var(--cor-link);
+      display: inline-flex;
+      font-size: 0.875rem !important;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+    }
+  }
+
+  .acoes-administrativas-da-materia {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: flex-end;
+  }
+
+  /* Biblioteca de materiais. */
+  .filtros-modernos-da-biblioteca {
+    align-items: end;
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    gap: 0.75rem;
+    grid-template-columns: minmax(15rem, 1fr) auto auto;
+    margin-bottom: 1.75rem;
+    padding: 1rem;
+  }
+
+  .busca-principal-da-biblioteca {
+    align-self: end;
+    width: 100%;
+  }
+
+  .opcoes-dos-filtros-da-biblioteca {
+    align-items: end;
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: minmax(9rem, 1fr) minmax(10rem, 1fr) auto;
+  }
+
+  .controle-do-filtro {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+
+    > span {
+      color: var(--cor-texto-secundario);
+      font-size: 0.8125rem;
+      font-weight: 650;
+    }
+
+    select {
+      min-height: 2.9rem;
+      min-width: 0;
+    }
+  }
+
+  .alternador-de-arquivados {
+    align-items: center;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto-secundario);
+    cursor: pointer;
+    font-size: 0.875rem !important;
+    gap: 0.55rem;
+    min-height: 2.9rem;
+    padding: 0.65rem 0.75rem;
+    white-space: nowrap;
+
+    input {
+      accent-color: var(--cor-violeta);
+      height: 1rem;
+      width: 1rem;
+    }
+
+    &:hover {
+      background: var(--cor-superficie-2);
+      border-color: var(--cor-borda-interativa);
+    }
+  }
+
+  .filtros-modernos-da-biblioteca > .btn {
+    min-height: 2.9rem;
+  }
+
+  .secao-da-biblioteca-moderna {
+    min-width: 0;
+  }
+
+  .cabecalho-da-grade-do-catalogo {
+    margin-bottom: 1.15rem;
+
+    h2 {
+      font-size: clamp(1.35rem, 2vw, 1.75rem);
+    }
+  }
+
+  .secao-da-biblioteca-moderna .grade-da-biblioteca {
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .grade-da-biblioteca .cartao-do-material {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    border-radius: var(--raio-lg);
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+    transition:
+      border-color 160ms ease,
+      transform 160ms ease;
+
+    &:hover {
+      border-color: rgb(var(--cor-violeta-rgb) / 42%);
+      box-shadow: none !important;
+      transform: translateY(-0.15rem);
+    }
+
+    &.material-arquivado {
+      opacity: 0.72;
+    }
+
+    &.material-arquivado:hover {
+      opacity: 0.88;
+    }
+  }
+
+  .grade-da-biblioteca .capa-do-material {
+    align-items: center;
+    background: var(--cor-superficie-2);
+    border-bottom: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+    box-shadow: inset 0 0.2rem 0 var(--cor-informacao);
+    display: flex;
+    height: 5.25rem;
+    padding: 1rem 1.15rem;
+
+    > i {
+      align-items: center;
+      background: color-mix(in srgb, currentcolor 12%, transparent);
+      border: 1px solid color-mix(in srgb, currentcolor 28%, transparent);
+      border-radius: var(--raio-sm);
+      display: inline-flex;
+      font-size: 1.15rem;
+      height: 2.6rem;
+      justify-content: center;
+      width: 2.6rem;
+    }
+
+    span {
+      background: var(--cor-superficie-1);
+      border: 1px solid var(--cor-borda);
+      color: currentcolor;
+      font-size: 0.8125rem !important;
+      letter-spacing: 0.04em;
+      padding: 0.35rem 0.55rem;
+    }
+
+    &.tipo-aula {
+      background: var(--cor-superficie-2);
+      box-shadow: inset 0 0.2rem 0 var(--cor-informacao);
+      color: var(--cor-informacao);
+    }
+
+    &.tipo-pdf {
+      background: var(--cor-superficie-2);
+      box-shadow: inset 0 0.2rem 0 var(--cor-sucesso);
+      color: var(--cor-sucesso);
+    }
+
+    &.tipo-outro {
+      background: var(--cor-superficie-2);
+      box-shadow: inset 0 0.2rem 0 var(--cor-aviso);
+      color: var(--cor-aviso);
+    }
+  }
+
+  .grade-da-biblioteca .corpo-do-cartao-do-material {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding: 1.15rem;
+
+    h2 {
+      color: var(--cor-texto);
+      font-size: 1.2rem;
+      letter-spacing: -0.025em;
+      line-height: 1.28;
+      margin: 0.55rem 0;
+      min-height: 0;
+      overflow-wrap: anywhere;
+    }
+
+    > p {
+      color: var(--cor-texto-secundario);
+      display: -webkit-box;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+      min-height: 2.8rem;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    footer {
+      border-color: var(--cor-borda);
+      margin-top: auto;
+      min-height: 3.25rem;
+      padding-top: 0.75rem;
+    }
+  }
+
+  .identidade-do-material {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    min-width: 0;
+
+    .rotulo-discreto {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .grade-da-biblioteca .dados-do-material {
+    align-items: flex-start;
+    color: var(--cor-texto-secundario);
+    display: grid;
+    font-size: 0.875rem !important;
+    gap: 0.45rem;
+    margin-bottom: 0.25rem;
+
+    span {
+      align-items: flex-start;
+      line-height: 1.35;
+      min-width: 0;
+    }
+
+    i {
+      color: var(--cor-link);
+      margin-top: 0.1rem;
+    }
+  }
+
+  .grade-da-biblioteca .link-da-jornada {
+    align-items: center;
+    color: var(--cor-link);
+    display: inline-flex;
+    font-size: 0.875rem !important;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+  }
+
+  .grade-da-biblioteca .acoes-do-material {
+    flex: 0 0 auto;
+
+    summary {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
+  .grade-da-biblioteca .menu-de-acoes-do-material {
+    background: var(--cor-superficie-3);
+    border: 1px solid var(--cor-borda-forte);
+    border-radius: var(--raio-sm);
+    box-shadow: var(--sombra-elevada);
+    min-width: 10rem;
+    z-index: 20;
+  }
+
+  .gaveta-de-cobertura-moderna {
+    .formulario-de-cobertura-moderna {
+      background: var(--cor-superficie-1);
+      border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-md);
+      margin-bottom: 1.25rem;
+      padding: 1rem;
+    }
+
+    .lista-moderna-de-coberturas {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .topicos-cobertos {
+      background: var(--cor-superficie-1);
+      border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-md);
+      margin-top: 0;
+      padding: 1rem;
+    }
+
+    .topicos-cobertos > p {
+      margin-bottom: 0.25rem;
+    }
+
+    .topicos-cobertos > div {
+      background: var(--cor-superficie-2);
+      border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-sm);
+      min-width: 0;
+      padding: 0.65rem 0.75rem;
+    }
+
+    .topicos-cobertos > div > span {
+      color: var(--cor-texto);
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  /* Detalhe completo da matéria. */
+  .botao-de-voltar-do-catalogo {
+    align-items: center;
+    color: var(--cor-link);
+    display: inline-flex;
+    gap: 0.55rem;
+    margin: -0.35rem 0 1rem;
+    min-height: 2.75rem;
+    padding-inline: 0;
+    text-decoration: none;
+  }
+
+  .botao-de-voltar-do-catalogo:hover {
+    color: var(--cor-foco);
+  }
+
+  .carregamento-do-detalhe-da-materia {
+    background: var(--cor-superficie-1);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    min-height: 22rem;
+  }
+
+  .hero-do-detalhe-da-materia {
+    align-items: center;
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: 0.35rem minmax(0, 1fr) auto;
+    margin-bottom: 1.25rem;
+    min-width: 0;
+    overflow: hidden;
+    padding: clamp(1.25rem, 2.5vw, 2rem);
+    position: relative;
+  }
+
+  .marca-de-cor-grande {
+    align-self: stretch;
+    background: var(--cor-identificadora-da-materia);
+    border-radius: 999px;
+    min-height: 5rem;
+    width: 0.35rem;
+  }
+
+  .identidade-do-detalhe-da-materia {
+    min-width: 0;
+
+    h1 {
+      color: var(--cor-texto);
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      letter-spacing: -0.05em;
+      line-height: 1;
+      margin: 0.65rem 0;
+      max-width: 24ch;
+    }
+
+    > p {
+      color: var(--cor-texto-secundario);
+      line-height: 1.55;
+      margin: 0;
+      max-width: 70ch;
+    }
+  }
+
+  .rotulos-do-detalhe-da-materia {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .grade-do-detalhe-da-materia {
+    align-items: start;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);
+  }
+
+  .coluna-principal-do-detalhe,
+  .coluna-do-editor-de-topico {
+    min-width: 0;
+  }
+
+  .painel-da-arvore-completa {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    margin-bottom: 1.25rem;
+    min-width: 0;
+    padding: clamp(1rem, 2vw, 1.5rem);
+
+    .cabecalho-do-cartao-da-jornada {
+      border-bottom: 1px solid var(--cor-borda);
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .cabecalho-do-cartao-da-jornada h2 {
+      font-size: clamp(1.35rem, 2vw, 1.8rem);
+      margin: 0.2rem 0;
+    }
+
+    .cabecalho-do-cartao-da-jornada p {
+      color: var(--cor-texto-secundario);
+      margin: 0;
+    }
+
+    .lista-de-topicos {
+      display: grid;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .lista-de-topicos li {
+      min-width: 0;
+    }
+
+    .lista-de-topicos .lista-de-topicos {
+      border-color: var(--cor-borda-interativa);
+      margin-left: 1rem;
+      padding-left: 1rem;
+    }
+
+    .lista-de-topicos article.card {
+      background: var(--cor-superficie-2) !important;
+      border: 1px solid var(--cor-borda) !important;
+      border-radius: var(--raio-sm);
+      box-shadow: none;
+      margin-bottom: 0 !important;
+      padding: 0.85rem !important;
+    }
+
+    .lista-de-topicos article.card:hover {
+      border-color: var(--cor-borda-interativa) !important;
+    }
+
+    .lista-de-topicos h3 {
+      color: var(--cor-texto);
+      font-size: 0.95rem;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .lista-de-topicos p {
+      color: var(--cor-texto-secundario) !important;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .lista-de-topicos .btn-sm {
+      min-width: 2.75rem;
+      padding-inline: 0.6rem;
+    }
+  }
+
+  .grade-de-uso-da-materia {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cartao-de-uso-da-materia {
+    align-content: start;
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+    padding: 1rem;
+
+    .icone-do-uso-da-materia {
+      align-items: center;
+      background: rgb(var(--cor-violeta-rgb) / 14%);
+      border: 1px solid rgb(var(--cor-violeta-rgb) / 25%);
+      border-radius: var(--raio-sm);
+      color: var(--cor-link);
+      display: inline-flex;
+      height: 2.5rem;
+      justify-content: center;
+      width: 2.5rem;
+    }
+
+    h2 {
+      color: var(--cor-texto);
+      font-size: 1rem;
+      line-height: 1.3;
+      margin: 0.55rem 0 0.7rem;
+    }
+
+    p,
+    li {
+      color: var(--cor-texto-secundario);
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    ul {
+      display: grid;
+      gap: 0.6rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    li {
+      border-top: 1px solid var(--cor-borda);
+      display: grid;
+      gap: 0.2rem;
+      min-width: 0;
+      padding-top: 0.6rem;
+    }
+
+    li:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    a {
+      color: var(--cor-link);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .coluna-do-editor-de-topico {
+    position: sticky;
+    top: calc(var(--altura-topo) + 1rem);
+  }
+
+  .formulario-de-topico-completo {
+    background: var(--cor-superficie-1);
+    border-color: var(--cor-borda);
+    box-shadow: none;
+    gap: 1rem;
+    padding: 1.25rem;
+
+    > header {
+      border-bottom: 1px solid var(--cor-borda);
+      padding-bottom: 1rem;
+    }
+
+    > header h2 {
+      color: var(--cor-texto);
+      font-size: 1.4rem;
+      margin: 0.25rem 0 0.45rem;
+    }
+
+    > header p {
+      color: var(--cor-texto-secundario);
+      line-height: 1.45;
+      margin: 0;
+    }
+  }
+
+  .campos-do-editor-de-topico {
+    border: 0;
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .acoes-do-editor-de-topico {
+    display: flex;
+    gap: 0.65rem;
+  }
+}
+
+@media (max-width: 1279.98px) {
+  [data-bs-theme='dark'] {
+    .catalogo-de-conteudos-moderno {
+      grid-template-columns: minmax(17rem, 20rem) minmax(0, 1fr);
+    }
+
+    .secao-da-biblioteca-moderna .grade-da-biblioteca {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .filtros-modernos-da-biblioteca {
+      grid-template-columns: minmax(14rem, 1fr) minmax(0, auto);
+    }
+
+    .filtros-modernos-da-biblioteca > .btn {
+      grid-column: 2;
+      justify-self: end;
+    }
+
+    .opcoes-dos-filtros-da-biblioteca {
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
+}
+
+@media (max-width: 991.98px) {
+  [data-bs-theme='dark'] {
+    .resumo-moderno-do-catalogo,
+    .resumo-moderno-dos-materiais {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .catalogo-de-conteudos-moderno {
+      grid-template-columns: minmax(15rem, 17rem) minmax(0, 1fr);
+    }
+
+    .catalogo-de-conteudos-moderno > .painel-mestre-de-materias {
+      padding: 0.85rem;
+    }
+
+    .catalogo-de-conteudos-moderno .lista-mestre-de-materias > button {
+      padding-inline: 0.6rem;
+    }
+
+    .cabecalho-do-detalhe-da-materia {
+      display: grid;
+    }
+
+    .acoes-do-detalhe-do-catalogo {
+      justify-content: flex-start;
+    }
+
+    .progresso-da-materia {
+      grid-template-columns: minmax(0, 1fr) auto;
+
+      > span {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .filtros-modernos-da-biblioteca {
+      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .busca-principal-da-biblioteca {
+      grid-column: 1 / -1;
+    }
+
+    .opcoes-dos-filtros-da-biblioteca {
+      grid-column: 1;
+      grid-row: auto;
+    }
+
+    .filtros-modernos-da-biblioteca > .btn {
+      grid-column: 2;
+      justify-self: stretch;
+    }
+
+    .grade-do-detalhe-da-materia {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .coluna-do-editor-de-topico {
+      position: static;
+    }
+
+    .formulario-de-topico-completo .campos-do-editor-de-topico {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .formulario-de-topico-completo
+      .campos-do-editor-de-topico
+      > label:first-child,
+    .formulario-de-topico-completo
+      .campos-do-editor-de-topico
+      > label:nth-child(2),
+    .formulario-de-topico-completo .acoes-do-editor-de-topico {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark'] {
+    .catalogo-de-conteudos-moderno {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .catalogo-de-conteudos-moderno > .painel-mestre-de-materias {
+      max-height: none;
+      overflow: hidden;
+      position: static;
+    }
+
+    .catalogo-de-conteudos-moderno .lista-mestre-de-materias {
+      display: grid;
+      grid-auto-columns: minmax(14rem, 78vw);
+      grid-auto-flow: column;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      padding: 0.1rem 0 0.65rem;
+      scroll-snap-type: inline mandatory;
+      scrollbar-color: var(--cor-borda-interativa) transparent;
+
+      > button {
+        scroll-snap-align: start;
+      }
+    }
+
+    .catalogo-de-conteudos-moderno .paginacao-do-catalogo {
+      margin-top: 0.4rem;
+    }
+
+    .acoes-secundarias-da-materia {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .acoes-administrativas-da-materia {
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .filtros-modernos-da-biblioteca {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .opcoes-dos-filtros-da-biblioteca {
+      grid-column: 1;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .alternador-de-arquivados {
+      grid-column: 1 / -1;
+    }
+
+    .filtros-modernos-da-biblioteca > .btn {
+      grid-column: 1;
+      justify-self: stretch;
+    }
+
+    .grade-de-uso-da-materia {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .painel-da-arvore-completa .lista-de-topicos .lista-de-topicos {
+      margin-left: 0.45rem;
+      padding-left: 0.65rem;
+    }
+
+    .painel-da-arvore-completa .lista-de-topicos article.card > .d-flex {
+      display: grid !important;
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .painel-da-arvore-completa
+      .lista-de-topicos
+      article.card
+      > .d-flex
+      > .d-flex {
+      grid-column: 1 / -1;
+      justify-content: flex-end;
+    }
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] {
+    .resumo-moderno-do-catalogo,
+    .resumo-moderno-dos-materiais {
+      gap: 0.55rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+
+      article {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.6rem;
+        min-height: 7rem;
+        padding: 0.75rem;
+      }
+
+      article > i {
+        height: 2.2rem;
+        width: 2.2rem;
+      }
+
+      b {
+        font-size: 1.1rem;
+      }
+    }
+
+    .cabecalho-do-painel-mestre {
+      align-items: center;
+
+      .badge {
+        max-width: 8.5rem;
+        white-space: normal;
+      }
+    }
+
+    .catalogo-de-conteudos-moderno .lista-mestre-de-materias > button {
+      min-height: 5rem;
+    }
+
+    .catalogo-de-conteudos-moderno > .detalhe-da-materia-no-catalogo {
+      padding: 1rem;
+    }
+
+    .cabecalho-do-detalhe-da-materia h2 {
+      font-size: 1.75rem;
+    }
+
+    .acoes-do-detalhe-do-catalogo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+
+      .btn {
+        min-width: 0;
+      }
+    }
+
+    .progresso-da-materia {
+      gap: 0.75rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: 0.85rem;
+    }
+
+    .pasta-dos-topicos {
+      gap: 0.5rem;
+      grid-template-columns: auto minmax(0, 1fr);
+
+      em {
+        grid-column: 2;
+      }
+    }
+
+    .linha-do-topico-no-catalogo {
+      gap: 0.6rem;
+      grid-template-columns: 1.45rem minmax(0, 1fr) 2.75rem;
+      padding-inline-start: clamp(
+        0.6rem,
+        calc(0.6rem + var(--recuo-do-topico-mobile, 0rem)),
+        2.4rem
+      );
+
+      > .badge {
+        grid-column: 2;
+        justify-self: start;
+      }
+
+      > .botao-de-icone {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+      }
+    }
+
+    .acoes-secundarias-da-materia > a {
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .acoes-administrativas-da-materia {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+
+      .btn {
+        min-width: 0;
+      }
+    }
+
+    .opcoes-dos-filtros-da-biblioteca {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .alternador-de-arquivados {
+      grid-column: 1;
+    }
+
+    .secao-da-biblioteca-moderna .grade-da-biblioteca {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cabecalho-da-grade-do-catalogo {
+      align-items: center;
+
+      .badge {
+        max-width: 8rem;
+        white-space: normal;
+      }
+    }
+
+    .grade-da-biblioteca .capa-do-material {
+      height: 4.75rem;
+    }
+
+    .hero-do-detalhe-da-materia {
+      align-items: start;
+      gap: 0.85rem;
+      grid-template-columns: 0.3rem minmax(0, 1fr);
+      padding: 1.1rem;
+
+      > .btn {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+    }
+
+    .identidade-do-detalhe-da-materia h1 {
+      font-size: 2rem;
+    }
+
+    .grade-de-uso-da-materia {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cartao-de-uso-da-materia {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .formulario-de-topico-completo .campos-do-editor-de-topico {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .formulario-de-topico-completo
+      .campos-do-editor-de-topico
+      > label:first-child,
+    .formulario-de-topico-completo
+      .campos-do-editor-de-topico
+      > label:nth-child(2),
+    .formulario-de-topico-completo .acoes-do-editor-de-topico {
+      grid-column: 1;
+    }
+
+    .acoes-do-editor-de-topico {
+      flex-direction: column;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-bs-theme='dark'] {
+    .grade-da-biblioteca .cartao-do-material,
+    .catalogo-de-conteudos-moderno .lista-mestre-de-materias > button {
+      transition: none;
+    }
+
+    .grade-da-biblioteca .cartao-do-material:hover {
+      transform: none;
+    }
+  }
+}

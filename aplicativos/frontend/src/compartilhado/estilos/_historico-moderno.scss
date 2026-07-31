@@ -1,0 +1,335 @@
+[data-bs-theme='dark'] .pagina-do-historico {
+  gap: 0;
+}
+
+[data-bs-theme='dark'] .pagina-do-historico .resumo-do-historico {
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 1.5rem;
+}
+
+[data-bs-theme='dark'] .resumo-do-historico > article {
+  background:
+    linear-gradient(rgb(255 255 255 / 1.5%), rgb(255 255 255 / 1.5%)),
+    var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
+  gap: 1rem;
+  min-height: 8rem;
+  padding: 1.25rem;
+}
+
+[data-bs-theme='dark'] .resumo-do-historico .mini-icone-da-jornada {
+  background: rgb(var(--cor-violeta-rgb) / 14%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 20%);
+  border-radius: var(--raio-md);
+  color: var(--cor-link);
+  height: 3rem;
+  width: 3rem;
+}
+
+[data-bs-theme='dark'] .resumo-do-historico strong {
+  color: var(--cor-texto);
+  font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+}
+
+[data-bs-theme='dark'] .resumo-do-historico small {
+  color: var(--cor-texto-secundario);
+  margin-top: 0.3rem;
+}
+
+[data-bs-theme='dark'] .estrutura-do-historico {
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 27rem);
+  margin-bottom: 1.5rem;
+}
+
+[data-bs-theme='dark'] .linha-do-tempo-de-estudos,
+[data-bs-theme='dark'] .ritmo-real-da-semana,
+[data-bs-theme='dark'] .diagnostico-de-topicos {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-cartao);
+  padding: clamp(1.35rem, 2.5vw, 2rem);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-cartao-da-jornada h2 {
+  color: var(--cor-texto);
+  font-size: clamp(1.55rem, 2.5vw, 2.15rem);
+  letter-spacing: -0.04em;
+  margin-top: 0.3rem;
+}
+
+[data-bs-theme='dark']
+  .linha-do-tempo-de-estudos
+  > .btn-group[aria-label='Filtrar histórico por período'] {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  gap: 0.25rem;
+  padding: 0.3rem;
+}
+
+[data-bs-theme='dark'] .linha-do-tempo-de-estudos > .btn-group .btn {
+  border: 0;
+  border-radius: calc(var(--raio-md) - 0.2rem) !important;
+  color: var(--cor-texto-secundario);
+  min-height: 2.5rem;
+}
+
+[data-bs-theme='dark'] .linha-do-tempo-de-estudos > .btn-group .btn.active {
+  background: var(--cor-superficie-3);
+  box-shadow: 0 0.4rem 1rem rgb(0 0 0 / 16%);
+  color: var(--cor-texto);
+}
+
+[data-bs-theme='dark'] .grupo-da-linha-do-tempo > h3 {
+  color: var(--cor-texto-suave);
+  font-size: 0.8rem !important;
+  letter-spacing: 0.08em;
+  margin: 1.75rem 0 0.7rem;
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo {
+  border: 1px solid transparent;
+  border-bottom-color: var(--cor-borda);
+  border-radius: var(--raio-md);
+  gap: 0.85rem;
+  grid-template-columns: 3.75rem 0.9rem minmax(0, 1fr) auto auto;
+  min-height: 6.25rem;
+  padding: 0.85rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo:hover {
+  background: rgb(255 255 255 / 2%);
+  border-color: var(--cor-borda);
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo > time {
+  color: var(--cor-texto-suave);
+  font-size: 0.8125rem !important;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo h4 {
+  color: var(--cor-texto);
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+  margin: 0.45rem 0 0.2rem;
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo > b {
+  color: var(--cor-texto);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-bs-theme='dark'] .marcador-do-registro {
+  background: var(--cor-violeta);
+  box-shadow: 0 0 0 0.3rem rgb(var(--cor-violeta-rgb) / 13%);
+  height: 0.65rem;
+  width: 0.65rem;
+}
+
+[data-bs-theme='dark'] .etiqueta-da-materia-no-historico {
+  background: rgb(var(--cor-violeta-rgb) / 11%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 17%);
+  color: var(--cor-link);
+  font-size: 0.75rem !important;
+  padding: 0.28rem 0.55rem;
+}
+
+[data-bs-theme='dark'] .acoes-do-registro > div {
+  background: var(--cor-superficie-3);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  box-shadow: var(--sombra-elevada);
+  min-width: 9rem;
+  padding: 0.4rem;
+}
+
+[data-bs-theme='dark'] .acoes-do-registro > div button {
+  border-radius: var(--raio-sm);
+  color: var(--cor-texto);
+  font-size: 0.875rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.7rem;
+}
+
+[data-bs-theme='dark'] .acoes-do-registro > div button:hover {
+  background: var(--cor-superficie-4);
+}
+
+[data-bs-theme='dark'] .ritmo-real-da-semana {
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgb(var(--cor-violeta-rgb) / 13%),
+      transparent 18rem
+    ),
+    var(--cor-superficie-2);
+  top: calc(var(--altura-topo) + 1.5rem);
+}
+
+[data-bs-theme='dark'] .ritmo-real-da-semana h2 {
+  color: var(--cor-texto);
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  letter-spacing: -0.045em;
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo {
+  gap: 0.6rem;
+  height: 12rem;
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo > div > span {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: 0.55rem;
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo > div > span > i {
+  background: linear-gradient(180deg, var(--cor-link), var(--cor-violeta));
+}
+
+[data-bs-theme='dark'] .grafico-do-ritmo b,
+[data-bs-theme='dark'] .grafico-do-ritmo small {
+  font-size: 0.75rem !important;
+}
+
+[data-bs-theme='dark'] .resumo-do-ritmo {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  padding: 0.9rem;
+}
+
+[data-bs-theme='dark'] .diagnostico-de-topicos {
+  background:
+    radial-gradient(circle at 95% 0, rgb(56 189 248 / 7%), transparent 24rem),
+    var(--cor-superficie-2);
+  margin-bottom: 0 !important;
+}
+
+[data-bs-theme='dark']
+  .diagnostico-de-topicos
+  #conteudo-diagnostico-de-topicos {
+  border-top: 1px solid var(--cor-borda);
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+[data-bs-theme='dark']
+  .diagnostico-de-topicos
+  #conteudo-diagnostico-de-topicos
+  > form {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: 1rem;
+}
+
+[data-bs-theme='dark'] .diagnostico-de-topicos .table-responsive {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  overflow: auto;
+}
+
+@media (max-width: 1199.98px) {
+  [data-bs-theme='dark'] .estrutura-do-historico {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .ritmo-real-da-semana {
+    position: static;
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark'] .pagina-do-historico .resumo-do-historico {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .resumo-do-historico > article {
+    min-height: 6.5rem;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo {
+    grid-template-columns: 3rem 0.75rem minmax(0, 1fr) auto;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > b {
+    grid-column: 3;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > .badge,
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > .acoes-do-registro {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .linha-do-tempo-de-estudos,
+  [data-bs-theme='dark'] .ritmo-real-da-semana,
+  [data-bs-theme='dark'] .diagnostico-de-topicos {
+    padding: 1.25rem;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo {
+    grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+    padding-inline: 0;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > time {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > .marcador-do-registro {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > div {
+    grid-column: 2;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > b {
+    grid-column: 2;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > .badge,
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo > .acoes-do-registro {
+    grid-column: 3;
+    grid-row: 1 / span 3;
+  }
+
+  [data-bs-theme='dark']
+    .diagnostico-de-topicos
+    #conteudo-diagnostico-de-topicos
+    > form {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  [data-bs-theme='dark']
+    .diagnostico-de-topicos
+    #conteudo-diagnostico-de-topicos
+    > form
+    label,
+  [data-bs-theme='dark']
+    .diagnostico-de-topicos
+    #conteudo-diagnostico-de-topicos
+    > form
+    .btn {
+    width: 100%;
+  }
+}

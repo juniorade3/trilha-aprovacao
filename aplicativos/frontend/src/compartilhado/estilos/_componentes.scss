@@ -4,16 +4,73 @@
 [data-bs-theme='dark'] .detalhe-da-materia-no-catalogo {
   background: var(--cor-superficie-2);
   border-color: var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
   color: var(--cor-texto);
 }
 
 [data-bs-theme='dark'] .pagina-da-jornada,
 [data-bs-theme='dark'] .pagina-comum {
   color: var(--cor-texto);
+  margin-inline: auto;
+  max-width: var(--largura-maxima-conteudo);
+  padding: clamp(1.5rem, 2.4vw, 3rem);
+  width: 100%;
 }
 
 [data-bs-theme='dark'] .cabecalho-da-pagina {
-  border-bottom-color: var(--cor-borda);
+  align-items: flex-end;
+  border: 0;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 0;
+}
+
+[data-bs-theme='dark'] .cabecalho-da-pagina > div:first-child {
+  min-width: 0;
+}
+
+[data-bs-theme='dark'] .cabecalho-da-pagina h1 {
+  font-size: clamp(2.5rem, 4vw, 4.25rem);
+  font-weight: 720;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 0.45rem 0 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+[data-bs-theme='dark'] .cabecalho-da-pagina > div > p:last-child {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 70ch;
+}
+
+[data-bs-theme='dark'] .acoes-do-cabecalho,
+[data-bs-theme='dark'] .grupo-de-acoes-responsivo {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+[data-bs-theme='dark'] .grade-de-metricas {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-bs-theme='dark'] .cartao-de-proxima-acao {
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      rgb(var(--cor-violeta-rgb) / 18%),
+      transparent 24rem
+    ),
+    var(--cor-superficie-2);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 28%);
+  box-shadow: var(--sombra-destaque);
 }
 
 [data-bs-theme='dark'] .cabecalho-da-pagina > div > p:last-child,
@@ -27,7 +84,7 @@
 }
 
 [data-bs-theme='dark'] small {
-  font-size: 0.875rem !important;
+  font-size: 0.9rem !important;
 }
 
 [data-bs-theme='dark'] time,
@@ -40,7 +97,7 @@
 [data-bs-theme='dark'] .etiqueta-da-materia,
 [data-bs-theme='dark'] .etiqueta-da-materia-no-historico,
 [data-bs-theme='dark'] .situacao-da-revisao {
-  font-size: 0.8125rem !important;
+  font-size: 0.82rem !important;
 }
 
 [data-bs-theme='dark'] .acao-global-de-estudo,
@@ -91,12 +148,12 @@
 [data-bs-theme='dark'] .resumo-da-carga-do-dia,
 [data-bs-theme='dark'] .conteudo-do-bloco-planejado span,
 [data-bs-theme='dark'] .resumo-do-planejamento-de-hoje span {
-  font-size: 0.8125rem !important;
+  font-size: 0.875rem !important;
 }
 
 [data-bs-theme='dark'] .corpo-do-cartao-do-material > p,
 [data-bs-theme='dark'] .ritmo-real-da-semana > p {
-  font-size: 0.875rem !important;
+  font-size: 0.9375rem !important;
 }
 
 [data-bs-theme='dark'] summary {
@@ -113,6 +170,8 @@
 [data-bs-theme='dark'] .gaveta-da-aplicacao {
   background: var(--cor-superficie-2);
   border-color: var(--cor-borda);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-elevada);
   color: var(--cor-texto);
 }
 
@@ -124,7 +183,9 @@
 
 [data-bs-theme='dark'] .aviso-da-aplicacao {
   background: var(--cor-superficie-3);
-  border: 1px solid var(--cor-borda-interativa);
+  border: 1px solid rgb(var(--cor-sucesso-rgb) / 30%);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-elevada);
   color: var(--cor-texto);
 }
 
@@ -136,15 +197,22 @@
 [data-bs-theme='dark'] .estado-do-catalogo,
 [data-bs-theme='dark'] .estado-vazio-com-borda,
 [data-bs-theme='dark'] .dia-sem-blocos {
-  background: var(--cor-superficie-1);
-  border-color: var(--cor-borda-interativa);
+  background:
+    radial-gradient(
+      circle at 50% 0,
+      rgb(var(--cor-violeta-rgb) / 10%),
+      transparent 18rem
+    ),
+    var(--cor-superficie-2);
+  border-color: var(--cor-borda);
+  border-radius: var(--raio-xl);
 }
 
 [data-bs-theme='dark'] .formulario-da-aplicacao label > span,
 [data-bs-theme='dark'] .formulario-da-aplicacao legend,
 [data-bs-theme='dark'] .formulario-da-aplicacao em {
   color: var(--cor-texto-secundario);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
 [data-bs-theme='dark'] .formulario-da-aplicacao label > span,
@@ -157,7 +225,7 @@
   background: var(--cor-superficie-3);
   border-color: var(--cor-borda-interativa);
   color: var(--cor-texto-secundario);
-  min-height: 2.75rem;
+  min-height: 3rem;
 }
 
 [data-bs-theme='dark'] .botao-de-duracao:hover,
@@ -191,11 +259,11 @@
   align-items: center;
   border-radius: 999px;
   display: inline-flex;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 700;
   gap: 0.35rem;
-  min-height: 1.75rem;
-  padding: 0.25rem 0.6rem;
+  min-height: 1.9rem;
+  padding: 0.3rem 0.7rem;
 }
 
 [data-bs-theme='dark'] .superficie-sutil {
@@ -205,7 +273,7 @@
 [data-bs-theme='dark'] .botao-de-contraste {
   border-radius: var(--raio-md);
   font-weight: 700;
-  min-height: 2.75rem;
+  min-height: 3rem;
 }
 
 [data-bs-theme='dark'] .etiqueta-da-materia {
@@ -289,6 +357,8 @@
 [data-bs-theme='dark'] .table-responsive {
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
+  overflow: hidden;
 }
 
 [data-bs-theme='dark'] code,
@@ -298,6 +368,21 @@
 }
 
 @media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .pagina-da-jornada,
+  [data-bs-theme='dark'] .pagina-comum {
+    padding: 1.25rem 1rem 7rem;
+  }
+
+  [data-bs-theme='dark'] .cabecalho-da-pagina {
+    align-items: stretch;
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  [data-bs-theme='dark'] .cabecalho-da-pagina h1 {
+    font-size: clamp(2.35rem, 12vw, 3.25rem);
+  }
+
   [data-bs-theme='dark'] .acoes-do-cabecalho {
     display: grid;
     grid-template-columns: 1fr;
@@ -306,5 +391,9 @@
   [data-bs-theme='dark'] .acoes-do-cabecalho .btn,
   [data-bs-theme='dark'] .acoes-do-cabecalho > * {
     width: 100%;
+  }
+
+  [data-bs-theme='dark'] .grade-de-metricas {
+    grid-template-columns: 1fr;
   }
 }

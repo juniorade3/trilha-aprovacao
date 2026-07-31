@@ -200,9 +200,11 @@ async function salvar() {
 </script>
 
 <template>
-  <main class="pagina-da-jornada pagina-do-assistente">
+  <main
+    class="pagina-da-jornada pagina-do-assistente pagina-do-novo-concurso modulo-concursos-moderno"
+  >
     <button
-      class="btn btn-link px-0 mb-3 text-decoration-none"
+      class="btn btn-link px-0 mb-3 text-decoration-none acao-de-retorno-dos-concursos"
       type="button"
       @click="roteador.push('/concursos')"
     >
@@ -210,7 +212,7 @@ async function salvar() {
       Voltar para concursos
     </button>
 
-    <header class="cabecalho-da-pagina">
+    <header class="cabecalho-da-pagina cabecalho-do-assistente-de-concurso">
       <div>
         <p class="sobretitulo-da-pagina">Etapa {{ passo }} de 4</p>
         <h1>Novo concurso</h1>
@@ -221,7 +223,10 @@ async function salvar() {
       </div>
     </header>
 
-    <ol class="passos-do-assistente" aria-label="Etapas de criação">
+    <ol
+      class="passos-do-assistente trilho-de-etapas-do-concurso"
+      aria-label="Etapas de criação"
+    >
       <li
         v-for="(item, indice) in passos"
         :key="item.nome"
@@ -242,15 +247,15 @@ async function salvar() {
       </li>
     </ol>
 
-    <div class="estrutura-do-assistente">
+    <div class="estrutura-do-assistente grade-do-assistente-de-concurso">
       <form
         ref="formularioDoPasso"
-        class="card cartao-do-assistente"
+        class="card cartao-do-assistente painel-da-etapa-do-concurso"
         @submit.prevent="continuar"
       >
         <p v-if="erro" class="alert alert-danger" role="alert">{{ erro }}</p>
 
-        <section v-if="passo === 1">
+        <section v-if="passo === 1" class="etapa-do-assistente-de-concurso">
           <p class="sobretitulo-da-pagina">Seu objetivo</p>
           <h2 class="titulo-editorial">Qual aprovação você está buscando?</h2>
           <p class="text-secondary">
@@ -316,7 +321,10 @@ async function salvar() {
           </div>
         </section>
 
-        <section v-else-if="passo === 2">
+        <section
+          v-else-if="passo === 2"
+          class="etapa-do-assistente-de-concurso"
+        >
           <p class="sobretitulo-da-pagina">Edital e cargo</p>
           <h2 class="titulo-editorial">Defina o foco desta jornada</h2>
           <div class="nota-contextual mt-3">
@@ -392,7 +400,10 @@ async function salvar() {
           </div>
         </section>
 
-        <section v-else-if="passo === 3">
+        <section
+          v-else-if="passo === 3"
+          class="etapa-do-assistente-de-concurso"
+        >
           <p class="sobretitulo-da-pagina">Estrutura da prova</p>
           <h2 class="titulo-editorial">Como o conteúdo será organizado?</h2>
           <p class="text-secondary">
@@ -478,7 +489,10 @@ async function salvar() {
           </div>
         </section>
 
-        <section v-else class="revisao-do-assistente">
+        <section
+          v-else
+          class="revisao-do-assistente etapa-do-assistente-de-concurso etapa-de-revisao-do-concurso"
+        >
           <span class="icone-de-confirmacao">
             <i class="bi bi-check2" aria-hidden="true"></i>
           </span>
@@ -521,7 +535,7 @@ async function salvar() {
           </p>
         </section>
 
-        <footer class="rodape-do-assistente">
+        <footer class="rodape-do-assistente acoes-da-etapa-do-concurso">
           <button
             class="btn btn-link text-secondary text-decoration-none"
             type="button"
@@ -552,7 +566,9 @@ async function salvar() {
         </footer>
       </form>
 
-      <aside class="cartao-de-contexto-do-assistente">
+      <aside
+        class="cartao-de-contexto-do-assistente contexto-do-assistente-de-concurso"
+      >
         <span class="icone-redondo-da-jornada">
           <i class="bi bi-signpost-split" aria-hidden="true"></i>
         </span>

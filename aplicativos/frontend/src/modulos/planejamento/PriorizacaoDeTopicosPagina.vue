@@ -199,13 +199,15 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="pagina-comum pagina-de-planejamento pagina-de-priorizacao">
-    <NavegacaoDoPlanejamento />
+    <div class="topo-da-area-de-planejamento">
+      <CabecalhoDaPagina
+        etiqueta="Prioridades objetivas"
+        titulo="Lacunas e prioridades"
+        descricao="Compare o conteúdo oficial com seus estudos e evidências. O ranking é determinístico e explica cada sugestão."
+      />
 
-    <CabecalhoDaPagina
-      etiqueta="Prioridades objetivas"
-      titulo="Lacunas e prioridades"
-      descricao="Compare o conteúdo oficial com seus estudos e evidências. O ranking é determinístico e explica cada sugestão."
-    />
+      <NavegacaoDoPlanejamento />
+    </div>
 
     <form
       class="card filtros-da-priorizacao"
@@ -874,10 +876,34 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 767.98px) {
-  .filtros-da-priorizacao,
-  .grade-do-resumo-da-priorizacao {
+@media (max-width: 991.98px) {
+  .filtros-da-priorizacao {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > * {
+      min-width: 0;
+    }
+
+    .btn {
+      width: 100%;
+    }
+  }
+
+  .contexto-da-priorizacao,
+  .contexto-da-priorizacao dl {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .filtros-da-priorizacao {
     grid-template-columns: 1fr;
+  }
+
+  .grade-do-resumo-da-priorizacao {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .contexto-da-priorizacao,
@@ -885,10 +911,6 @@ onBeforeUnmount(() => {
     align-items: flex-start;
     flex-direction: column;
     gap: 1rem;
-  }
-
-  .filtros-da-priorizacao .btn {
-    width: 100%;
   }
 }
 </style>

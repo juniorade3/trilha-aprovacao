@@ -568,3 +568,999 @@
     width: 100%;
   }
 }
+
+/* Composição moderna e ampla */
+[data-bs-theme='dark'] .painel-da-jornada,
+[data-bs-theme='dark'] .pagina-comum {
+  background:
+    radial-gradient(
+      circle at 18% -8%,
+      rgb(var(--cor-violeta-rgb) / 9%),
+      transparent 30rem
+    ),
+    transparent;
+}
+
+[data-bs-theme='dark'] .painel-da-jornada {
+  min-height: calc(100vh - var(--altura-topo));
+}
+
+[data-bs-theme='dark'] .resumo-principal-da-jornada {
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgb(var(--cor-violeta-rgb) / 16%),
+      transparent 24rem
+    ),
+    var(--cor-superficie-2);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 22%);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-destaque);
+}
+
+[data-bs-theme='dark'] .objetivo-da-jornada,
+[data-bs-theme='dark'] .medidor-da-jornada,
+[data-bs-theme='dark'] .tempo-da-jornada {
+  padding: clamp(1.5rem, 2.5vw, 2.5rem);
+}
+
+[data-bs-theme='dark'] .objetivo-da-jornada h2 {
+  font-size: clamp(1.75rem, 2.5vw, 2.6rem);
+  letter-spacing: -0.04em;
+}
+
+[data-bs-theme='dark'] .icone-redondo-da-jornada {
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 26%);
+  height: 4.75rem;
+  width: 4.75rem;
+}
+
+[data-bs-theme='dark'] .etapas-da-jornada {
+  background: rgb(255 255 255 / 1.5%);
+  padding: 1.5rem clamp(1.5rem, 4vw, 4rem);
+}
+
+[data-bs-theme='dark'] .grade-de-resumo {
+  gap: 1.25rem;
+}
+
+[data-bs-theme='dark'] .indicador-resumido,
+[data-bs-theme='dark'] .bloco-do-dashboard,
+[data-bs-theme='dark'] .atividade-da-jornada,
+[data-bs-theme='dark'] .atalhos-do-dashboard,
+[data-bs-theme='dark'] .cartao-do-concurso,
+[data-bs-theme='dark'] .cartao-do-material {
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
+}
+
+[data-bs-theme='dark'] .indicador-resumido,
+[data-bs-theme='dark'] .cartao-do-concurso,
+[data-bs-theme='dark'] .cartao-do-material,
+[data-bs-theme='dark'] .atalho-do-dashboard {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+[data-bs-theme='dark'] .indicador-resumido:hover,
+[data-bs-theme='dark'] .cartao-do-concurso:hover,
+[data-bs-theme='dark'] .cartao-do-material:hover,
+[data-bs-theme='dark'] .atalho-do-dashboard:hover {
+  border-color: rgb(var(--cor-violeta-rgb) / 42%);
+  box-shadow: var(--sombra-interativa) !important;
+  transform: translateY(-0.2rem);
+}
+
+[data-bs-theme='dark'] .valor-do-indicador,
+[data-bs-theme='dark'] .indicador-resumido strong {
+  font-size: clamp(1.65rem, 2.5vw, 2.4rem);
+  letter-spacing: -0.045em;
+}
+
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque {
+  background:
+    radial-gradient(
+      circle at 88% 12%,
+      rgb(255 255 255 / 12%),
+      transparent 17rem
+    ),
+    linear-gradient(
+      135deg,
+      var(--cor-violeta-profundo),
+      var(--cor-violeta) 62%,
+      var(--cor-azul-acento)
+    );
+  border: 0;
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-destaque);
+  min-height: 20rem;
+}
+
+[data-bs-theme='dark'] .objetivo-ativo-em-destaque h2 {
+  font-size: clamp(2.4rem, 5vw, 4.25rem);
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+[data-bs-theme='dark'] .grade-dos-concursos {
+  gap: 1.25rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-bs-theme='dark'] .cartao-do-concurso {
+  min-height: 17rem;
+  padding: 1.6rem;
+}
+
+[data-bs-theme='dark'] .cartao-do-concurso h3 {
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+}
+
+[data-bs-theme='dark'] .catalogo-mestre-detalhe {
+  gap: 1.5rem;
+  grid-template-columns: minmax(22rem, 27rem) minmax(0, 1fr);
+}
+
+[data-bs-theme='dark'] .painel-mestre-de-materias,
+[data-bs-theme='dark'] .detalhe-da-materia-no-catalogo {
+  border-radius: var(--raio-lg);
+  padding: 1.5rem;
+}
+
+[data-bs-theme='dark'] .lista-mestre-de-materias > button {
+  border-radius: var(--raio-md);
+  min-height: 4rem;
+  padding: 0.85rem;
+}
+
+[data-bs-theme='dark'] .lista-mestre-de-materias > button.ativo {
+  background: rgb(var(--cor-violeta-rgb) / 13%);
+  box-shadow: inset 0 0 0 1px rgb(var(--cor-violeta-rgb) / 18%);
+}
+
+[data-bs-theme='dark'] .cabecalho-do-detalhe-da-materia h2 {
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+  letter-spacing: -0.045em;
+}
+
+[data-bs-theme='dark'] .grade-da-biblioteca {
+  gap: 1.35rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+[data-bs-theme='dark'] .capa-do-material {
+  height: 8.5rem;
+  padding: 1.4rem;
+}
+
+[data-bs-theme='dark'] .resumo-do-historico {
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-bs-theme='dark'] .estrutura-do-historico {
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(21rem, 25rem);
+}
+
+[data-bs-theme='dark'] .linha-do-tempo-de-estudos,
+[data-bs-theme='dark'] .ritmo-real-da-semana {
+  border-radius: var(--raio-lg);
+  padding: 1.6rem;
+}
+
+[data-bs-theme='dark'] .registro-na-linha-do-tempo {
+  min-height: 5.75rem;
+}
+
+[data-bs-theme='dark'] h1,
+[data-bs-theme='dark'] h2,
+[data-bs-theme='dark'] h3,
+[data-bs-theme='dark'] h4,
+[data-bs-theme='dark'] .objetivo-da-jornada,
+[data-bs-theme='dark'] .conteudo-do-bloco-planejado,
+[data-bs-theme='dark'] .identificacao-da-revisao {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1279.98px) {
+  [data-bs-theme='dark'] .resumo-principal-da-jornada {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .tempo-da-jornada {
+    border-left: 0;
+    border-top: 1px solid var(--cor-borda);
+    grid-column: 1 / -1;
+  }
+
+  [data-bs-theme='dark'] .grade-dos-concursos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 991.98px) {
+  [data-bs-theme='dark'] .grade-de-resumo,
+  [data-bs-theme='dark'] .resumo-do-historico {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  [data-bs-theme='dark'] .catalogo-mestre-detalhe {
+    grid-template-columns: minmax(18rem, 0.78fr) minmax(0, 1.22fr);
+  }
+
+  [data-bs-theme='dark'] .estrutura-do-historico {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .ritmo-real-da-semana {
+    position: static;
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark'] .resumo-principal-da-jornada,
+  [data-bs-theme='dark'] .catalogo-mestre-detalhe {
+    grid-template-columns: 1fr;
+  }
+
+  [data-bs-theme='dark'] .objetivo-da-jornada {
+    border-bottom: 1px solid var(--cor-borda);
+    border-right: 0;
+  }
+
+  [data-bs-theme='dark'] .medidor-da-jornada {
+    border-bottom: 1px solid var(--cor-borda);
+  }
+
+  [data-bs-theme='dark'] .grade-de-resumo,
+  [data-bs-theme='dark'] .resumo-do-historico {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-bs-theme='dark'] .grade-dos-concursos {
+    grid-template-columns: 1fr;
+  }
+
+  [data-bs-theme='dark'] .painel-mestre-de-materias {
+    max-height: 27rem;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .grade-de-resumo,
+  [data-bs-theme='dark'] .resumo-do-historico {
+    grid-template-columns: 1fr;
+  }
+
+  [data-bs-theme='dark'] .objetivo-ativo-em-destaque {
+    min-height: auto;
+    padding: 1.5rem;
+  }
+
+  [data-bs-theme='dark'] .icone-do-objetivo-ativo {
+    display: none;
+  }
+
+  [data-bs-theme='dark'] .etapas-da-jornada {
+    gap: 0.85rem;
+    grid-template-columns: 1fr 1fr;
+    padding: 1.25rem;
+  }
+
+  [data-bs-theme='dark'] .etapas-da-jornada > div::before {
+    display: none;
+  }
+
+  [data-bs-theme='dark'] .registro-na-linha-do-tempo {
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  }
+}
+
+/* Planejamento diário — central de foco */
+[data-bs-theme='dark'] .pagina-do-planejamento-de-hoje {
+  display: grid;
+  gap: 0;
+}
+
+[data-bs-theme='dark'] .topo-do-planejamento-de-hoje {
+  border-bottom: 1px solid var(--cor-borda);
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+}
+
+[data-bs-theme='dark'] .topo-do-planejamento-de-hoje .cabecalho-da-pagina {
+  margin: 0;
+}
+
+[data-bs-theme='dark'] .topo-do-planejamento-de-hoje .cabecalho-da-pagina h1 {
+  font-size: clamp(3rem, 5vw, 5.5rem);
+}
+
+[data-bs-theme='dark']
+  .topo-do-planejamento-de-hoje
+  .navegacao-do-planejamento {
+  align-self: end;
+  background: rgb(255 255 255 / 2%);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  gap: 0.25rem;
+  padding: 0.3rem;
+}
+
+[data-bs-theme='dark']
+  .topo-do-planejamento-de-hoje
+  .navegacao-do-planejamento
+  a {
+  border: 0;
+  border-radius: calc(var(--raio-md) - 0.2rem);
+  min-height: 2.75rem;
+  padding-inline: 0.9rem;
+}
+
+[data-bs-theme='dark']
+  .topo-do-planejamento-de-hoje
+  .navegacao-do-planejamento
+  a.router-link-active {
+  background: var(--cor-superficie-3);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    0 0.5rem 1.25rem rgb(0 0 0 / 16%);
+}
+
+[data-bs-theme='dark'] .mensagens-do-planejamento-de-hoje {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+[data-bs-theme='dark'] .mensagens-do-planejamento-de-hoje .alert:last-child {
+  margin-bottom: 0;
+}
+
+[data-bs-theme='dark'] .grade-superior-do-planejamento-de-hoje {
+  --bs-gutter-x: 1.5rem;
+
+  margin-bottom: clamp(2.75rem, 5vw, 4.5rem);
+}
+
+[data-bs-theme='dark'] .coluna-de-foco-do-planejamento-de-hoje,
+[data-bs-theme='dark'] .coluna-lateral-do-planejamento-de-hoje {
+  min-width: 0;
+}
+
+[data-bs-theme='dark'] .coluna-de-foco-do-planejamento-de-hoje {
+  display: flex;
+}
+
+[data-bs-theme='dark'] .coluna-de-foco-do-planejamento-de-hoje > * {
+  flex: 1;
+  width: 100%;
+}
+
+[data-bs-theme='dark'] .coluna-lateral-do-planejamento-de-hoje {
+  display: grid;
+  gap: 1.25rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-foco-do-dia {
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      rgb(255 255 255 / 12%),
+      transparent 18rem
+    ),
+    radial-gradient(
+      circle at 4% 105%,
+      rgb(56 189 248 / 18%),
+      transparent 23rem
+    ),
+    linear-gradient(135deg, #35126f 0%, #5423a9 48%, #7138d0 100%);
+  border: 1px solid rgb(189 174 255 / 24%);
+  border-radius: var(--raio-xl);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 12%),
+    0 2rem 5rem rgb(45 16 91 / 35%);
+  color: #fff;
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  grid-template-columns: minmax(0, 1fr);
+  min-height: clamp(24rem, 32vw, 29rem);
+  overflow: hidden;
+  padding: clamp(1.75rem, 3.5vw, 3.5rem);
+  position: relative;
+}
+
+[data-bs-theme='dark'] .cartao-de-foco-do-dia::after {
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 50%;
+  content: '';
+  height: 22rem;
+  pointer-events: none;
+  position: absolute;
+  right: -10rem;
+  top: -11rem;
+  width: 22rem;
+}
+
+[data-bs-theme='dark'] .cartao-de-foco-do-dia > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-bs-theme='dark'] .identificacao-do-foco-do-dia {
+  align-content: center;
+  display: grid;
+  max-width: 50rem;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .identificacao-do-foco-do-dia
+  .sobretitulo-da-pagina {
+  color: rgb(255 255 255 / 72%);
+  margin: 0 0 0.85rem;
+}
+
+[data-bs-theme='dark'] .identificacao-do-foco-do-dia h2 {
+  color: #fff;
+  font-size: clamp(2.15rem, 3.5vw, 3.85rem);
+  font-weight: 720;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  margin: 0;
+  max-width: 18ch;
+}
+
+[data-bs-theme='dark'] .identificacao-do-foco-do-dia > p:last-child {
+  color: rgb(255 255 255 / 74%);
+  font-size: 1rem;
+  margin: 1.15rem 0 0;
+}
+
+[data-bs-theme='dark'] .tempo-do-foco-do-dia {
+  align-content: center;
+  align-self: stretch;
+  border-top: 1px solid rgb(255 255 255 / 15%);
+  display: grid;
+  grid-column: 1;
+  grid-row: auto;
+  justify-items: start;
+  min-width: 0;
+  padding-top: 1.25rem;
+}
+
+[data-bs-theme='dark'] .cronometro-da-execucao {
+  color: #fff;
+  font-size: clamp(2.75rem, 5vw, 5.25rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+  letter-spacing: -0.065em;
+  line-height: 1;
+}
+
+[data-bs-theme='dark'] .tempo-do-foco-do-dia span {
+  color: rgb(255 255 255 / 70%);
+  font-size: 0.875rem;
+  margin-top: 0.6rem;
+}
+
+[data-bs-theme='dark'] .acoes-do-foco-do-dia {
+  align-self: end;
+  grid-column: 1;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia:not(.bloco-em-andamento)
+  .acoes-do-foco-do-dia {
+  grid-column: 1 / -1;
+}
+
+[data-bs-theme='dark'] .cartao-de-foco-do-dia .acoes-do-foco-do-dia .btn {
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: 0.9375rem;
+  min-height: 3rem;
+  padding-inline: 1.25rem;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-primary {
+  background: #fff;
+  border-color: #fff;
+  color: #321065;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-primary:hover {
+  background: #eee9ff;
+  border-color: #eee9ff;
+  color: #250b4e;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.botao-de-contraste,
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-outline-secondary {
+  background: rgb(8 5 20 / 24%);
+  border-color: rgb(255 255 255 / 28%);
+  color: #fff;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.botao-de-contraste:hover,
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-outline-secondary:hover {
+  background: rgb(8 5 20 / 42%);
+  border-color: rgb(255 255 255 / 48%);
+  color: #fff;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-outline-danger {
+  background: rgb(74 8 28 / 22%);
+  border-color: rgb(255 184 194 / 48%);
+  color: #ffe1e5;
+}
+
+[data-bs-theme='dark']
+  .cartao-de-foco-do-dia
+  .acoes-do-foco-do-dia
+  .btn.btn-outline-danger:hover {
+  background: rgb(96 9 35 / 48%);
+  border-color: rgb(255 214 220 / 70%);
+  color: #fff;
+}
+
+[data-bs-theme='dark'] .painel-da-carga-do-dia,
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia {
+  margin: 0;
+  padding: clamp(1.35rem, 2vw, 1.75rem);
+}
+
+[data-bs-theme='dark'] .painel-da-carga-do-dia {
+  background:
+    linear-gradient(rgb(255 255 255 / 1.5%), rgb(255 255 255 / 1.5%)),
+    var(--cor-superficie-2);
+  display: grid;
+  gap: 1.35rem;
+  grid-template-columns: 1fr;
+}
+
+[data-bs-theme='dark'] .cabecalho-do-painel-da-carga,
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia > header,
+[data-bs-theme='dark'] .cabecalho-da-linha-do-tempo-do-dia {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+[data-bs-theme='dark'] .painel-da-carga-do-dia h2,
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia h2,
+[data-bs-theme='dark'] .cabecalho-da-agenda-do-dia h2,
+[data-bs-theme='dark'] .linha-do-tempo-dos-estudos-do-dia h2 {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  letter-spacing: -0.035em;
+  margin: 0.25rem 0 0;
+}
+
+[data-bs-theme='dark'] .percentual-da-carga-planejada {
+  color: var(--cor-link);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+[data-bs-theme='dark'] .progresso-da-carga-planejada {
+  appearance: none;
+  background: var(--cor-superficie-4);
+  border: 0;
+  border-radius: 999px;
+  height: 0.55rem;
+  overflow: hidden;
+  width: 100%;
+}
+
+[data-bs-theme='dark'] .progresso-da-carga-planejada::-webkit-progress-bar {
+  background: var(--cor-superficie-4);
+}
+
+[data-bs-theme='dark'] .progresso-da-carga-planejada::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--cor-violeta), var(--cor-link));
+  border-radius: 999px;
+}
+
+[data-bs-theme='dark'] .progresso-da-carga-planejada::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--cor-violeta), var(--cor-link));
+  border-radius: 999px;
+}
+
+[data-bs-theme='dark'] .indicadores-da-carga-do-dia {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+[data-bs-theme='dark'] .indicadores-da-carga-do-dia > div {
+  background: var(--cor-superficie-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+}
+
+[data-bs-theme='dark'] .indicadores-da-carga-do-dia dt {
+  color: var(--cor-texto-suave);
+  font-size: 0.75rem !important;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+[data-bs-theme='dark'] .indicadores-da-carga-do-dia dd {
+  color: var(--cor-texto);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  margin: 0;
+}
+
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia {
+  min-height: 11rem;
+}
+
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia .estado-das-revisoes {
+  background: rgb(var(--cor-sucesso-rgb) / 7%);
+  border: 1px solid rgb(var(--cor-sucesso-rgb) / 16%);
+  border-radius: var(--raio-md);
+  margin-top: 1.2rem;
+  min-height: 4.5rem;
+  padding: 0.9rem 1rem;
+}
+
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia .estado-das-revisoes > i {
+  color: var(--cor-sucesso);
+}
+
+[data-bs-theme='dark'] .quantidade-de-revisoes,
+[data-bs-theme='dark'] .quantidade-de-estudos-realizados {
+  align-items: center;
+  background: rgb(var(--cor-violeta-rgb) / 15%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 22%);
+  border-radius: 999px;
+  color: var(--cor-link);
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 750;
+  justify-content: center;
+  min-height: 2.15rem;
+  min-width: 2.15rem;
+  padding: 0.25rem 0.7rem;
+}
+
+[data-bs-theme='dark'] .painel-de-revisoes-do-dia .lista-de-revisoes-de-hoje {
+  margin-top: 1.1rem;
+}
+
+[data-bs-theme='dark']
+  .painel-de-revisoes-do-dia
+  .lista-de-revisoes-de-hoje
+  li {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+[data-bs-theme='dark']
+  .painel-de-revisoes-do-dia
+  .lista-de-revisoes-de-hoje
+  .btn {
+  align-self: flex-start;
+}
+
+[data-bs-theme='dark'] .agenda-do-planejamento-de-hoje {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: clamp(2.75rem, 5vw, 4.5rem);
+}
+
+[data-bs-theme='dark'] .cabecalho-da-agenda-do-dia {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+[data-bs-theme='dark'] .cabecalho-da-agenda-do-dia h2 {
+  font-size: clamp(2rem, 3vw, 3rem);
+}
+
+[data-bs-theme='dark'] .fluxo-da-agenda-do-dia {
+  align-items: start;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 31rem), 1fr));
+}
+
+[data-bs-theme='dark'] .grupo-da-agenda-do-dia {
+  border-radius: var(--raio-xl);
+  margin: 0;
+  padding: clamp(1.35rem, 2.25vw, 2rem);
+}
+
+[data-bs-theme='dark'] .grupo-da-agenda-do-dia > header {
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: 0.25rem;
+  padding-bottom: 1rem;
+}
+
+[data-bs-theme='dark'] .grupo-da-agenda-do-dia > header h2 {
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+  margin: 0.25rem 0 0;
+}
+
+[data-bs-theme='dark'] .grupo-da-agenda-do-dia ol {
+  gap: 0;
+}
+
+[data-bs-theme='dark'] .grupo-da-agenda-do-dia .item-da-agenda-do-dia {
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  gap: 1rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  min-height: 5.75rem;
+  padding: 1rem 0;
+}
+
+[data-bs-theme='dark']
+  .grupo-da-agenda-do-dia
+  .item-da-agenda-do-dia:last-child {
+  border-bottom: 0;
+  padding-bottom: 0.25rem;
+}
+
+[data-bs-theme='dark'] .marcador-do-item-da-agenda {
+  align-items: center;
+  align-self: start;
+  background: rgb(var(--cor-violeta-rgb) / 13%);
+  border: 1px solid rgb(var(--cor-violeta-rgb) / 22%);
+  border-radius: 0.75rem;
+  color: var(--cor-link);
+  display: inline-flex;
+  font-size: 0.875rem;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+[data-bs-theme='dark'] .conteudo-do-item-da-agenda {
+  align-self: center;
+  gap: 0.3rem;
+}
+
+[data-bs-theme='dark'] .conteudo-do-item-da-agenda strong,
+[data-bs-theme='dark'] .conteudo-da-linha-do-tempo strong {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+[data-bs-theme='dark'] .acoes-do-item-da-agenda {
+  align-self: center;
+  justify-content: flex-end;
+}
+
+[data-bs-theme='dark'] .acoes-do-item-da-agenda .btn,
+[data-bs-theme='dark'] .acoes-da-linha-do-tempo .btn {
+  min-height: 2.75rem;
+}
+
+[data-bs-theme='dark'] .linha-do-tempo-dos-estudos-do-dia {
+  border-radius: var(--raio-xl);
+  margin: 0;
+  padding: clamp(1.35rem, 2.25vw, 2rem);
+}
+
+[data-bs-theme='dark'] .cabecalho-da-linha-do-tempo-do-dia {
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: 0.25rem;
+  padding-bottom: 1.25rem;
+}
+
+[data-bs-theme='dark'] .lista-da-linha-do-tempo-do-dia {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+[data-bs-theme='dark'] .item-da-linha-do-tempo-do-dia {
+  align-items: center;
+  border-bottom: 1px solid var(--cor-borda);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  min-height: 5.75rem;
+  padding: 1rem 0;
+}
+
+[data-bs-theme='dark'] .item-da-linha-do-tempo-do-dia:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+[data-bs-theme='dark'] .marcador-da-linha-do-tempo {
+  align-items: center;
+  background: rgb(var(--cor-sucesso-rgb) / 12%);
+  border: 1px solid rgb(var(--cor-sucesso-rgb) / 20%);
+  border-radius: 50%;
+  color: var(--cor-sucesso);
+  display: inline-flex;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+[data-bs-theme='dark'] .conteudo-da-linha-do-tempo {
+  display: grid;
+  gap: 0.2rem;
+}
+
+@media (max-width: 1199.98px) {
+  [data-bs-theme='dark'] .tempo-do-foco-do-dia {
+    grid-column: 1;
+    grid-row: auto;
+    justify-items: start;
+    min-width: 0;
+    padding-left: 0;
+    padding-top: 1.25rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  [data-bs-theme='dark'] .topo-do-planejamento-de-hoje {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark']
+    .topo-do-planejamento-de-hoje
+    .navegacao-do-planejamento {
+    justify-self: stretch;
+  }
+
+  [data-bs-theme='dark'] .cartao-de-foco-do-dia {
+    min-height: 22rem;
+  }
+
+  [data-bs-theme='dark'] .coluna-de-foco-do-planejamento-de-hoje {
+    display: block;
+  }
+}
+
+@media (max-width: 767.98px) {
+  [data-bs-theme='dark']
+    .topo-do-planejamento-de-hoje
+    .navegacao-do-planejamento {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  [data-bs-theme='dark']
+    .topo-do-planejamento-de-hoje
+    .navegacao-do-planejamento
+    a {
+    flex: 0 0 auto;
+  }
+
+  [data-bs-theme='dark'] .grupo-da-agenda-do-dia .item-da-agenda-do-dia,
+  [data-bs-theme='dark'] .item-da-linha-do-tempo-do-dia {
+    align-items: start;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .acoes-do-item-da-agenda,
+  [data-bs-theme='dark'] .acoes-da-linha-do-tempo {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 575.98px) {
+  [data-bs-theme='dark'] .topo-do-planejamento-de-hoje {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+  }
+
+  [data-bs-theme='dark']
+    .topo-do-planejamento-de-hoje
+    .cabecalho-da-pagina
+    .acoes-do-cabecalho {
+    width: 100%;
+  }
+
+  [data-bs-theme='dark']
+    .topo-do-planejamento-de-hoje
+    .cabecalho-da-pagina
+    .acoes-do-cabecalho
+    .btn {
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .cartao-de-foco-do-dia {
+    border-radius: var(--raio-lg);
+    gap: 1.5rem;
+    min-height: 25rem;
+    padding: 1.5rem;
+  }
+
+  [data-bs-theme='dark'] .identificacao-do-foco-do-dia h2 {
+    font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  [data-bs-theme='dark'] .cronometro-da-execucao {
+    font-size: clamp(2.75rem, 15vw, 4.5rem);
+  }
+
+  [data-bs-theme='dark'] .acoes-do-foco-do-dia {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .acoes-do-foco-do-dia .btn {
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .acoes-do-foco-do-dia .btn-primary {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  [data-bs-theme='dark'] .indicadores-da-carga-do-dia {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-bs-theme='dark'] .fluxo-da-agenda-do-dia {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-bs-theme='dark'] .grupo-da-agenda-do-dia,
+  [data-bs-theme='dark'] .linha-do-tempo-dos-estudos-do-dia {
+    padding: 1.25rem;
+  }
+
+  [data-bs-theme='dark'] .acoes-do-item-da-agenda,
+  [data-bs-theme='dark'] .acoes-da-linha-do-tempo {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  [data-bs-theme='dark'] .acoes-do-item-da-agenda .btn,
+  [data-bs-theme='dark'] .acoes-da-linha-do-tempo .btn {
+    width: 100%;
+  }
+}
