@@ -8,6 +8,7 @@ import {
   listarMateriaisRelacionadosAosTopicos,
   listarMateriaisDeEstudo,
   paraEvidencia,
+  registrarEstudo,
 } from './apiDeEstudos'
 
 describe('paraEvidencia', () => {
@@ -45,5 +46,22 @@ describe('paraEvidencia', () => {
       '/v1/materiais/atalhos-por-topico?identificadoresDosTopicos=topico-1&identificadoresDosTopicos=topico-2',
       { signal: undefined },
     )
+  })
+
+  it('envia a chave idempotente somente na criação do estudo', async () => {
+    const dados = {
+      identificadorDoTopico: 'topico-1',
+      dataHora: '2026-07-22T02:59:00Z',
+      duracaoEmMinutos: 50,
+      tipoDeEstudo: 'QUESTOES' as const,
+    }
+
+    await registrarEstudo(dados, 'tentativa-1')
+
+    expect(requisitar).toHaveBeenCalledWith('/v1/estudos', {
+      method: 'POST',
+      headers: { 'X-Chave-De-Idempotencia': 'tentativa-1' },
+      body: JSON.stringify(dados),
+    })
   })
 })

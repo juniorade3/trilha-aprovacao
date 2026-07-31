@@ -4,6 +4,7 @@ import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaPaginada;
 import br.com.trilhaaprovacao.conteudos.aplicacao.ServicoDeTopicos;
 import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeMateriaisEEstudos;
+import br.com.trilhaaprovacao.estudos.aplicacao.ServicoDeRegistroIdempotenteDeEstudo;
 import br.com.trilhaaprovacao.estudos.dominio.RegistroDeEstudo;
 import br.com.trilhaaprovacao.estudos.dominio.TipoDeEstudo;
 import br.com.trilhaaprovacao.evidencias.aplicacao.ServicoDeEvidenciasDeAprendizagem;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,16 +42,19 @@ public class ControladorDeMateriaisEEstudos {
     private final ServicoDeTopicos topicos;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
     private final ServicoDeEvidenciasDeAprendizagem evidencias;
+    private final ServicoDeRegistroIdempotenteDeEstudo registroIdempotente;
 
     public ControladorDeMateriaisEEstudos(
             ServicoDeMateriaisEEstudos servico,
             ServicoDeTopicos topicos,
             IdentidadeDoUsuarioAtual usuarioAtual,
-            ServicoDeEvidenciasDeAprendizagem evidencias) {
+            ServicoDeEvidenciasDeAprendizagem evidencias,
+            ServicoDeRegistroIdempotenteDeEstudo registroIdempotente) {
         this.servico = servico;
         this.topicos = topicos;
         this.usuarioAtual = usuarioAtual;
         this.evidencias = evidencias;
+        this.registroIdempotente = registroIdempotente;
     }
 
     @PostMapping("/materiais")
@@ -178,13 +183,18 @@ public class ControladorDeMateriaisEEstudos {
     })
     public ResponseEntity<RespostaDeRegistroDeEstudo> registrarEstudo(
             @Valid @RequestBody RequisicaoDeRegistroDeEstudo requisicao,
+            @RequestHeader(
+                    name = "X-Chave-De-Idempotencia",
+                    required = false)
+            String chaveDeIdempotencia,
             Authentication autenticacao) {
         UUID usuario = usuario(autenticacao);
-        var registro = servico.registrarEstudo(usuario,
+        var registro = registroIdempotente.registrar(
+                usuario, chaveDeIdempotencia,
                 requisicao.identificadorDoTopico(), requisicao.identificadorDoMaterial(),
                 requisicao.tipoDeEstudo() == null ? TipoDeEstudo.OUTRA : requisicao.tipoDeEstudo(),
                 requisicao.dataHora(), requisicao.duracaoEmMinutos(), requisicao.observacao(),
-                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados(), true);
+                requisicao.evidencia() == null ? null : requisicao.evidencia().paraDados());
         return ResponseEntity.created(
                         URI.create("/api/v1/estudos/" + registro.identificador()))
                 .body(respostaDoRegistro(usuario, registro));

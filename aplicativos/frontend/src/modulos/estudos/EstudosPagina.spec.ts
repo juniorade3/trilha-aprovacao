@@ -65,6 +65,7 @@ const material = {
   tipo: 'AULA',
   arquivado: false,
 }
+const paginasMontadas: ReturnType<typeof mount>[] = []
 
 describe('EstudosPagina', () => {
   beforeEach(() => {
@@ -91,12 +92,15 @@ describe('EstudosPagina', () => {
   })
 
   afterEach(() => {
+    for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('apresenta a linha do tempo e abre o registro rapido global', async () => {
     const despachar = vi.spyOn(window, 'dispatchEvent')
     const pagina = mount(EstudosPagina)
+    paginasMontadas.push(pagina)
     await flushPromises()
 
     expect(pagina.text()).toContain('Direitos fundamentais')
@@ -115,9 +119,10 @@ describe('EstudosPagina', () => {
   it('abre o registro rapido global ao entrar pela rota de novo estudo', async () => {
     const despachar = vi.spyOn(window, 'dispatchEvent')
 
-    mount(EstudosPagina, {
+    const pagina = mount(EstudosPagina, {
       props: { abrirRegistroRapidoAoEntrar: true },
     })
+    paginasMontadas.push(pagina)
     await flushPromises()
 
     expect(despachar).toHaveBeenCalledWith(
@@ -151,6 +156,7 @@ describe('EstudosPagina', () => {
       },
     ])
     const pagina = mount(EstudosPagina)
+    paginasMontadas.push(pagina)
     await flushPromises()
 
     expect(pagina.text()).toContain('3 registros')
@@ -182,6 +188,7 @@ describe('EstudosPagina', () => {
     const pagina = mount(EstudosPagina, {
       global: { stubs: { Teleport: true } },
     })
+    paginasMontadas.push(pagina)
     await flushPromises()
 
     await pagina
@@ -196,6 +203,8 @@ describe('EstudosPagina', () => {
       'estudo-1',
       expect.objectContaining({ duracaoEmMinutos: 50 }),
     )
+    expect(chamadas.listarTodosOsEstudos).toHaveBeenCalledTimes(2)
+    expect(chamadas.consultarDiagnosticoDeTopicos).toHaveBeenCalledTimes(2)
 
     await pagina
       .findAll('button')
@@ -230,6 +239,7 @@ describe('EstudosPagina', () => {
       },
     ])
     const pagina = mount(EstudosPagina)
+    paginasMontadas.push(pagina)
     await flushPromises()
 
     expect(pagina.text()).toContain('75% de acertos')
@@ -270,5 +280,94 @@ describe('EstudosPagina', () => {
       true,
     )
     pagina.unmount()
+  })
+
+  it('usa São Paulo no diagnóstico, na exibição e na correção perto da virada UTC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-22T02:30:00Z'))
+    chamadas.listarTodosOsEstudos.mockResolvedValue([
+      {
+        ...registro,
+        dataHora: '2026-07-22T02:59:00Z',
+      },
+    ])
+    const pagina = mount(EstudosPagina, {
+      global: { stubs: { Teleport: true } },
+    })
+    paginasMontadas.push(pagina)
+    await flushPromises()
+
+    expect(chamadas.consultarDiagnosticoDeTopicos).toHaveBeenCalledWith(
+      '2026-07-21',
+      undefined,
+      false,
+      expect.any(AbortSignal),
+    )
+    expect(pagina.text()).toContain('23:59')
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === 'Corrigir')!
+      .trigger('click')
+    expect((pagina.get('#data-estudo').element as HTMLInputElement).value).toBe(
+      '2026-07-21T23:59',
+    )
+
+    await pagina.get('#formulario-estudo').trigger('submit')
+    await flushPromises()
+
+    expect(chamadas.corrigirEstudo).toHaveBeenCalledWith(
+      'estudo-1',
+      expect.objectContaining({ dataHora: '2026-07-22T02:59:00.000Z' }),
+    )
+  })
+
+  it('não inclui uma data civil futura nos períodos recentes nem na semana', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-22T02:30:00Z'))
+    chamadas.listarTodosOsEstudos.mockResolvedValue([
+      {
+        ...registro,
+        nomeDoTopico: 'Tópico de hoje',
+        dataHora: '2026-07-22T02:59:00Z',
+      },
+      {
+        ...registro,
+        identificador: 'estudo-futuro',
+        nomeDoTopico: 'Tópico futuro',
+        dataHora: '2026-07-22T03:00:00Z',
+      },
+    ])
+    const pagina = mount(EstudosPagina)
+    paginasMontadas.push(pagina)
+    await flushPromises()
+
+    expect(pagina.text()).toContain('2 registros')
+    expect(pagina.get('.resumo-do-historico article strong').text()).toBe(
+      '45min',
+    )
+
+    await pagina
+      .findAll('button')
+      .find((botao) => botao.text() === '7 dias')!
+      .trigger('click')
+
+    expect(pagina.text()).toContain('1 registro')
+    expect(pagina.text()).toContain('Tópico de hoje')
+    expect(pagina.text()).not.toContain('Tópico futuro')
+  })
+
+  it('recarrega histórico e diagnóstico após uma nova evidência global', async () => {
+    const pagina = mount(EstudosPagina)
+    paginasMontadas.push(pagina)
+    await flushPromises()
+    expect(chamadas.listarTodosOsEstudos).toHaveBeenCalledTimes(1)
+    expect(chamadas.consultarDiagnosticoDeTopicos).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new CustomEvent('estudo-registrado'))
+    await flushPromises()
+
+    expect(chamadas.listarTodosOsEstudos).toHaveBeenCalledTimes(2)
+    expect(chamadas.consultarDiagnosticoDeTopicos).toHaveBeenCalledTimes(2)
   })
 })

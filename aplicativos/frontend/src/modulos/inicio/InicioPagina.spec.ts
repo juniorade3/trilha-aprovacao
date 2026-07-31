@@ -2,13 +2,15 @@
 
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { obterDashboard } = vi.hoisted(() => ({ obterDashboard: vi.fn() }))
 
 vi.mock('./apiDoDashboard', () => ({ obterDashboard }))
 
 import InicioPagina from './InicioPagina.vue'
+
+const paginasMontadas: ReturnType<typeof mount>[] = []
 
 function criarRoteador() {
   return createRouter({
@@ -34,6 +36,7 @@ async function montar() {
   await roteador.push('/')
   await roteador.isReady()
   const pagina = mount(InicioPagina, { global: { plugins: [roteador] } })
+  paginasMontadas.push(pagina)
   await flushPromises()
   return pagina
 }
@@ -41,6 +44,10 @@ async function montar() {
 describe('InicioPagina', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
   })
 
   it('orienta o usuario quando ainda nao existe concurso ativo', async () => {
@@ -104,7 +111,7 @@ describe('InicioPagina', () => {
 
     const pagina = await montar()
 
-    expect(pagina.get('h1').text()).toContain('avançando')
+    expect(pagina.get('h1').text()).toContain('Visão geral')
     expect(pagina.text()).toContain('Receita Federal')
     expect(pagina.text()).toContain('Auditor Fiscal')
     expect(pagina.text()).toContain('1 de 3')
@@ -118,6 +125,8 @@ describe('InicioPagina', () => {
     expect(pagina.get('a[href="/planejamento/prioridades"]').text()).toContain(
       'Ver lacunas',
     )
+    expect(pagina.text()).not.toContain('Consolidação')
+    expect(pagina.text()).not.toContain('Estudo consistente')
   })
 
   it('permite tentar novamente quando a consulta falha', async () => {
@@ -142,5 +151,62 @@ describe('InicioPagina', () => {
 
     expect(obterDashboard).toHaveBeenCalledTimes(2)
     expect(pagina.text()).toContain('Comece escolhendo')
+  })
+
+  it('recarrega as medidas depois de uma nova evidência', async () => {
+    obterDashboard.mockResolvedValue({
+      concursoAtivo: {
+        identificador: 'concurso-1',
+        nome: 'Receita Federal',
+        situacao: 'EM_ANDAMENTO',
+      },
+      tempoEstudadoNaSemanaEmMinutos: 60,
+      quantidadeDeMaterias: 1,
+      quantidadeDeTopicosExigidos: 1,
+      quantidadeDeTopicosComEstudo: 1,
+      quantidadeDeItensMapeados: 1,
+      quantidadeDeItensSemMapeamento: 0,
+      atividadeRecente: [],
+      alertas: [],
+    })
+    const pagina = await montar()
+    expect(obterDashboard).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new CustomEvent('estudo-registrado'))
+    await flushPromises()
+
+    expect(obterDashboard).toHaveBeenCalledTimes(2)
+    expect(pagina.text()).toContain('1 de 1 tópicos com estudo')
+  })
+
+  it('exibe a atividade recente no horário civil de São Paulo', async () => {
+    obterDashboard.mockResolvedValue({
+      concursoAtivo: {
+        identificador: 'concurso-1',
+        nome: 'Receita Federal',
+        situacao: 'EM_ANDAMENTO',
+      },
+      tempoEstudadoNaSemanaEmMinutos: 30,
+      quantidadeDeMaterias: 1,
+      quantidadeDeTopicosExigidos: 1,
+      quantidadeDeTopicosComEstudo: 1,
+      quantidadeDeItensMapeados: 1,
+      quantidadeDeItensSemMapeamento: 0,
+      atividadeRecente: [
+        {
+          identificador: 'estudo-1',
+          identificadorDoTopico: 'topico-1',
+          nomeDoTopico: 'Virada do dia',
+          dataHora: '2026-07-22T02:30:00Z',
+          duracaoEmMinutos: 30,
+        },
+      ],
+      alertas: [],
+    })
+
+    const pagina = await montar()
+
+    expect(pagina.text()).toContain('21 de jul.')
+    expect(pagina.text()).toContain('23:30')
   })
 })

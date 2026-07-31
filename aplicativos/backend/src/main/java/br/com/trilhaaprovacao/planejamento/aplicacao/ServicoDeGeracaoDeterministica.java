@@ -342,7 +342,7 @@ public class ServicoDeGeracaoDeterministica {
                 WHERE plano.usuario_id = ?
                   AND plano.estado IN ('RASCUNHO', 'ATIVO')
                   AND bloco.tipo_de_atividade = 'REVISAO'
-                  AND bloco.estado <> 'CANCELADO'
+                  AND bloco.estado IN ('PLANEJADO', 'EM_ANDAMENTO')
                   AND bloco.topico_id IS NOT NULL
                 """, (resultado, linha) -> new BlocoAbertoLido(
                         resultado.getObject("identificador", UUID.class),

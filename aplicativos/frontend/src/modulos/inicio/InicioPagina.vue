@@ -31,8 +31,8 @@ const etapasDaJornada = computed(() => {
   return [
     { nome: 'Objetivo', detalhe: 'Concurso e cargo' },
     { nome: 'Base do edital', detalhe: 'Estrutura e vínculos' },
-    { nome: 'Consolidação', detalhe: 'Estudo consistente' },
-    { nome: 'Reta final', detalhe: 'Cobertura avançada' },
+    { nome: 'Cobertura', detalhe: 'Tópicos com registro' },
+    { nome: 'Cobertura avançada', detalhe: 'Mais tópicos estudados' },
   ].map((etapa, indice) => ({
     ...etapa,
     situacao:
@@ -71,7 +71,8 @@ function formatarData(data: string) {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(`${data}T12:00:00`))
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(`${data}T12:00:00-03:00`))
 }
 
 function formatarDataHora(dataHora: string) {
@@ -80,6 +81,7 @@ function formatarDataHora(dataHora: string) {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   }).format(new Date(dataHora))
 }
 
@@ -192,8 +194,8 @@ onBeforeUnmount(() => {
       <template v-else>
         <CabecalhoDaPagina
           etiqueta="Sua jornada de hoje"
-          titulo="Você está avançando"
-          descricao="Mantenha o ritmo e siga firme até a prova. Consistência hoje, aprovação amanhã."
+          titulo="Visão geral da preparação"
+          descricao="Acompanhe cobertura, tempo registrado e pendências do concurso ativo."
         >
           <template #acoes>
             <RouterLink class="btn btn-outline-primary" to="/planejamento/hoje">

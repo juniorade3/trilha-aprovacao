@@ -46,7 +46,7 @@ public class ConsultaDeDiagnosticoDeTopicos {
                      AND ed.principal = TRUE
                     WHERE c.usuario_id = ? AND c.ativo = TRUE
                 ), topicos_exigidos AS (
-                    SELECT DISTINCT mapa.topico_da_materia_id AS topico_id
+                    SELECT DISTINCT topico_mapeado.identificador AS topico_id
                     FROM contexto_oficial contexto
                     JOIN itens_do_edital i ON i.edital_id = contexto.edital_id
                     JOIN materias_da_prova mp
@@ -59,6 +59,9 @@ public class ConsultaDeDiagnosticoDeTopicos {
                     JOIN mapeamentos_de_itens_do_edital mapa
                       ON mapa.item_do_edital_id = i.identificador
                      AND mapa.confirmado = TRUE
+                    JOIN topicos_da_materia topico_mapeado
+                      ON topico_mapeado.identificador = mapa.topico_da_materia_id
+                     AND topico_mapeado.materia_id = mp.materia_id
                 ), fatos AS (
                     SELECT r.topico_id, r.data_hora, r.tipo_de_estudo,
                            e.identificador AS evidencia_id,
@@ -157,7 +160,7 @@ public class ConsultaDeDiagnosticoDeTopicos {
                      AND ed.principal = TRUE
                     WHERE c.usuario_id = ? AND c.ativo = TRUE
                 ), topicos_exigidos AS (
-                    SELECT DISTINCT mapa.topico_da_materia_id AS topico_id
+                    SELECT DISTINCT topico_mapeado.identificador AS topico_id
                     FROM contexto_oficial contexto
                     JOIN itens_do_edital i ON i.edital_id = contexto.edital_id
                     JOIN materias_da_prova mp
@@ -170,6 +173,9 @@ public class ConsultaDeDiagnosticoDeTopicos {
                     JOIN mapeamentos_de_itens_do_edital mapa
                       ON mapa.item_do_edital_id = i.identificador
                      AND mapa.confirmado = TRUE
+                    JOIN topicos_da_materia topico_mapeado
+                      ON topico_mapeado.identificador = mapa.topico_da_materia_id
+                     AND topico_mapeado.materia_id = mp.materia_id
                 )
                 SELECT p.topico_id, p.identificador, p.descricao,
                        COUNT(DISTINCT e.identificador) AS evidencias,

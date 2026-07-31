@@ -590,11 +590,11 @@ public class CatalogoDeFerramentasMcp {
 
     private Map<String, Object> esquemaDaEvidencia() {
         Map<String, Object> padrao = objeto(Map.of(
-                "descricao", texto(500),
+                "descricao", texto(200),
                 "quantidadeDeOcorrencias", inteiro(1, 1_000_000)),
                 List.of("descricao", "quantidadeDeOcorrencias"));
         return objeto(Map.of(
-                "quantidadeDeQuestoes", inteiro(0, 1_000_000),
+                "quantidadeDeQuestoes", inteiro(1, 1_000_000),
                 "quantidadeDeAcertos", inteiro(0, 1_000_000),
                 "nivelDeRecordacao", inteiro(1, 5),
                 "dificuldadePercebida", inteiro(1, 5),

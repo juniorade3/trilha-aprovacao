@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
+import { dataCivilEmSaoPaulo } from '@/compartilhado/datas/fusoHorario'
 import NavegacaoDoPlanejamento from './NavegacaoDoPlanejamento.vue'
 import {
   consultarPriorizacaoDeTopicos,
@@ -19,7 +20,7 @@ const carregando = ref(true)
 const erro = ref('')
 const contextoIncompleto = ref(false)
 const sessaoExpirada = ref(false)
-const dataDeReferencia = ref(dataLocalAtual())
+const dataDeReferencia = ref(dataCivilEmSaoPaulo())
 const identificadorDaMateria = ref('')
 const grupoSelecionado = ref<'TODOS' | GrupoDaPriorizacao>('TODOS')
 const opcoesDeMaterias = ref<Array<{ id: string; nome: string }>>([])
@@ -85,18 +86,6 @@ const totalDeTopicosVisiveis = computed(() => {
 function quantidadeDeTopicosVisiveis(materia: MateriaPriorizada) {
   if (grupoSelecionado.value === 'TODOS') return materia.topicos.length
   return topicosDoGrupo(materia, grupoSelecionado.value).length
-}
-
-function dataLocalAtual() {
-  const partes = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
-    partes.find((parte) => parte.type === tipo)?.value ?? ''
-  return `${valor('year')}-${valor('month')}-${valor('day')}`
 }
 
 function atualizarOpcoesDeMaterias(
@@ -198,8 +187,14 @@ function rotuloDoPercentual(valor?: number | null) {
   return valor == null ? '—' : `${valor}%`
 }
 
-onMounted(() => void carregar())
-onBeforeUnmount(() => cancelamento?.abort())
+onMounted(() => {
+  void carregar()
+  window.addEventListener('estudo-registrado', carregar)
+})
+onBeforeUnmount(() => {
+  cancelamento?.abort()
+  window.removeEventListener('estudo-registrado', carregar)
+})
 </script>
 
 <template>

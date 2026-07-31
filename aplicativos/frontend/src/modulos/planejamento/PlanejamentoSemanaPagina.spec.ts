@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
+import { dataCivilEmSaoPaulo } from '@/compartilhado/datas/fusoHorario'
 
 const chamadas = vi.hoisted(() => ({
   adicionarBloco: vi.fn(),
@@ -69,8 +70,7 @@ const inicio = '2026-07-20'
 const paginasMontadas: ReturnType<typeof mount>[] = []
 
 function dataDeReferenciaEsperada() {
-  const agora = new Date()
-  const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`
+  const hoje = dataCivilEmSaoPaulo()
   if (hoje < inicio) return inicio
   return hoje > '2026-07-26' ? '2026-07-26' : hoje
 }
@@ -135,7 +135,7 @@ function blocoDeEstudo(
   }
 }
 
-async function montarPagina(foco?: string) {
+async function montarPagina(foco?: string, informarInicio = true) {
   const roteador = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -159,7 +159,7 @@ async function montarPagina(foco?: string) {
   })
   await roteador.push({
     path: '/planejamento/semana',
-    query: { inicio, ...(foco ? { foco } : {}) },
+    query: { ...(informarInicio ? { inicio } : {}), ...(foco ? { foco } : {}) },
   })
   await roteador.isReady()
   const pagina = mount(PlanejamentoSemanaPagina, {
@@ -288,6 +288,15 @@ describe('PlanejamentoSemanaPagina', () => {
     )
     expect(chamadas.alterarDisponibilidades.mock.calls[0]?.[1]).toHaveLength(7)
     expect(pagina.text()).toContain('Disponibilidade salva')
+  })
+
+  it('calcula a semana atual pela data civil de São Paulo na virada UTC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-20T02:30:00Z'))
+
+    await montarPagina(undefined, false)
+
+    expect(chamadas.obterPlanoSemanal).toHaveBeenCalledWith('2026-07-13')
   })
 
   it('abre a geracao deterministica somente em plano rascunho', async () => {

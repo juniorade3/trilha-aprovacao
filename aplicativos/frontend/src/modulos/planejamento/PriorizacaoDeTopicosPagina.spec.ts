@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 
@@ -16,6 +16,8 @@ vi.mock('./apiDePriorizacaoDeTopicos', async (importarOriginal) => ({
 }))
 
 import PriorizacaoDeTopicosPagina from './PriorizacaoDeTopicosPagina.vue'
+
+const paginasMontadas: ReturnType<typeof mount>[] = []
 
 const resposta = {
   contexto: {
@@ -161,6 +163,7 @@ async function montar(anexarAoDocumento = false) {
     ...(anexarAoDocumento ? { attachTo: document.body } : {}),
     global: { plugins: [roteador] },
   })
+  paginasMontadas.push(pagina)
   await flushPromises()
   return pagina
 }
@@ -169,6 +172,10 @@ describe('PriorizacaoDeTopicosPagina', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     consultarPriorizacaoDeTopicos.mockResolvedValue(resposta)
+  })
+
+  afterEach(() => {
+    for (const pagina of paginasMontadas.splice(0)) pagina.unmount()
   })
 
   it('mostra contexto, lacunas, indicadores e justificativas do ranking', async () => {
@@ -308,5 +315,16 @@ describe('PriorizacaoDeTopicosPagina', () => {
       pagina.get('button[type="submit"]').element,
     )
     pagina.unmount()
+  })
+
+  it('não mantém o ranking anterior depois de uma nova evidência', async () => {
+    const pagina = await montar()
+    expect(consultarPriorizacaoDeTopicos).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new CustomEvent('estudo-registrado'))
+    await flushPromises()
+
+    expect(consultarPriorizacaoDeTopicos).toHaveBeenCalledTimes(2)
+    expect(pagina.text()).toContain('Receita Federal')
   })
 })

@@ -120,11 +120,13 @@ public class AssinadorDaPreviaDaGeracao {
                       FROM mapeamentos_de_itens_do_edital mapa
                       JOIN itens_oficiais item
                         ON item.identificador = mapa.item_do_edital_id
+                     WHERE mapa.confirmado = TRUE
                     UNION ALL
                     SELECT 'material', material.identificador::text,
                            to_jsonb(material)::text
                       FROM materiais_de_estudo material CROSS JOIN entrada e
                      WHERE material.usuario_id = e.usuario_id
+                       AND material.arquivado = FALSE
                     UNION ALL
                     SELECT 'cobertura', cobertura.identificador::text,
                            to_jsonb(cobertura)::text
@@ -132,6 +134,7 @@ public class AssinadorDaPreviaDaGeracao {
                       JOIN materiais_de_estudo material
                         ON material.identificador = cobertura.material_id
                       CROSS JOIN entrada e WHERE material.usuario_id = e.usuario_id
+                       AND material.arquivado = FALSE
                     UNION ALL
                     SELECT 'estudo', estudo.identificador::text, to_jsonb(estudo)::text
                       FROM estudos_ativos estudo
@@ -177,7 +180,7 @@ public class AssinadorDaPreviaDaGeracao {
                      WHERE plano_aberto.usuario_id = e.usuario_id
                        AND plano_aberto.estado IN ('RASCUNHO', 'ATIVO')
                        AND bloco.tipo_de_atividade = 'REVISAO'
-                       AND bloco.estado <> 'CANCELADO'
+                       AND bloco.estado IN ('PLANEJADO', 'EM_ANDAMENTO')
                        AND bloco.topico_id IS NOT NULL
                 ) estado
                 ORDER BY tipo, chave

@@ -316,9 +316,15 @@ export async function listarTodosOsEstudos(sinal?: AbortSignal) {
   ]
 }
 
-export function registrarEstudo(dados: DadosDeRegistroDeEstudo) {
+export function registrarEstudo(
+  dados: DadosDeRegistroDeEstudo,
+  chaveDeIdempotencia?: string,
+) {
   return requisitar<RegistroDeEstudo>('/v1/estudos', {
     method: 'POST',
+    headers: chaveDeIdempotencia
+      ? { 'X-Chave-De-Idempotencia': chaveDeIdempotencia }
+      : undefined,
     body: JSON.stringify(dados),
   })
 }

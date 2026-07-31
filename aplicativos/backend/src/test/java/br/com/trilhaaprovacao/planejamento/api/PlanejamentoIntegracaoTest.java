@@ -640,6 +640,36 @@ class PlanejamentoIntegracaoTest {
                 .andExpect(jsonPath("$.materias[1].prioridade").value("ALTA"));
         assertThatQuantidade("prioridades_de_materias_no_plano", 2);
 
+        String materiaInelegivel = criarMateria(sessaoA, "Fora do edital");
+        for (String listaInvalida : List.of(
+                """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"},
+                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"}]}
+                """.formatted(bancoDeDados, bancoDeDados, seguranca),
+                """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"}]}
+                """.formatted(bancoDeDados, redes),
+                """
+                {"prioridades":[
+                  {"identificadorDaMateria":"%s","prioridade":"ALTA"},
+                  {"identificadorDaMateria":"%s","prioridade":"BAIXA"},
+                  {"identificadorDaMateria":"%s","prioridade":"NORMAL"}]}
+                """.formatted(bancoDeDados, redes, materiaInelegivel))) {
+            api.perform(put(
+                            "/api/v1/planos-semanais/{id}/prioridades-de-materias",
+                            planoA)
+                            .session(sessaoA).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(listaInvalida))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.codigo").value("PRIORIDADES_INVALIDAS"));
+            assertThatQuantidade("prioridades_de_materias_no_plano", 2);
+        }
+
         String configuracao = """
                 {"dataDeReferencia":"%s","duracaoDoBlocoPrincipalEmMinutos":50,
                  "quantidadeDeMateriasPorDia":2}

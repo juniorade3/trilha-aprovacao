@@ -7,6 +7,12 @@ import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
 import {
+  adicionarDiasADataCivil,
+  dataCivilEhSegundaFeira,
+  dataCivilEmSaoPaulo,
+  inicioDaSemanaCivil,
+} from '@/compartilhado/datas/fusoHorario'
+import {
   listarTodasAsMaterias,
   listarTodosOsTopicos,
   type Materia,
@@ -86,31 +92,22 @@ const nomesDosDias = [
   'Domingo',
 ]
 
-function paraIso(data: Date) {
-  const ano = data.getFullYear()
-  const mes = String(data.getMonth() + 1).padStart(2, '0')
-  const dia = String(data.getDate()).padStart(2, '0')
-  return `${ano}-${mes}-${dia}`
-}
-
 function inicioDaSemanaAtual() {
-  const hoje = new Date()
-  const deslocamento = hoje.getDay() === 0 ? -6 : 1 - hoje.getDay()
-  hoje.setDate(hoje.getDate() + deslocamento)
-  return paraIso(hoje)
+  return inicioDaSemanaCivil()
 }
 
 function adicionarDias(dataIso: string, quantidade: number) {
-  const data = new Date(`${dataIso}T12:00:00`)
-  data.setDate(data.getDate() + quantidade)
-  return paraIso(data)
+  return adicionarDiasADataCivil(dataIso, quantidade)
 }
 
 function inicioValido(valor: unknown): valor is string {
   if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor))
     return false
-  const data = new Date(`${valor}T12:00:00`)
-  return !Number.isNaN(data.getTime()) && data.getDay() === 1
+  try {
+    return dataCivilEhSegundaFeira(valor)
+  } catch {
+    return false
+  }
 }
 
 const dataInicial = computed(() => {
@@ -150,8 +147,9 @@ const periodo = computed(() => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
   })
-  return `${formatador.format(new Date(`${dataInicial.value}T12:00:00`))} a ${formatador.format(new Date(`${adicionarDias(dataInicial.value, 6)}T12:00:00`))}`
+  return `${formatador.format(new Date(`${dataInicial.value}T12:00:00-03:00`))} a ${formatador.format(new Date(`${adicionarDias(dataInicial.value, 6)}T12:00:00-03:00`))}`
 })
 
 const pendenciasDaAtivacao = computed(() => {
@@ -167,7 +165,7 @@ const pendenciasDaAtivacao = computed(() => {
 })
 
 const dataDeReferenciaDoReplanejamento = computed(() => {
-  const hoje = paraIso(new Date())
+  const hoje = dataCivilEmSaoPaulo()
   if (hoje < dataInicial.value) return dataInicial.value
   const domingo = adicionarDias(dataInicial.value, 6)
   return hoje > domingo ? domingo : hoje
@@ -186,7 +184,8 @@ function formatarData(dataIso: string) {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: 'long',
-  }).format(new Date(`${dataIso}T12:00:00`))
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(`${dataIso}T12:00:00-03:00`))
 }
 
 function preencherFormulario(planoObtido: PlanoSemanal) {

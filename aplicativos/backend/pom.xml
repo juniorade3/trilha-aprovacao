@@ -17,9 +17,11 @@
     <properties>
         <java.version>21</java.version>
         <versao.archunit>1.4.2</versao.archunit>
+        <versao.jacoco>0.8.13</versao.jacoco>
         <versao.mcp>2.0.0</versao.mcp>
         <versao.springdoc>3.0.3</versao.springdoc>
         <versao.testcontainers>2.0.5</versao.testcontainers>
+        <linhaDeArgumentosJacoco></linhaDeArgumentosJacoco>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -124,8 +126,31 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-Xshare:off -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    <argLine>@{linhaDeArgumentosJacoco} -Xshare:off -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${versao.jacoco}</version>
+                <executions>
+                    <execution>
+                        <id>preparar-cobertura</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>linhaDeArgumentosJacoco</propertyName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>relatorio-de-cobertura</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

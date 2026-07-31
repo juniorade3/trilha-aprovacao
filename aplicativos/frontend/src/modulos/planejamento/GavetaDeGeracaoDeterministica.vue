@@ -410,7 +410,11 @@ onMounted(carregarMaterias)
       aria-labelledby="titulo-prioridades"
     >
       <h3 id="titulo-prioridades">Prioridades desta semana</h3>
-      <p>Matérias ausentes de configuração permanecem com prioridade Normal.</p>
+      <p>
+        <strong>Ajustes manuais:</strong> estes pesos orientam somente esta
+        geração e não alteram o diagnóstico objetivo. Matérias sem ajuste
+        permanecem com prioridade Normal.
+      </p>
       <div class="lista-de-prioridades">
         <label
           v-for="materia in materias"
@@ -434,7 +438,7 @@ onMounted(carregarMaterias)
         :disabled="processando"
         @click="salvarPrioridades"
       >
-        {{ processando ? 'Salvando…' : 'Salvar prioridades e continuar' }}
+        {{ processando ? 'Salvando…' : 'Salvar ajustes e continuar' }}
       </button>
     </section>
 

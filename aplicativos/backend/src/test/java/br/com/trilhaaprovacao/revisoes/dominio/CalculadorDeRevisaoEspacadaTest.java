@@ -95,6 +95,23 @@ class CalculadorDeRevisaoEspacadaTest {
     }
 
     @Test
+    void deveOrdenarEventosRecebidosForaDeOrdem() {
+        EventoDeRevisaoEspacada inicial = evento(1, INICIO, 8, false, null);
+        EventoDeRevisaoEspacada avancou = evento(
+                2, INICIO.plusDays(1), 8, true, 5);
+        EventoDeRevisaoEspacada recuou = evento(
+                3, INICIO.plusDays(2), 8, true, 2);
+
+        var emOrdem = CalculadorDeRevisaoEspacada.calcular(
+                List.of(inicial, avancou, recuou));
+        var foraDeOrdem = CalculadorDeRevisaoEspacada.calcular(
+                List.of(recuou, inicial, avancou));
+
+        assertThat(foraDeOrdem).isEqualTo(emOrdem);
+        assertThat(foraDeOrdem.orElseThrow().etapa()).isEqualTo(1);
+    }
+
+    @Test
     void deveRetornarVazioSemEvidencias() {
         assertThat(CalculadorDeRevisaoEspacada.calcular(List.of())).isEmpty();
     }

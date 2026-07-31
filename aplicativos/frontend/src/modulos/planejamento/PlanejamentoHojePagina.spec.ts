@@ -76,7 +76,8 @@ function diaPlanejado() {
 }
 
 function revisaoEspacada(
-  situacao: 'VENCIDA' | 'DEVIDA_HOJE' | 'JA_PLANEJADA' = 'DEVIDA_HOJE',
+  situacao:
+    'VENCIDA' | 'DEVIDA_HOJE' | 'FUTURA' | 'JA_PLANEJADA' = 'DEVIDA_HOJE',
 ) {
   return {
     identificadorDoTopico: 'topico-1',
@@ -85,12 +86,17 @@ function revisaoEspacada(
     nomeDaMateria: 'Direito Constitucional',
     etapa: 2,
     intervaloEmDias: 7,
-    dataDevida: '2026-07-21',
+    dataDevida: situacao === 'VENCIDA' ? '2026-07-18' : '2026-07-21',
     diasEmAtraso: situacao === 'VENCIDA' ? 3 : 0,
     ultimaRevisao: '2026-07-14T10:00:00-03:00',
     ultimaRecordacao: 3,
     situacao,
   }
+}
+
+const capacidadeDaFila = {
+  limiteDePrioridades: 3,
+  duracaoEstimadaPorRevisaoEmMinutos: 20,
 }
 
 const paginasMontadas: ReturnType<typeof mount>[] = []
@@ -136,6 +142,7 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [],
     })
   })
@@ -154,7 +161,11 @@ describe('PlanejamentoHojePagina', () => {
       expect.any(AbortSignal),
     )
     const [referencia, ate] = chamadas.consultarRevisoesEspacadas.mock.calls[0]!
-    expect(ate).toBe(referencia)
+    const intervalo =
+      (new Date(`${ate}T12:00:00Z`).getTime() -
+        new Date(`${referencia}T12:00:00Z`).getTime()) /
+      86_400_000
+    expect(intervalo).toBe(7)
   })
 
   it('usa a data civil de Sao Paulo perto da virada em UTC', async () => {
@@ -166,9 +177,59 @@ describe('PlanejamentoHojePagina', () => {
 
     expect(chamadas.consultarRevisoesEspacadas).toHaveBeenCalledWith(
       '2026-07-21',
-      '2026-07-21',
+      '2026-07-28',
       expect.any(AbortSignal),
     )
+  })
+
+  it('distingue revisão futura e revisão futura já vinculada a bloco', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T15:00:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-28',
+      capacidadeDaFila,
+      revisoes: [
+        {
+          ...revisaoEspacada('FUTURA'),
+          dataDevida: '2026-07-24',
+          identificadorDoTopico: 'topico-futuro',
+          nomeDoTopico: 'Controle concentrado',
+        },
+        {
+          ...revisaoEspacada('JA_PLANEJADA'),
+          dataDevida: '2026-07-25',
+          identificadorDoTopico: 'topico-planejado',
+          nomeDoTopico: 'Controle difuso',
+          blocoAberto: {
+            identificador: 'bloco-revisao',
+            identificadorDoPlano: 'plano-1',
+            dataInicialDoPlano: '2026-07-20',
+            data: '2026-07-25',
+            estado: 'PLANEJADO',
+          },
+        },
+      ],
+    })
+
+    const pagina = await montar()
+
+    expect(pagina.text()).toContain('Próximos 7 dias')
+    expect(pagina.text()).toContain('Futura para 24 de jul.')
+    expect(pagina.text()).toContain('Já planejada para 25 de jul.')
+    expect(pagina.get('.situacao-futura').text()).toContain('Futura')
+    expect(pagina.get('.situacao-ja_planejada').text()).toContain(
+      'Já planejada',
+    )
+    expect(
+      pagina
+        .find('[aria-label="Revisar agora: Controle concentrado"]')
+        .exists(),
+    ).toBe(false)
+    expect(
+      pagina.get('[aria-label="Ir para o bloco: Controle difuso"]'),
+    ).toBeTruthy()
   })
 
   it('abre o registro rapido preenchido para revisao vencida ou devida', async () => {
@@ -176,6 +237,7 @@ describe('PlanejamentoHojePagina', () => {
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [
         revisaoEspacada('VENCIDA'),
         {
@@ -194,6 +256,8 @@ describe('PlanejamentoHojePagina', () => {
 
     expect(pagina.text()).toContain('Vencida há 3 dias')
     expect(pagina.text()).toContain('Devida hoje')
+    expect(pagina.get('.situacao-vencida').text()).toContain('Vencida')
+    expect(pagina.get('.situacao-devida_hoje').text()).toBe('Devida hoje')
     expect(
       pagina.get('[aria-label="Revisar agora: Direitos fundamentais"]'),
     ).toBeTruthy()
@@ -211,14 +275,68 @@ describe('PlanejamentoHojePagina', () => {
     ])
   })
 
+  it('prioriza tres revisoes e deixa a fila de recuperacao explicita', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T15:00:00Z'))
+    chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
+    chamadas.consultarRevisoesEspacadas.mockResolvedValue({
+      dataDeReferencia: '2026-07-21',
+      ate: '2026-07-28',
+      capacidadeDaFila,
+      revisoes: Array.from({ length: 14 }, (_, indice) => ({
+        ...revisaoEspacada(indice < 8 ? 'VENCIDA' : 'DEVIDA_HOJE'),
+        identificadorDoTopico: `topico-${indice + 1}`,
+        nomeDoTopico: `Tópico ${indice + 1}`,
+      })),
+    })
+
+    const pagina = await montar()
+    const botoesDeRevisao = () =>
+      pagina
+        .findAll('[aria-label^="Revisar agora:"]')
+        .filter((item) => item.isVisible())
+
+    expect(pagina.text()).toContain('14 para acompanhar hoje')
+    expect(pagina.text()).toContain('8 vencidas')
+    expect(pagina.text()).toContain('6 devidas hoje')
+    expect(botoesDeRevisao()).toHaveLength(3)
+    expect(pagina.text()).toContain('11 revisões continuam pendentes')
+    expect(
+      pagina
+        .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+        .attributes('aria-expanded'),
+    ).toBe('false')
+    expect(pagina.get('#itens-da-fila-de-recuperacao').isVisible()).toBe(false)
+
+    await pagina
+      .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+      .trigger('click')
+
+    expect(
+      pagina
+        .get('[aria-controls="itens-da-fila-de-recuperacao"]')
+        .attributes('aria-expanded'),
+    ).toBe('true')
+    expect(pagina.get('#itens-da-fila-de-recuperacao').isVisible()).toBe(true)
+    expect(botoesDeRevisao()).toHaveLength(14)
+    expect(
+      pagina.find('a[href="/planejamento/semana?inicio=2026-07-20"]').exists(),
+    ).toBe(true)
+  })
+
   it('navega para a semana e informa o bloco que deve receber foco', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T15:00:00Z'))
     chamadas.obterPlanejamentoDeHoje.mockResolvedValue(diaPlanejado())
     chamadas.consultarRevisoesEspacadas.mockResolvedValue({
       dataDeReferencia: '2026-07-21',
       ate: '2026-07-21',
+      capacidadeDaFila,
       revisoes: [
         {
           ...revisaoEspacada('JA_PLANEJADA'),
+          dataDevida: '2026-07-18',
+          diasEmAtraso: 3,
           blocoAberto: {
             identificador: 'bloco-revisao',
             identificadorDoPlano: 'plano-1',
@@ -231,7 +349,12 @@ describe('PlanejamentoHojePagina', () => {
     })
     const pagina = await montar()
 
-    expect(pagina.text()).toContain('Já planejada para 23 de jul.')
+    expect(pagina.text()).toContain(
+      'Vencida há 3 dias · planejada para 23 de jul.',
+    )
+    expect(pagina.get('.situacao-vencida').text()).toContain(
+      'Vencida há 3 dias',
+    )
     expect(
       pagina.get('[aria-label="Ir para o bloco: Direitos fundamentais"]'),
     ).toBeTruthy()
@@ -263,6 +386,7 @@ describe('PlanejamentoHojePagina', () => {
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [],
       })
     const rede = await montar()
@@ -298,11 +422,13 @@ describe('PlanejamentoHojePagina', () => {
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [revisaoEspacada()],
       })
       .mockResolvedValueOnce({
         dataDeReferencia: '2026-07-21',
         ate: '2026-07-21',
+        capacidadeDaFila,
         revisoes: [],
       })
     const atualizada = await montar()

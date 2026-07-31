@@ -84,7 +84,7 @@ public class ConsultaDePriorizacaoDeTopicos {
                 .filter(item -> item.classificacao().grupo() == GrupoDePriorizacao.FRAQUEZA)
                 .count();
         long consolidados = topicos.size() - lacunas - fraquezas;
-        long itensOficiais = contarItensOficiais(contexto, materia);
+        long itensOficiais = contarItensOficiais(usuario, contexto, materia);
         Resumo resumo = new Resumo(itensOficiais, itensSemMapeamento.size(), topicos.size(),
                 lacunas, fraquezas, consolidados);
         return new ResultadoDaPriorizacaoDeTopicos(
@@ -129,6 +129,11 @@ public class ConsultaDePriorizacaoDeTopicos {
                            e.quantidade_de_questoes, e.quantidade_de_acertos,
                            e.nivel_de_recordacao, e.dificuldade_percebida
                     FROM registros_de_estudo r
+                    JOIN topicos_da_materia topico_do_fato
+                      ON topico_do_fato.identificador = r.topico_id
+                    JOIN materias materia_do_fato
+                      ON materia_do_fato.identificador = topico_do_fato.materia_id
+                     AND materia_do_fato.usuario_id = ?
                     LEFT JOIN evidencias_de_aprendizagem e
                       ON e.registro_de_estudo_id = r.identificador
                     WHERE r.situacao = 'ATIVO'
@@ -210,7 +215,7 @@ public class ConsultaDePriorizacaoDeTopicos {
                 WHERE (CAST(? AS UUID) IS NULL OR m.identificador = CAST(? AS UUID))
                 """, (resultado, linha) -> mapearTopico(resultado, inicio),
                 contexto.identificadorDoEdital(), contexto.identificadorDoCargo(), usuario,
-                referencia, inicio, referencia, inicio, referencia, inicio, referencia,
+                usuario, referencia, inicio, referencia, inicio, referencia, inicio, referencia,
                 inicio, referencia, usuario, usuario, referencia, inicio, materia, materia);
     }
 
@@ -332,7 +337,8 @@ public class ConsultaDePriorizacaoDeTopicos {
                 materia, materia);
     }
 
-    private long contarItensOficiais(ContextoDeConteudoExigido contexto, UUID materia) {
+    private long contarItensOficiais(UUID usuario,
+            ContextoDeConteudoExigido contexto, UUID materia) {
         Long total = banco.queryForObject("""
                 SELECT COUNT(*) FROM itens_do_edital i
                 JOIN materias_da_prova mp ON mp.identificador = i.materia_da_prova_id
@@ -340,10 +346,10 @@ public class ConsultaDePriorizacaoDeTopicos {
                 JOIN provas p ON p.identificador = g.prova_id
                 JOIN materias m ON m.identificador = mp.materia_id
                 WHERE i.edital_id = ? AND p.cargo_id = ?
-                  AND m.arquivada = FALSE
+                  AND m.usuario_id = ? AND m.arquivada = FALSE
                   AND (CAST(? AS UUID) IS NULL OR mp.materia_id = CAST(? AS UUID))
                 """, Long.class, contexto.identificadorDoEdital(),
-                contexto.identificadorDoCargo(), materia, materia);
+                contexto.identificadorDoCargo(), usuario, materia, materia);
         return total == null ? 0 : total;
     }
 

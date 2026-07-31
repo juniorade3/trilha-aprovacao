@@ -4783,6 +4783,61 @@ a {
   color: var(--bs-success-text-emphasis);
 }
 
+.conteudo-da-fila-de-revisoes {
+  display: grid;
+  margin-top: 1rem;
+}
+
+.resumo-da-fila-de-revisoes {
+  align-items: baseline;
+  color: var(--cor-texto-secundario);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+
+  strong {
+    color: var(--cor-tinta);
+  }
+}
+
+.secao-da-fila-de-revisoes {
+  border-top: 1px solid var(--cor-borda);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.cabecalho-da-fila-de-revisoes {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+
+  h3 {
+    color: var(--cor-texto-secundario);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  p {
+    color: var(--cor-texto-secundario);
+    font-size: 0.86rem;
+    margin-top: 0.25rem;
+  }
+}
+
+.orientacao-da-fila-de-recuperacao {
+  color: var(--cor-texto-secundario);
+  font-size: 0.86rem;
+  margin-top: 0.75rem;
+}
+
+.fila-de-recuperacao > .btn {
+  margin-top: 1rem;
+}
+
 .proximas-revisoes {
   border-top: 1px solid var(--cor-borda);
   margin-top: 1rem;
@@ -5008,6 +5063,11 @@ a {
   .estado-das-revisoes {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .cabecalho-da-fila-de-revisoes {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .lista-de-revisoes-de-hoje li {

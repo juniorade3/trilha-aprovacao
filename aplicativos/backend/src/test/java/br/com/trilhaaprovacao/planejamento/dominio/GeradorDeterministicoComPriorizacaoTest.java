@@ -31,6 +31,43 @@ class GeradorDeterministicoComPriorizacaoTest {
     }
 
     @Test
+    void prioridadeManualDeveOrdenarMateriasSemApagarDiagnosticoDoTopico() {
+        CandidatoDeMateriaParaGeracao fracaComPrioridadeBaixa = materia(
+                11, PrioridadeDaMateriaNoPlano.BAIXA);
+        CandidatoDeMateriaParaGeracao consolidadaComPrioridadeAlta = materia(
+                12, PrioridadeDaMateriaNoPlano.ALTA);
+        CandidatoDeTopicoParaGeracao fraco = topico(
+                fracaComPrioridadeBaixa, 111, GrupoDePriorizacao.FRAQUEZA,
+                FaixaDePriorizacao.PRECISA_REFORCO, true, 1);
+        CandidatoDeTopicoParaGeracao consolidado = topico(
+                consolidadaComPrioridadeAlta, 121, GrupoDePriorizacao.CONSOLIDADO,
+                FaixaDePriorizacao.CONSOLIDADO, true, 1);
+
+        var previa = gerar(SEGUNDA,
+                List.of(fracaComPrioridadeBaixa, consolidadaComPrioridadeAlta),
+                List.of(fraco, consolidado), List.of(), dias(50));
+
+        assertThat(principais(previa.dias().getFirst()))
+                .extracting(BlocoSugerido::identificadorDoTopico)
+                .containsExactly(consolidado.identificadorDoTopico(),
+                        fraco.identificadorDoTopico());
+        assertThat(principais(previa.dias().getFirst()).getFirst()
+                .justificativas())
+                .extracting(JustificativaDaGeracao::codigo)
+                .contains("PRIORIDADE_ALTA", "GRUPO_CONSOLIDADO",
+                        "FAIXA_CONSOLIDADO");
+        assertThat(previa.dias())
+                .flatExtracting(DiaDaPreviaDaGeracao::blocosSugeridos)
+                .filteredOn(bloco -> bloco.identificadorDoTopico()
+                        .equals(fraco.identificadorDoTopico()))
+                .isNotEmpty()
+                .allSatisfy(bloco -> assertThat(bloco.justificativas())
+                        .extracting(JustificativaDaGeracao::codigo)
+                        .contains("PRIORIDADE_BAIXA", "GRUPO_FRAQUEZA",
+                                "FAIXA_PRECISA_REFORCO"));
+    }
+
+    @Test
     void deveSerDeterministicoSobPermutacoesDeTodasAsEntradas() {
         List<CandidatoDeMateriaParaGeracao> materias = materias(4);
         List<CandidatoDeTopicoParaGeracao> topicos = new ArrayList<>();

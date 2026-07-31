@@ -6,6 +6,10 @@ import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import {
+  adicionarDiasADataCivil,
+  dataCivilEmSaoPaulo,
+} from '@/compartilhado/datas/fusoHorario'
 import CamposDeEvidencia from '@/modulos/estudos/CamposDeEvidencia.vue'
 import {
   paraEvidencia,
@@ -17,6 +21,7 @@ import {
   type AgendaDeRevisoesEspacadas,
   type RevisaoEspacada,
 } from './apiDeRevisoesEspacadas'
+import { organizarFilaDeRevisoesDeHoje } from './filaDeRevisoes'
 import {
   concluirBloco,
   iniciarBloco,
@@ -47,6 +52,7 @@ const erroDasRevisoes = ref('')
 const contextoDasRevisoesIncompleto = ref(false)
 const tituloDasRevisoes = ref<HTMLElement>()
 const botaoDeRepetirRevisoes = ref<HTMLButtonElement>()
+const filaDeRecuperacaoVisivel = ref(false)
 const conflito = ref(false)
 const aviso = ref('')
 const acaoDeFinalizacao = ref<'CONCLUIR' | 'INTERROMPER'>()
@@ -80,19 +86,8 @@ let cancelamentoDasRevisoes: AbortController | undefined
 let temporizador: number | undefined
 const chaveDaPausa = 'trilha:planejamento:pausa'
 
-function dataLocalAtual() {
-  const partes = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
-    partes.find((parte) => parte.type === tipo)?.value ?? ''
-  return `${valor('year')}-${valor('month')}-${valor('day')}`
-}
-
-const dataConsultada = dataLocalAtual()
+const dataConsultada = dataCivilEmSaoPaulo()
+const horizonteDasRevisoes = adicionarDiasADataCivil(dataConsultada, 7)
 const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
   weekday: 'long',
   day: '2-digit',
@@ -101,9 +96,37 @@ const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
 }).format(new Date(`${dataConsultada}T12:00:00-03:00`))
 
-const revisoesDeHoje = computed(() =>
+const filaDeRevisoes = computed(() => {
+  const agenda = agendaDeRevisoes.value
+  if (!agenda) return undefined
+  return organizarFilaDeRevisoesDeHoje(
+    agenda.revisoes,
+    dataConsultada,
+    agenda.capacidadeDaFila,
+  )
+})
+const revisoesDeHoje = computed(
+  () => filaDeRevisoes.value?.revisoesDeHoje ?? [],
+)
+const prioridadesDasRevisoes = computed(
+  () => filaDeRevisoes.value?.prioridades ?? [],
+)
+const revisoesPlanejadas = computed(
+  () => filaDeRevisoes.value?.planejadas ?? [],
+)
+const filaDeRecuperacao = computed(
+  () => filaDeRevisoes.value?.filaDeRecuperacao ?? [],
+)
+const minutosEstimadosDasPrioridades = computed(
+  () =>
+    prioridadesDasRevisoes.value.length *
+    (agendaDeRevisoes.value?.capacidadeDaFila
+      ?.duracaoEstimadaPorRevisaoEmMinutos ?? 0),
+)
+const proximasRevisoes = computed(() =>
   (agendaDeRevisoes.value?.revisoes ?? []).filter(
-    (revisao) => revisao.situacao !== 'FUTURA',
+    (revisao) =>
+      revisao.situacao === 'FUTURA' || revisao.dataDevida > dataConsultada,
   ),
 )
 
@@ -115,12 +138,11 @@ const linkDaSemana = computed(() => ({
 }))
 
 const datasDaSemana = computed(() => {
-  if (!planejamento.value?.dataInicialDoPlano) return []
-  return Array.from({ length: 7 }, (_, indice) => {
-    const data = new Date(`${planejamento.value!.dataInicialDoPlano}T12:00:00`)
-    data.setDate(data.getDate() + indice)
-    return data.toISOString().slice(0, 10)
-  })
+  const dataInicialDoPlano = planejamento.value?.dataInicialDoPlano
+  if (!dataInicialDoPlano) return []
+  return Array.from({ length: 7 }, (_, indice) =>
+    adicionarDiasADataCivil(dataInicialDoPlano, indice),
+  )
 })
 
 const segundosDecorridos = computed(() => {
@@ -282,9 +304,10 @@ async function carregarRevisoes() {
   try {
     agendaDeRevisoes.value = await consultarRevisoesEspacadas(
       dataConsultada,
-      dataConsultada,
+      horizonteDasRevisoes,
       requisicao.signal,
     )
+    filaDeRecuperacaoVisivel.value = false
   } catch (causa) {
     if (causa instanceof DOMException && causa.name === 'AbortError') return
     agendaDeRevisoes.value = undefined
@@ -329,15 +352,30 @@ function formatarDataCurta(data: string) {
 }
 
 function descricaoDaSituacaoDaRevisao(revisao: RevisaoEspacada) {
-  if (revisao.situacao === 'JA_PLANEJADA')
-    return revisao.blocoAberto
-      ? `Já planejada para ${formatarDataCurta(revisao.blocoAberto.data)}`
-      : 'Já planejada'
+  if (revisao.blocoAberto) {
+    const planejadaPara = formatarDataCurta(revisao.blocoAberto.data)
+    if (revisao.dataDevida < dataConsultada)
+      return `Vencida há ${revisao.diasEmAtraso} ${
+        revisao.diasEmAtraso === 1 ? 'dia' : 'dias'
+      } · planejada para ${planejadaPara}`
+    if (revisao.dataDevida === dataConsultada)
+      return `Devida hoje · planejada para ${planejadaPara}`
+    return `Já planejada para ${planejadaPara}`
+  }
+  if (revisao.situacao === 'JA_PLANEJADA') return 'Já planejada'
   if (revisao.situacao === 'VENCIDA')
     return `Vencida há ${revisao.diasEmAtraso} ${
       revisao.diasEmAtraso === 1 ? 'dia' : 'dias'
     }`
+  if (revisao.situacao === 'FUTURA')
+    return `Futura para ${formatarDataCurta(revisao.dataDevida)}`
   return 'Devida hoje'
+}
+
+function classeDaSituacaoDaRevisao(revisao: RevisaoEspacada) {
+  if (revisao.blocoAberto && revisao.dataDevida < dataConsultada)
+    return 'situacao-vencida'
+  return `situacao-${revisao.situacao.toLowerCase()}`
 }
 
 function abrirRegistroDaRevisao(revisao: RevisaoEspacada) {
@@ -791,47 +829,247 @@ onBeforeUnmount(() => {
         Nenhuma revisão vencida ou devida hoje.
       </p>
 
-      <ol v-else class="lista-de-revisoes-de-hoje">
-        <li
-          v-for="revisao in revisoesDeHoje"
-          :key="revisao.identificadorDoTopico"
+      <div v-else class="conteudo-da-fila-de-revisoes">
+        <p class="resumo-da-fila-de-revisoes">
+          <strong>{{ revisoesDeHoje.length }} para acompanhar hoje.</strong>
+          <span v-if="filaDeRevisoes?.quantidadeVencidas">
+            {{ filaDeRevisoes.quantidadeVencidas }} vencida{{
+              filaDeRevisoes.quantidadeVencidas === 1 ? '' : 's'
+            }}.
+          </span>
+          <span v-if="filaDeRevisoes?.quantidadeDevidasHoje">
+            {{ filaDeRevisoes.quantidadeDevidasHoje }} devida{{
+              filaDeRevisoes.quantidadeDevidasHoje === 1 ? '' : 's'
+            }}
+            hoje.
+          </span>
+          <span> A fila prioriza uma quantidade viável por vez.</span>
+        </p>
+
+        <section
+          class="secao-da-fila-de-revisoes"
+          aria-labelledby="titulo-das-prioridades-de-revisao"
         >
-          <div class="identificacao-da-revisao">
-            <span
-              class="situacao-da-revisao"
-              :class="`situacao-${revisao.situacao.toLowerCase()}`"
-            >
-              {{ descricaoDaSituacaoDaRevisao(revisao) }}
-            </span>
-            <strong>{{ revisao.nomeDoTopico }}</strong>
-            <small>
-              {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
-              intervalo de {{ revisao.intervaloEmDias }} dias
-            </small>
-            <small v-if="revisao.ultimaRecordacao">
-              Última recordação: {{ revisao.ultimaRecordacao }}/5
-            </small>
+          <div class="cabecalho-da-fila-de-revisoes">
+            <div>
+              <h3 id="titulo-das-prioridades-de-revisao">
+                Prioridades para agora
+              </h3>
+              <p v-if="agendaDeRevisoes?.capacidadeDaFila">
+                Até
+                {{ agendaDeRevisoes?.capacidadeDaFila.limiteDePrioridades }}
+                revisões por vez · cerca de {{ minutosEstimadosDasPrioridades }}
+                min
+              </p>
+              <p v-else>Agenda completa.</p>
+            </div>
           </div>
-          <button
-            v-if="!revisao.blocoAberto"
-            class="btn btn-sm btn-primary"
-            type="button"
-            :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
-            @click="abrirRegistroDaRevisao(revisao)"
+
+          <p
+            v-if="prioridadesDasRevisoes.length === 0"
+            class="estado-das-revisoes"
           >
-            Revisar agora
-          </button>
-          <button
-            v-else
-            class="btn btn-sm btn-outline-primary"
-            type="button"
-            :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
-            @click="irParaBlocoDaRevisao(revisao)"
+            <i class="bi bi-calendar2-check" aria-hidden="true"></i>
+            Todas as revisões de hoje já têm um bloco ou estão na fila de
+            recuperação.
+          </p>
+
+          <ol v-else class="lista-de-revisoes-de-hoje">
+            <li
+              v-for="revisao in prioridadesDasRevisoes"
+              :key="revisao.identificadorDoTopico"
+            >
+              <div class="identificacao-da-revisao">
+                <span
+                  class="situacao-da-revisao"
+                  :class="classeDaSituacaoDaRevisao(revisao)"
+                >
+                  {{ descricaoDaSituacaoDaRevisao(revisao) }}
+                </span>
+                <strong>{{ revisao.nomeDoTopico }}</strong>
+                <small>
+                  {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+                  intervalo de {{ revisao.intervaloEmDias }} dias
+                </small>
+                <small v-if="revisao.ultimaRecordacao">
+                  Última recordação: {{ revisao.ultimaRecordacao }}/5
+                </small>
+              </div>
+              <button
+                class="btn btn-sm btn-primary"
+                type="button"
+                :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
+                @click="abrirRegistroDaRevisao(revisao)"
+              >
+                Revisar agora
+              </button>
+            </li>
+          </ol>
+        </section>
+
+        <section
+          v-if="revisoesPlanejadas.length"
+          class="secao-da-fila-de-revisoes"
+          aria-labelledby="titulo-das-revisoes-planejadas"
+        >
+          <div class="cabecalho-da-fila-de-revisoes">
+            <div>
+              <h3 id="titulo-das-revisoes-planejadas">Já planejadas</h3>
+              <p>
+                {{ revisoesPlanejadas.length }} revis{{
+                  revisoesPlanejadas.length === 1 ? 'ão' : 'ões'
+                }}
+                com bloco aberto
+              </p>
+            </div>
+          </div>
+          <ol class="lista-de-revisoes-de-hoje">
+            <li
+              v-for="revisao in revisoesPlanejadas"
+              :key="revisao.identificadorDoTopico"
+            >
+              <div class="identificacao-da-revisao">
+                <span
+                  class="situacao-da-revisao"
+                  :class="classeDaSituacaoDaRevisao(revisao)"
+                >
+                  {{ descricaoDaSituacaoDaRevisao(revisao) }}
+                </span>
+                <strong>{{ revisao.nomeDoTopico }}</strong>
+                <small>
+                  {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+                  intervalo de {{ revisao.intervaloEmDias }} dias
+                </small>
+              </div>
+              <button
+                v-if="revisao.blocoAberto"
+                class="btn btn-sm btn-outline-primary"
+                type="button"
+                :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
+                @click="irParaBlocoDaRevisao(revisao)"
+              >
+                Ir para o bloco
+              </button>
+            </li>
+          </ol>
+        </section>
+
+        <section
+          v-if="filaDeRecuperacao.length"
+          class="secao-da-fila-de-revisoes fila-de-recuperacao"
+          aria-labelledby="titulo-da-fila-de-recuperacao"
+        >
+          <div class="cabecalho-da-fila-de-revisoes">
+            <div>
+              <h3 id="titulo-da-fila-de-recuperacao">Fila de recuperação</h3>
+              <p>
+                {{ filaDeRecuperacao.length }} revis{{
+                  filaDeRecuperacao.length === 1 ? 'ão' : 'ões'
+                }}
+                continua{{
+                  filaDeRecuperacao.length === 1 ? '' : 'm'
+                }}
+                pendente{{ filaDeRecuperacao.length === 1 ? '' : 's' }}.
+              </p>
+            </div>
+            <button
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              aria-controls="itens-da-fila-de-recuperacao"
+              :aria-expanded="filaDeRecuperacaoVisivel"
+              @click="filaDeRecuperacaoVisivel = !filaDeRecuperacaoVisivel"
+            >
+              {{
+                filaDeRecuperacaoVisivel ? 'Ocultar fila' : 'Ver fila completa'
+              }}
+            </button>
+          </div>
+          <p class="orientacao-da-fila-de-recuperacao">
+            Nenhuma data foi alterada. Organize os próximos blocos no
+            planejamento quando houver capacidade.
+          </p>
+          <ol
+            v-show="filaDeRecuperacaoVisivel"
+            id="itens-da-fila-de-recuperacao"
+            class="lista-de-revisoes-de-hoje"
           >
-            Ir para o bloco
-          </button>
-        </li>
-      </ol>
+            <li
+              v-for="revisao in filaDeRecuperacao"
+              :key="revisao.identificadorDoTopico"
+            >
+              <div class="identificacao-da-revisao">
+                <span
+                  class="situacao-da-revisao"
+                  :class="classeDaSituacaoDaRevisao(revisao)"
+                >
+                  {{ descricaoDaSituacaoDaRevisao(revisao) }}
+                </span>
+                <strong>{{ revisao.nomeDoTopico }}</strong>
+                <small>
+                  {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+                  intervalo de {{ revisao.intervaloEmDias }} dias
+                </small>
+                <small v-if="revisao.ultimaRecordacao">
+                  Última recordação: {{ revisao.ultimaRecordacao }}/5
+                </small>
+              </div>
+              <button
+                class="btn btn-sm btn-primary"
+                type="button"
+                :aria-label="`Revisar agora: ${revisao.nomeDoTopico}`"
+                @click="abrirRegistroDaRevisao(revisao)"
+              >
+                Revisar agora
+              </button>
+            </li>
+          </ol>
+          <RouterLink class="btn btn-sm btn-outline-primary" :to="linkDaSemana">
+            Ver planejamento da semana
+          </RouterLink>
+        </section>
+      </div>
+
+      <section
+        v-if="
+          !carregandoRevisoes &&
+          !erroDasRevisoes &&
+          !contextoDasRevisoesIncompleto &&
+          proximasRevisoes.length
+        "
+        class="proximas-revisoes"
+        aria-labelledby="titulo-das-proximas-revisoes"
+      >
+        <h3 id="titulo-das-proximas-revisoes">Próximos 7 dias</h3>
+        <ol class="lista-de-revisoes-de-hoje">
+          <li
+            v-for="revisao in proximasRevisoes"
+            :key="revisao.identificadorDoTopico"
+          >
+            <div class="identificacao-da-revisao">
+              <span
+                class="situacao-da-revisao"
+                :class="classeDaSituacaoDaRevisao(revisao)"
+              >
+                {{ descricaoDaSituacaoDaRevisao(revisao) }}
+              </span>
+              <strong>{{ revisao.nomeDoTopico }}</strong>
+              <small>
+                {{ revisao.nomeDaMateria }} · Etapa {{ revisao.etapa }} ·
+                intervalo de {{ revisao.intervaloEmDias }} dias
+              </small>
+            </div>
+            <button
+              v-if="revisao.blocoAberto"
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              :aria-label="`Ir para o bloco: ${revisao.nomeDoTopico}`"
+              @click="irParaBlocoDaRevisao(revisao)"
+            >
+              Ir para o bloco
+            </button>
+          </li>
+        </ol>
+      </section>
     </section>
 
     <EstadoDaPagina

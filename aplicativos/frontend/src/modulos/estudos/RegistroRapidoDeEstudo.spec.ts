@@ -115,6 +115,7 @@ describe('RegistroRapidoDeEstudo', () => {
         identificadorDoMaterial: 'material-1',
         duracaoEmMinutos: 50,
       }),
+      expect.any(String),
     )
     expect(componente.emitted('registrado')).toHaveLength(1)
   })
@@ -178,6 +179,38 @@ describe('RegistroRapidoDeEstudo', () => {
       expect.objectContaining({
         dataHora: '2026-07-22T02:30:00.000Z',
       }),
+      expect.any(String),
     )
+  })
+
+  it('reutiliza a chave no retry e troca a chave quando o payload muda', async () => {
+    chamadas.registrarEstudo
+      .mockRejectedValueOnce(new Error('Conexão interrompida'))
+      .mockRejectedValueOnce(new Error('Conexão interrompida'))
+      .mockResolvedValueOnce({})
+    const componente = montar()
+    await flushPromises()
+    await componente.findAll('select')[1]!.setValue('materia-1')
+    await componente.findAll('select')[2]!.setValue('topico-1')
+
+    await componente.get('#registro-rapido-de-estudo').trigger('submit')
+    await flushPromises()
+    await componente.get('#registro-rapido-de-estudo').trigger('submit')
+    await flushPromises()
+
+    const primeiraChave = chamadas.registrarEstudo.mock.calls[0]![1]
+    const chaveDoRetry = chamadas.registrarEstudo.mock.calls[1]![1]
+    expect(chaveDoRetry).toBe(primeiraChave)
+    expect(componente.text()).toContain('Conexão interrompida')
+
+    await componente.get('input[max="1440"]').setValue(60)
+    await componente.get('#registro-rapido-de-estudo').trigger('submit')
+    await flushPromises()
+
+    expect(chamadas.registrarEstudo.mock.calls[2]![0]).toEqual(
+      expect.objectContaining({ duracaoEmMinutos: 60 }),
+    )
+    expect(chamadas.registrarEstudo.mock.calls[2]![1]).not.toBe(primeiraChave)
+    expect(componente.emitted('registrado')).toHaveLength(1)
   })
 })

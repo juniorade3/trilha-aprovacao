@@ -1,6 +1,7 @@
 package br.com.trilhaaprovacao.planejamento.dominio;
 
 import br.com.trilhaaprovacao.priorizacao.dominio.GrupoDePriorizacao;
+import br.com.trilhaaprovacao.revisoes.dominio.ConfiguracaoDaFilaDeRevisoes;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -18,8 +19,10 @@ import java.util.function.Predicate;
 public final class GeradorDeterministicoDePlano {
     private static final int DURACAO_MINIMA =
             DistribuidorDeterministicoDeCapacidade.DURACAO_MINIMA;
-    public static final int DURACAO_DA_REVISAO_ESPECIFICA_EM_MINUTOS = 20;
-    public static final int LIMITE_DE_REVISOES_ESPECIFICAS_POR_DIA = 3;
+    public static final int DURACAO_DA_REVISAO_ESPECIFICA_EM_MINUTOS =
+            ConfiguracaoDaFilaDeRevisoes.DURACAO_ESTIMADA_POR_REVISAO_EM_MINUTOS;
+    public static final int LIMITE_DE_REVISOES_ESPECIFICAS_POR_DIA =
+            ConfiguracaoDaFilaDeRevisoes.LIMITE_DE_PRIORIDADES_DA_FILA;
 
     /**
      * Geracao baseada no ranking por topico e na agenda calculada de revisoes.

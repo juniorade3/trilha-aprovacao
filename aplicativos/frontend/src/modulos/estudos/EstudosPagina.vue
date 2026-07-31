@@ -12,6 +12,13 @@ import BarraDeProgresso from '@/compartilhado/componentes/BarraDeProgresso.vue'
 import CabecalhoDaPagina from '@/compartilhado/componentes/CabecalhoDaPagina.vue'
 import EstadoDaPagina from '@/compartilhado/componentes/EstadoDaPagina.vue'
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import {
+  adicionarDiasADataCivil,
+  dataCivilEmSaoPaulo,
+  dataHoraCivilEmSaoPaulo,
+  inicioDaSemanaCivil,
+  instanteDeDataHoraCivilEmSaoPaulo,
+} from '@/compartilhado/datas/fusoHorario'
 import CamposDeEvidencia from './CamposDeEvidencia.vue'
 import {
   listarTodasAsMaterias,
@@ -35,6 +42,7 @@ import {
   type RegistroDeEstudo,
   type TipoDeEstudo,
 } from './apiDeEstudos'
+import { ControleDeTentativaIdempotente } from './ControleDeTentativaIdempotente'
 
 const propriedades = withDefaults(
   defineProps<{
@@ -68,7 +76,7 @@ const formulario = reactive({
   identificadorDaMateria: '',
   identificadorDoTopico: '',
   identificadorDoMaterial: '',
-  dataHora: dataHoraLocalAtual(),
+  dataHora: dataHoraCivilEmSaoPaulo(),
   duracaoEmMinutos: 60,
   observacao: '',
   tipoDeEstudo: 'TEORIA' as TipoDeEstudo,
@@ -84,6 +92,7 @@ const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
   { valor: 'OUTRA', rotulo: 'Outra' },
 ]
 let cancelamento: AbortController | undefined
+const tentativaDeRegistro = new ControleDeTentativaIdempotente()
 
 const topicosDaMateria = computed(() =>
   topicos.value.filter(
@@ -113,13 +122,16 @@ const registrosFiltrados = computed(() => {
   if (periodoSelecionado.value === 'TODOS') return registros.value
 
   const quantidadeDeDias = periodoSelecionado.value === 'SETE_DIAS' ? 7 : 30
-  const inicioDoPeriodo = new Date()
-  inicioDoPeriodo.setHours(0, 0, 0, 0)
-  inicioDoPeriodo.setDate(inicioDoPeriodo.getDate() - quantidadeDeDias + 1)
-
-  return registros.value.filter(
-    (registro) => new Date(registro.dataHora) >= inicioDoPeriodo,
+  const inicioDoPeriodo = adicionarDiasADataCivil(
+    dataCivilEmSaoPaulo(),
+    -quantidadeDeDias + 1,
   )
+  const fimDoPeriodo = dataCivilEmSaoPaulo()
+
+  return registros.value.filter((registro) => {
+    const dataDoRegistro = dataCivilEmSaoPaulo(registro.dataHora)
+    return dataDoRegistro >= inicioDoPeriodo && dataDoRegistro <= fimDoPeriodo
+  })
 })
 
 const registrosAgrupados = computed(() => {
@@ -127,25 +139,23 @@ const registrosAgrupados = computed(() => {
   for (const registro of registrosFiltrados.value) {
     const chave = new Intl.DateTimeFormat('pt-BR', {
       dateStyle: 'full',
+      timeZone: 'America/Sao_Paulo',
     }).format(new Date(registro.dataHora))
     grupos.set(chave, [...(grupos.get(chave) ?? []), registro])
   }
   return [...grupos.entries()]
 })
 
-const inicioDaSemana = computed(() => {
-  const agora = new Date()
-  const dia = agora.getDay() || 7
-  const inicio = new Date(agora)
-  inicio.setHours(0, 0, 0, 0)
-  inicio.setDate(agora.getDate() - dia + 1)
-  return inicio
-})
+const inicioDaSemana = computed(() => inicioDaSemanaCivil())
 
 const registrosDaSemana = computed(() =>
-  registrosAtivos.value.filter(
-    (registro) => new Date(registro.dataHora) >= inicioDaSemana.value,
-  ),
+  registrosAtivos.value.filter((registro) => {
+    const dataDoRegistro = dataCivilEmSaoPaulo(registro.dataHora)
+    return (
+      dataDoRegistro >= inicioDaSemana.value &&
+      dataDoRegistro <= dataCivilEmSaoPaulo()
+    )
+  }),
 )
 
 const minutosDaSemana = computed(() =>
@@ -159,7 +169,7 @@ const diasComEstudo = computed(
   () =>
     new Set(
       registrosDaSemana.value.map((registro) =>
-        new Date(registro.dataHora).toDateString(),
+        dataCivilEmSaoPaulo(registro.dataHora),
       ),
     ).size,
 )
@@ -180,13 +190,9 @@ const materiasDaSemana = computed(
 
 const ritmoDaSemana = computed(() =>
   Array.from({ length: 7 }, (_, indice) => {
-    const data = new Date(inicioDaSemana.value)
-    data.setDate(data.getDate() + indice)
+    const data = adicionarDiasADataCivil(inicioDaSemana.value, indice)
     const minutos = registrosDaSemana.value
-      .filter(
-        (registro) =>
-          new Date(registro.dataHora).toDateString() === data.toDateString(),
-      )
+      .filter((registro) => dataCivilEmSaoPaulo(registro.dataHora) === data)
       .reduce((total, registro) => total + registro.duracaoEmMinutos, 0)
     return {
       dia: ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'][indice],
@@ -199,14 +205,8 @@ const maiorRitmo = computed(() =>
   Math.max(...ritmoDaSemana.value.map((dia) => dia.minutos), 1),
 )
 
-function dataHoraLocalAtual() {
-  return dataHoraParaCampoLocal(new Date().toISOString())
-}
-
 function dataHoraParaCampoLocal(dataHora: string) {
-  const data = new Date(dataHora)
-  data.setMinutes(data.getMinutes() - data.getTimezoneOffset())
-  return data.toISOString().slice(0, 16)
+  return dataHoraCivilEmSaoPaulo(dataHora)
 }
 
 async function carregar() {
@@ -249,18 +249,12 @@ async function carregar() {
   }
 }
 
-function dataLocalAtual() {
-  const agora = new Date()
-  agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
-  return agora.toISOString().slice(0, 10)
-}
-
 async function carregarDiagnostico(sinal?: AbortSignal) {
   carregandoDiagnostico.value = true
   erroDoDiagnostico.value = ''
   try {
     diagnosticos.value = await consultarDiagnosticoDeTopicos(
-      dataLocalAtual(),
+      dataCivilEmSaoPaulo(),
       materiaDoDiagnostico.value || undefined,
       somenteExigidos.value,
       sinal,
@@ -282,7 +276,7 @@ function limparFormulario() {
     identificadorDaMateria: '',
     identificadorDoTopico: '',
     identificadorDoMaterial: '',
-    dataHora: dataHoraLocalAtual(),
+    dataHora: dataHoraCivilEmSaoPaulo(),
     duracaoEmMinutos: 60,
     observacao: '',
     tipoDeEstudo: 'TEORIA',
@@ -303,7 +297,7 @@ function dadosDoFormulario() {
   return {
     identificadorDoTopico: formulario.identificadorDoTopico,
     identificadorDoMaterial: formulario.identificadorDoMaterial || undefined,
-    dataHora: new Date(formulario.dataHora).toISOString(),
+    dataHora: instanteDeDataHoraCivilEmSaoPaulo(formulario.dataHora),
     duracaoEmMinutos: formulario.duracaoEmMinutos,
     observacao: formulario.observacao || undefined,
     tipoDeEstudo: formulario.tipoDeEstudo,
@@ -312,13 +306,16 @@ function dadosDoFormulario() {
 }
 
 async function salvar() {
+  if (salvando.value) return
   salvando.value = true
   erro.value = ''
   try {
     if (identificadorEmCorrecao.value) {
       await corrigirEstudo(identificadorEmCorrecao.value, dadosDoFormulario())
     } else {
-      await registrarEstudo(dadosDoFormulario())
+      const dados = dadosDoFormulario()
+      await registrarEstudo(dados, tentativaDeRegistro.chavePara(dados))
+      tentativaDeRegistro.concluir()
     }
     limparFormulario()
     formularioAberto.value = false
@@ -375,6 +372,7 @@ function formatarHora(dataHora: string) {
   return new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   }).format(new Date(dataHora))
 }
 

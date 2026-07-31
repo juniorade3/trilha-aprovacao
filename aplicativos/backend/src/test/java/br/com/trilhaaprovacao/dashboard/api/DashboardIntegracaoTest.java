@@ -196,6 +196,43 @@ class DashboardIntegracaoTest {
                 .andExpect(jsonPath("$.tempoEstudadoNaSemanaEmMinutos").value(60));
     }
 
+    @Test
+    void deveIgnorarMapeamentosConfirmadosDeOutraMateriaOuUsuario()
+            throws Exception {
+        MockHttpSession sessaoA = criarContaEEntrar("dashboard.mapeamento.a@example.com");
+        criarContaEEntrar("dashboard.mapeamento.b@example.com");
+        UUID usuarioA = usuario("dashboard.mapeamento.a@example.com");
+        UUID usuarioB = usuario("dashboard.mapeamento.b@example.com");
+
+        UUID concurso = inserirConcurso(usuarioA, "Concurso isolado", true);
+        UUID cargo = inserirCargo(concurso, "Auditor", true);
+        UUID prova = inserirProva(cargo, "Prova isolada");
+        UUID grupo = inserirGrupo(prova, "Conhecimentos");
+        UUID materiaOficial = inserirMateria(usuarioA, "Materia oficial");
+        UUID outraMateria = inserirMateria(usuarioA, "Outra materia");
+        UUID materiaAlheia = inserirMateria(usuarioB, "Materia alheia");
+        UUID topicoDeOutraMateria = inserirTopico(
+                outraMateria, "Topico de outra materia");
+        UUID topicoAlheio = inserirTopico(materiaAlheia, "Topico alheio");
+        UUID materiaDaProva = inserirMateriaDaProva(grupo, materiaOficial, 1);
+        UUID edital = inserirEdital(concurso, "Edital isolado");
+        UUID item = inserirItem(edital, materiaDaProva, "Item sem mapa valido", 1);
+        inserirMapeamento(item, topicoDeOutraMateria);
+        inserirMapeamento(item, topicoAlheio);
+        inserirEstudo(topicoDeOutraMateria, 40, "ATIVO");
+        inserirEstudo(topicoAlheio, 50, "ATIVO");
+
+        api.perform(get("/api/v1/dashboard").session(sessaoA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantidadeDeMaterias").value(1))
+                .andExpect(jsonPath("$.quantidadeDeTopicosExigidos").value(0))
+                .andExpect(jsonPath("$.quantidadeDeTopicosComEstudo").value(0))
+                .andExpect(jsonPath("$.quantidadeDeItensMapeados").value(0))
+                .andExpect(jsonPath("$.quantidadeDeItensSemMapeamento").value(1))
+                .andExpect(jsonPath("$.tempoEstudadoNaSemanaEmMinutos").value(0))
+                .andExpect(jsonPath("$.atividadeRecente").isEmpty());
+    }
+
     private MockHttpSession criarContaEEntrar(String email) throws Exception {
         api.perform(post("/api/v1/autenticacao/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

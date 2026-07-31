@@ -9,6 +9,10 @@ import {
 } from 'vue'
 
 import ModalDaAplicacao from '@/compartilhado/componentes/ModalDaAplicacao.vue'
+import {
+  dataHoraCivilEmSaoPaulo,
+  instanteDeDataHoraCivilEmSaoPaulo,
+} from '@/compartilhado/datas/fusoHorario'
 import CamposDeEvidencia from './CamposDeEvidencia.vue'
 import {
   listarTodasAsMaterias,
@@ -26,6 +30,7 @@ import {
   type ModeloDeEvidencia,
   type TipoDeEstudo,
 } from './apiDeEstudos'
+import { ControleDeTentativaIdempotente } from './ControleDeTentativaIdempotente'
 
 const propriedades = defineProps<{
   identificadorDaMateriaInicial?: string
@@ -50,6 +55,7 @@ const botaoDeRepetir = ref<HTMLButtonElement>()
 const campoDoTipo = ref<HTMLSelectElement>()
 const cancelamento = new AbortController()
 const duracoesRapidas = [30, 50, 60, 90]
+const tentativaDeRegistro = new ControleDeTentativaIdempotente()
 const tiposDeEstudo: Array<{ valor: TipoDeEstudo; rotulo: string }> = [
   { valor: 'TEORIA', rotulo: 'Teoria' },
   { valor: 'QUESTOES', rotulo: 'Questões' },
@@ -64,7 +70,7 @@ const formulario = reactive({
   identificadorDaMateria: propriedades.identificadorDaMateriaInicial ?? '',
   identificadorDoTopico: propriedades.identificadorDoTopicoInicial ?? '',
   identificadorDoMaterial: '',
-  dataHora: dataHoraLocalAtual(),
+  dataHora: dataHoraCivilEmSaoPaulo(),
   duracaoEmMinutos: 50,
   observacao: '',
   tipoDeEstudo: propriedades.tipoDeEstudoInicial ?? ('TEORIA' as TipoDeEstudo),
@@ -91,66 +97,6 @@ const materiaisDoTopico = computed(() => {
     identificadores.has(material.identificador),
   )
 })
-
-function dataHoraLocalAtual() {
-  const partes = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date())
-  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
-    partes.find((parte) => parte.type === tipo)?.value ?? ''
-  return `${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}`
-}
-
-function paraInstanteDeSaoPaulo(valor: string) {
-  const correspondencia = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(
-    valor,
-  )
-  if (!correspondencia) throw new Error('Informe uma data e horario validos.')
-  const desejado = correspondencia.slice(1).map(Number)
-  let instante = Date.UTC(
-    desejado[0]!,
-    desejado[1]! - 1,
-    desejado[2]!,
-    desejado[3]!,
-    desejado[4]!,
-  )
-  const formatador = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
-    const partes = formatador.formatToParts(new Date(instante))
-    const numero = (tipo: Intl.DateTimeFormatPartTypes) =>
-      Number(partes.find((parte) => parte.type === tipo)?.value)
-    const exibidoComoUtc = Date.UTC(
-      numero('year'),
-      numero('month') - 1,
-      numero('day'),
-      numero('hour'),
-      numero('minute'),
-    )
-    const desejadoComoUtc = Date.UTC(
-      desejado[0]!,
-      desejado[1]! - 1,
-      desejado[2]!,
-      desejado[3]!,
-      desejado[4]!,
-    )
-    instante += desejadoComoUtc - exibidoComoUtc
-  }
-  return new Date(instante).toISOString()
-}
 
 async function carregar() {
   carregando.value = true
@@ -212,18 +158,21 @@ function ajustarMaterial() {
 }
 
 async function salvar() {
+  if (salvando.value) return
   salvando.value = true
   erro.value = ''
   try {
-    await registrarEstudo({
+    const dados = {
       identificadorDoTopico: formulario.identificadorDoTopico,
       identificadorDoMaterial: formulario.identificadorDoMaterial || undefined,
-      dataHora: paraInstanteDeSaoPaulo(formulario.dataHora),
+      dataHora: instanteDeDataHoraCivilEmSaoPaulo(formulario.dataHora),
       duracaoEmMinutos: formulario.duracaoEmMinutos,
       observacao: formulario.observacao || undefined,
       tipoDeEstudo: formulario.tipoDeEstudo,
       evidencia: paraEvidencia(formulario.evidencia),
-    })
+    }
+    await registrarEstudo(dados, tentativaDeRegistro.chavePara(dados))
+    tentativaDeRegistro.concluir()
     emitir('registrado')
   } catch (causa) {
     erro.value =

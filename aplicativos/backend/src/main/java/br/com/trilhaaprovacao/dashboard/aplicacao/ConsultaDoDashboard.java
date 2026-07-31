@@ -85,14 +85,16 @@ public class ConsultaDoDashboard {
         }
 
         UUID edital = contexto.identificadorDoEdital();
-        int quantidadeDeMaterias = contarMaterias(cargo);
-        int quantidadeDeTopicosExigidos = contarTopicosExigidos(cargo, edital);
-        int quantidadeDeTopicosComEstudo = contarTopicosComEstudo(cargo, edital);
-        ContagemDeItens itens = contarItens(cargo, edital);
-        int tempoNaSemana = somarTempoNaSemana(cargo, edital);
-        List<AtividadeRecente> atividades = listarAtividadeRecente(cargo, edital);
+        int quantidadeDeMaterias = contarMaterias(usuario, cargo);
+        int quantidadeDeTopicosExigidos = contarTopicosExigidos(usuario, cargo, edital);
+        int quantidadeDeTopicosComEstudo =
+                contarTopicosComEstudo(usuario, cargo, edital);
+        ContagemDeItens itens = contarItens(usuario, cargo, edital);
+        int tempoNaSemana = somarTempoNaSemana(usuario, cargo, edital);
+        List<AtividadeRecente> atividades =
+                listarAtividadeRecente(usuario, cargo, edital);
         int gruposSemMateria = contarGruposSemMateria(cargo);
-        int materiasSemTopico = contarMateriasSemTopico(cargo);
+        int materiasSemTopico = contarMateriasSemTopico(usuario, cargo);
 
         if (gruposSemMateria > 0) {
             alertas.add(alerta("GRUPO_SEM_MATERIA", "Grupo sem matéria",
@@ -146,18 +148,19 @@ public class ConsultaDoDashboard {
                 cargo, OffsetDateTime.now(FUSO_HORARIO)).stream().findFirst();
     }
 
-    private int contarMaterias(UUID cargo) {
+    private int contarMaterias(UUID usuario, UUID cargo) {
         return numero("""
                 SELECT COUNT(DISTINCT mp.materia_id)
                 FROM materias_da_prova mp
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
                 JOIN materias m ON m.identificador = mp.materia_id
-                WHERE p.cargo_id = ? AND m.arquivada = FALSE
-                """, cargo);
+                WHERE p.cargo_id = ? AND m.usuario_id = ?
+                  AND m.arquivada = FALSE
+                """, cargo, usuario);
     }
 
-    private int contarTopicosExigidos(UUID cargo, UUID edital) {
+    private int contarTopicosExigidos(UUID usuario, UUID cargo, UUID edital) {
         return numero("""
                 SELECT COUNT(DISTINCT mapa.topico_da_materia_id)
                 FROM mapeamentos_de_itens_do_edital mapa
@@ -167,14 +170,15 @@ public class ConsultaDoDashboard {
                 JOIN provas p ON p.identificador = g.prova_id
                 JOIN topicos_da_materia t
                   ON t.identificador = mapa.topico_da_materia_id
+                 AND t.materia_id = mp.materia_id
                 JOIN materias m ON m.identificador = t.materia_id
                 WHERE p.cargo_id = ? AND i.edital_id = ?
                   AND mapa.confirmado = TRUE AND t.arquivado = FALSE
-                  AND m.arquivada = FALSE
-                """, cargo, edital);
+                  AND m.usuario_id = ? AND m.arquivada = FALSE
+                """, cargo, edital, usuario);
     }
 
-    private int contarTopicosComEstudo(UUID cargo, UUID edital) {
+    private int contarTopicosComEstudo(UUID usuario, UUID cargo, UUID edital) {
         return numero("""
                 SELECT COUNT(DISTINCT mapa.topico_da_materia_id)
                 FROM mapeamentos_de_itens_do_edital mapa
@@ -184,19 +188,20 @@ public class ConsultaDoDashboard {
                 JOIN provas p ON p.identificador = g.prova_id
                 JOIN topicos_da_materia t
                   ON t.identificador = mapa.topico_da_materia_id
+                 AND t.materia_id = mp.materia_id
                 JOIN materias m ON m.identificador = t.materia_id
                 WHERE p.cargo_id = ? AND i.edital_id = ?
                   AND mapa.confirmado = TRUE AND t.arquivado = FALSE
-                  AND m.arquivada = FALSE
+                  AND m.usuario_id = ? AND m.arquivada = FALSE
                   AND EXISTS (
                     SELECT 1 FROM registros_de_estudo r
                     WHERE r.topico_id = mapa.topico_da_materia_id
                       AND r.situacao = 'ATIVO'
                   )
-                """, cargo, edital);
+                """, cargo, edital, usuario);
     }
 
-    private ContagemDeItens contarItens(UUID cargo, UUID edital) {
+    private ContagemDeItens contarItens(UUID usuario, UUID cargo, UUID edital) {
         return banco.queryForObject("""
                 SELECT COUNT(*) AS total,
                        COUNT(*) FILTER (
@@ -207,7 +212,9 @@ public class ConsultaDoDashboard {
                            JOIN materias m ON m.identificador = t.materia_id
                            WHERE mapa.item_do_edital_id = i.identificador
                              AND mapa.confirmado = TRUE
-                             AND t.arquivado = FALSE AND m.arquivada = FALSE
+                             AND t.materia_id = mp.materia_id
+                             AND t.arquivado = FALSE
+                             AND m.usuario_id = ? AND m.arquivada = FALSE
                          )
                        ) AS mapeados
                 FROM itens_do_edital i
@@ -219,10 +226,10 @@ public class ConsultaDoDashboard {
                     int total = resultado.getInt("total");
                     int mapeados = resultado.getInt("mapeados");
                     return new ContagemDeItens(mapeados, total - mapeados);
-                }, cargo, edital);
+                }, usuario, cargo, edital);
     }
 
-    private int somarTempoNaSemana(UUID cargo, UUID edital) {
+    private int somarTempoNaSemana(UUID usuario, UUID cargo, UUID edital) {
         LocalDate inicioDaSemana = LocalDate.now(FUSO_HORARIO)
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         OffsetDateTime inicio = inicioDaSemana.atStartOfDay(FUSO_HORARIO)
@@ -232,6 +239,11 @@ public class ConsultaDoDashboard {
         return numero("""
                 SELECT COALESCE(SUM(r.duracao_em_minutos), 0)
                 FROM registros_de_estudo r
+                JOIN topicos_da_materia topico_do_registro
+                  ON topico_do_registro.identificador = r.topico_id
+                JOIN materias materia_do_registro
+                  ON materia_do_registro.identificador = topico_do_registro.materia_id
+                 AND materia_do_registro.usuario_id = ?
                 WHERE r.situacao = 'ATIVO'
                   AND r.data_hora >= ? AND r.data_hora < ?
                   AND EXISTS (
@@ -249,22 +261,28 @@ public class ConsultaDoDashboard {
                     JOIN materias m ON m.identificador = t.materia_id
                     WHERE mapa.topico_da_materia_id = r.topico_id
                       AND mapa.confirmado = TRUE
+                      AND t.materia_id = mp.materia_id
                       AND t.arquivado = FALSE AND m.arquivada = FALSE
                       AND p.cargo_id = ?
                       AND i.edital_id = ?
                   )
-                """, inicio, fim, cargo, edital);
+                """, usuario, inicio, fim, cargo, edital);
     }
 
-    private List<AtividadeRecente> listarAtividadeRecente(UUID cargo, UUID edital) {
+    private List<AtividadeRecente> listarAtividadeRecente(
+            UUID usuario, UUID cargo, UUID edital) {
         return banco.query("""
                 SELECT r.identificador, r.topico_id, t.nome AS nome_do_topico,
                        material.titulo AS titulo_do_material,
                        r.data_hora, r.duracao_em_minutos
                 FROM registros_de_estudo r
                 JOIN topicos_da_materia t ON t.identificador = r.topico_id
+                JOIN materias materia_do_registro
+                  ON materia_do_registro.identificador = t.materia_id
+                 AND materia_do_registro.usuario_id = ?
                 LEFT JOIN materiais_de_estudo material
                   ON material.identificador = r.material_id
+                 AND material.usuario_id = ?
                 WHERE r.situacao = 'ATIVO'
                   AND t.arquivado = FALSE
                   AND EXISTS (
@@ -280,6 +298,7 @@ public class ConsultaDoDashboard {
                     JOIN materias m ON m.identificador = t.materia_id
                     WHERE mapa.topico_da_materia_id = r.topico_id
                       AND mapa.confirmado = TRUE
+                      AND t.materia_id = mp.materia_id
                       AND m.arquivada = FALSE
                       AND p.cargo_id = ?
                       AND i.edital_id = ?
@@ -292,7 +311,8 @@ public class ConsultaDoDashboard {
                     resultado.getString("nome_do_topico"),
                     resultado.getString("titulo_do_material"),
                     resultado.getObject("data_hora", OffsetDateTime.class),
-                    resultado.getInt("duracao_em_minutos")), cargo, edital);
+                    resultado.getInt("duracao_em_minutos")),
+                usuario, usuario, cargo, edital);
     }
 
     private int contarGruposSemMateria(UUID cargo) {
@@ -308,19 +328,20 @@ public class ConsultaDoDashboard {
                 """, cargo);
     }
 
-    private int contarMateriasSemTopico(UUID cargo) {
+    private int contarMateriasSemTopico(UUID usuario, UUID cargo) {
         return numero("""
                 SELECT COUNT(DISTINCT mp.materia_id)
                 FROM materias_da_prova mp
                 JOIN grupos_de_conteudo g ON g.identificador = mp.grupo_de_conteudo_id
                 JOIN provas p ON p.identificador = g.prova_id
                 JOIN materias m ON m.identificador = mp.materia_id
-                WHERE p.cargo_id = ? AND m.arquivada = FALSE
+                WHERE p.cargo_id = ? AND m.usuario_id = ?
+                  AND m.arquivada = FALSE
                   AND NOT EXISTS (
                     SELECT 1 FROM topicos_da_materia t
                     WHERE t.materia_id = mp.materia_id AND t.arquivado = FALSE
                   )
-                """, cargo);
+                """, cargo, usuario);
     }
 
     private int numero(String consulta, Object... parametros) {

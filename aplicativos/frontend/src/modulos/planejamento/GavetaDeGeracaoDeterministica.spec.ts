@@ -556,6 +556,7 @@ describe('GavetaDeGeracaoDeterministica', () => {
     expect(configuracao.attributes('disabled')).toBeDefined()
     await configuracao.trigger('click')
     expect(componente.text()).toContain('Prioridades desta semana')
+    expect(componente.text()).toContain('não alteram o diagnóstico objetivo')
     expect(chamadas.gerar).toHaveBeenCalledTimes(1)
 
     const previaAntiga = componente
