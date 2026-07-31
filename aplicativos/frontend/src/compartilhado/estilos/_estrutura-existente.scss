@@ -5065,6 +5065,11 @@ a {
     flex-wrap: wrap;
   }
 
+  .cabecalho-da-fila-de-revisoes {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .lista-de-revisoes-de-hoje li {
     align-items: stretch;
     flex-direction: column;
