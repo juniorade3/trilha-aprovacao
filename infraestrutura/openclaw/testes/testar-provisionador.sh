@@ -163,8 +163,10 @@ jq -e --arg vinculo "${vinculo_um}" \
    .mcpServers.trilha.args == ["./proxy-mcp-http-stdio.mjs", ("http://broker-credenciais:18890/mcp/" + $vinculo)] and
    (.mcpServers.trilha | has("url") | not) and
    (.mcpServers.trilha | has("headers") | not) and
-   (.mcpServers.trilha.toolFilter.include | length == 24) and
-   (.mcpServers.trilha.toolFilter.include | unique | length == 24)' "${arquivo_mcp_um}" >/dev/null
+   (.mcpServers.trilha.toolFilter.include | length == 25) and
+   (.mcpServers.trilha.toolFilter.include | unique | length == 25) and
+   (.mcpServers.trilha.toolFilter.include |
+     index("preparar_importacao_completa_do_edital") != null)' "${arquivo_mcp_um}" >/dev/null
 [[ "$(stat -c '%a' "${arquivo_mcp_um}")" == "600" ]]
 [[ -x "${estado}/workspaces/${agente_um}/.openclaw/extensions/${plugin_um}/proxy-mcp-http-stdio.mjs" ]]
 jq -e --arg token "${valor_token_um}" --arg agente "${agente_um}" \
@@ -178,7 +180,7 @@ jq -e --arg hash "$(sha256sum \
     "${diretorio_do_modulo}/modelos/workspace/AGENTS.md" | cut -d' ' -f1)" \
   '.versao == 3 and .identificadorDaContaDoBot == "principal" and
    .identificadorDaSessao == ("sessao:" + .identificadorDoVinculo) and
-   .modeloDoWorkspace.versao == 1 and
+   .modeloDoWorkspace.versao == 2 and
    .modeloDoWorkspace.hashes["AGENTS.md"] == $hash and
    .registradoNoBackendEm == null' \
   "${estado}/provisionamentos/${vinculo_um}.json" >/dev/null

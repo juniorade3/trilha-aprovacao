@@ -11,14 +11,32 @@ RUN mvn --batch-mode --no-transfer-progress -DskipTests package \
         -exec cp '{}' /aplicacao.jar \; \
     && test -s /aplicacao.jar
 
+FROM node:22-alpine AS codex-cli
+
+RUN npm install --global --prefix /opt/codex-cli \
+        @openai/codex@0.145.0 \
+    && /opt/codex-cli/bin/codex --version \
+    && npm cache clean --force
+
 FROM eclipse-temurin:21-jre-alpine
 
-RUN addgroup -S aplicacao \
-    && adduser -S -G aplicacao aplicacao
+RUN apk add --no-cache libstdc++ \
+    && addgroup -S -g 1000 aplicacao \
+    && adduser -S -D -h /home/aplicacao -u 1000 -G aplicacao aplicacao \
+    && install -d -o aplicacao -g aplicacao \
+        /aplicacao /home/aplicacao /home/aplicacao/.codex
+
+ENV HOME=/home/aplicacao \
+    CODEX_HOME=/home/aplicacao/.codex \
+    PATH="/opt/codex-cli/bin:${PATH}"
 
 WORKDIR /aplicacao
 
-COPY --from=construcao /aplicacao.jar ./aplicacao.jar
+COPY --from=codex-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=codex-cli /opt/codex-cli /opt/codex-cli
+COPY --from=construcao --chown=1000:1000 /aplicacao.jar ./aplicacao.jar
+
+RUN codex --version
 
 USER aplicacao
 EXPOSE 8080

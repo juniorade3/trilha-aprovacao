@@ -71,6 +71,15 @@ public class ServicoDeConteudoProgramatico {
     @Transactional
     public ItemDoEdital criarItem(UUID usuario, UUID materiaDaProva, UUID edital,
             String descricaoOriginal, UUID itemPai, int ordem) {
+        return criarItem(usuario, materiaDaProva, edital, descricaoOriginal,
+                itemPai, ordem, null, null, null);
+    }
+
+    @Transactional
+    public ItemDoEdital criarItem(UUID usuario, UUID materiaDaProva, UUID edital,
+            String descricaoOriginal, UUID itemPai, int ordem,
+            String numeroOficial, String descricaoNormalizada,
+            UUID identificadorDaImportacao) {
         ContextoDaMateria contexto = contextoDaMateria(usuario, materiaDaProva, true);
         EditalPersistido editalEncontrado = editalPersistido(usuario, edital);
         if (!editalEncontrado.identificadorDoConcurso().equals(contexto.concurso())) {
@@ -79,9 +88,16 @@ public class ServicoDeConteudoProgramatico {
         }
         validarPai(materiaDaProva, edital, itemPai, null);
         ItemDoEdital item = executarRegra("ITEM_DO_EDITAL_INVALIDO",
-                () -> ItemDoEdital.criar(
-                        edital, materiaDaProva, descricaoOriginal, itemPai, ordem));
-        return itens.save(new ItemDoEditalPersistido(item)).paraDominio();
+                () -> identificadorDaImportacao == null
+                        ? ItemDoEdital.criar(edital, materiaDaProva,
+                                descricaoOriginal, itemPai, ordem)
+                        : ItemDoEdital.criarDaImportacao(edital,
+                                materiaDaProva, descricaoOriginal, itemPai,
+                                ordem, numeroOficial, descricaoNormalizada,
+                                identificadorDaImportacao));
+        return itens.save(new ItemDoEditalPersistido(item,
+                identificadorDaImportacao == null ? null : usuario))
+                .paraDominio();
     }
 
     @Transactional(readOnly = true)

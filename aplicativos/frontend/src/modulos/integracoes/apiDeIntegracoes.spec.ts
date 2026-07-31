@@ -9,6 +9,8 @@ vi.mock('@/compartilhado/api/clienteHttp', async (importarOriginal) => ({
 
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 import {
+  cancelarOperacaoAssistida,
+  confirmarOperacaoAssistidaPelaWeb,
   criarCodigoDeVinculo,
   listarOperacoesAssistidas,
   obterOperacaoAssistida,
@@ -77,6 +79,8 @@ describe('apiDeIntegracoes', () => {
 
     await listarOperacoesAssistidas(2, 15, sinal)
     await obterOperacaoAssistida('operacao-1', sinal)
+    await confirmarOperacaoAssistidaPelaWeb('operacao-1')
+    await cancelarOperacaoAssistida('operacao-2')
 
     expect(requisitar).toHaveBeenNthCalledWith(
       1,
@@ -87,6 +91,16 @@ describe('apiDeIntegracoes', () => {
       2,
       '/v1/operacoes-assistidas/operacao-1',
       { signal: sinal },
+    )
+    expect(requisitar).toHaveBeenNthCalledWith(
+      3,
+      '/v1/operacoes-assistidas/operacao-1/confirmacao-web',
+      { method: 'POST' },
+    )
+    expect(requisitar).toHaveBeenNthCalledWith(
+      4,
+      '/v1/operacoes-assistidas/operacao-2/cancelamento',
+      { method: 'POST' },
     )
   })
 })

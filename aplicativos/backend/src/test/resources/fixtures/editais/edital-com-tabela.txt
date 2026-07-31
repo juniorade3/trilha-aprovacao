@@ -1,0 +1,13 @@
+CONCURSO: Concurso em formato tabular
+EDITAL: Edital de abertura tabular
+CARGO: Analista
+ESCOLARIDADE: SUPERIOR
+PROVA: Prova objetiva
+TIPO: OBJETIVA
+CARÁTER: CLASSIFICATORIO
+GRUPO: Conhecimentos gerais
+MATÉRIA: Raciocínio Lógico
+QUESTÕES: 5
+PONTUAÇÃO MÁXIMA: 5
+ITEM: 1 - Proposições | 2 questões | 2 pontos
+ITEM: 2 - Equivalências lógicas | 3 questões | 3 pontos

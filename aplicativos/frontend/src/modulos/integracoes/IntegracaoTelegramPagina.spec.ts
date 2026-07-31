@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErroDaApi } from '@/compartilhado/api/clienteHttp'
 
 const api = vi.hoisted(() => ({
+  cancelarOperacaoAssistida: vi.fn(),
+  confirmarOperacaoAssistidaPelaWeb: vi.fn(),
   criarCodigoDeVinculo: vi.fn(),
   listarOperacoesAssistidas: vi.fn(),
   obterOperacaoAssistida: vi.fn(),
@@ -43,6 +45,14 @@ const operacao = {
   expiraEm: '2026-07-21T11:30:00-03:00',
   criadoEm: '2026-07-21T11:00:00-03:00',
   atualizadoEm: '2026-07-21T11:05:00-03:00',
+}
+
+const operacaoPendente = {
+  ...operacao,
+  identificador: 'operacao-pendente',
+  estado: 'AGUARDANDO_CONFIRMACAO' as const,
+  resumo: 'Concluir o bloco informado',
+  expiraEm: '2026-08-21T11:30:00-03:00',
 }
 
 const historicoVazio = {
@@ -84,6 +94,8 @@ describe('IntegracaoTelegramPagina', () => {
     api.listarOperacoesAssistidas.mockResolvedValue(historicoVazio)
     api.revogarVinculoDoTelegram.mockResolvedValue(undefined)
     api.rotacionarVinculoDoTelegram.mockResolvedValue(undefined)
+    api.confirmarOperacaoAssistidaPelaWeb.mockResolvedValue(undefined)
+    api.cancelarOperacaoAssistida.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -330,6 +342,156 @@ describe('IntegracaoTelegramPagina', () => {
 
     expect(pagina.find('[role="dialog"]').exists()).toBe(false)
     expect(document.activeElement).toBe(origem.element)
+  })
+
+  it('permite aceitar uma prévia comum pela gaveta', async () => {
+    api.obterVinculoDoTelegram.mockResolvedValue(vinculoAtivo)
+    api.listarOperacoesAssistidas.mockResolvedValue({
+      itens: [operacaoPendente],
+      pagina: 0,
+      tamanho: 20,
+      totalDeItens: 1,
+      totalDePaginas: 1,
+    })
+    api.obterOperacaoAssistida.mockResolvedValue({
+      ...operacaoPendente,
+      proposta: { minutos: 20 },
+      assinatura: 'sha256:assinatura',
+      versoesConsultadas: { bloco: 1 },
+      confirmadaEm: null,
+      aplicadaEm: null,
+      canceladaEm: null,
+      falha: null,
+      resultado: null,
+    })
+    api.confirmarOperacaoAssistidaPelaWeb.mockResolvedValue({
+      ...operacaoPendente,
+      estado: 'APLICADA',
+      proposta: { minutos: 20 },
+      assinatura: 'sha256:assinatura',
+      versoesConsultadas: { bloco: 1 },
+      confirmadaEm: '2026-07-21T11:05:00-03:00',
+      aplicadaEm: '2026-07-21T11:05:01-03:00',
+      canceladaEm: null,
+      falha: null,
+      resultado: { concluido: true },
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    pagina = await montar()
+
+    await pagina
+      .get('button[aria-label="Ver detalhes: Concluir o bloco informado"]')
+      .trigger('click')
+    await flushPromises()
+    await pagina
+      .findAll('button')
+      .find((item) => item.text().includes('Aceitar e aplicar'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(api.confirmarOperacaoAssistidaPelaWeb).toHaveBeenCalledWith(
+      'operacao-pendente',
+    )
+    expect(pagina.text()).toContain('Operação confirmada e aplicada.')
+    expect(pagina.get('[role="dialog"]').text()).toContain('Aplicada')
+    expect(pagina.get('[role="dialog"]').text()).not.toContain(
+      'Aceitar e aplicar',
+    )
+  })
+
+  it('permite cancelar uma prévia pendente sem aplicá-la', async () => {
+    api.obterVinculoDoTelegram.mockResolvedValue(vinculoAtivo)
+    api.listarOperacoesAssistidas.mockResolvedValue({
+      itens: [operacaoPendente],
+      pagina: 0,
+      tamanho: 20,
+      totalDeItens: 1,
+      totalDePaginas: 1,
+    })
+    api.obterOperacaoAssistida.mockResolvedValue({
+      ...operacaoPendente,
+      proposta: { minutos: 20 },
+      assinatura: 'sha256:assinatura',
+      versoesConsultadas: { bloco: 1 },
+      confirmadaEm: null,
+      aplicadaEm: null,
+      canceladaEm: null,
+      falha: null,
+      resultado: null,
+    })
+    api.cancelarOperacaoAssistida.mockResolvedValue({
+      ...operacaoPendente,
+      estado: 'CANCELADA',
+      proposta: { minutos: 20 },
+      assinatura: 'sha256:assinatura',
+      versoesConsultadas: { bloco: 1 },
+      confirmadaEm: null,
+      aplicadaEm: null,
+      canceladaEm: '2026-07-21T11:05:01-03:00',
+      falha: null,
+      resultado: null,
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    pagina = await montar()
+
+    await pagina
+      .get('button[aria-label="Ver detalhes: Concluir o bloco informado"]')
+      .trigger('click')
+    await flushPromises()
+    await pagina
+      .findAll('button')
+      .find((item) => item.text().includes('Cancelar operação'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(api.cancelarOperacaoAssistida).toHaveBeenCalledWith(
+      'operacao-pendente',
+    )
+    expect(pagina.text()).toContain('Operação cancelada. Nenhuma alteração')
+    expect(pagina.get('[role="dialog"]').text()).toContain('Cancelada')
+  })
+
+  it('mantém a prévia pendente quando a confirmação web conflita', async () => {
+    api.obterVinculoDoTelegram.mockResolvedValue(vinculoAtivo)
+    api.listarOperacoesAssistidas.mockResolvedValue({
+      itens: [operacaoPendente],
+      pagina: 0,
+      tamanho: 20,
+      totalDeItens: 1,
+      totalDePaginas: 1,
+    })
+    api.obterOperacaoAssistida.mockResolvedValue({
+      ...operacaoPendente,
+      proposta: { minutos: 20 },
+      assinatura: 'sha256:assinatura',
+      versoesConsultadas: { bloco: 1 },
+      confirmadaEm: null,
+      aplicadaEm: null,
+      canceladaEm: null,
+      falha: null,
+      resultado: null,
+    })
+    api.confirmarOperacaoAssistidaPelaWeb.mockRejectedValue(
+      new ErroDaApi(409, 'A prévia mudou. Atualize e tente novamente.'),
+    )
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    pagina = await montar(true)
+
+    await pagina
+      .get('button[aria-label="Ver detalhes: Concluir o bloco informado"]')
+      .trigger('click')
+    await flushPromises()
+    await pagina
+      .findAll('button')
+      .find((item) => item.text().includes('Aceitar e aplicar'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(api.confirmarOperacaoAssistidaPelaWeb).toHaveBeenCalledOnce()
+    expect(api.listarOperacoesAssistidas).toHaveBeenCalledTimes(2)
+    expect(pagina.get('[role="dialog"]').text()).toContain(
+      'Aguardando confirmação',
+    )
   })
 
   it('orienta novo login quando a sessao expira', async () => {

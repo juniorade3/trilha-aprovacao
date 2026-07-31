@@ -112,3 +112,15 @@ export const obterOperacaoAssistida = (
     `/v1/operacoes-assistidas/${identificador}`,
     { signal: sinal },
   )
+
+export const confirmarOperacaoAssistidaPelaWeb = (identificador: string) =>
+  requisitar<DetalheDaOperacaoAssistida>(
+    `/v1/operacoes-assistidas/${identificador}/confirmacao-web`,
+    { method: 'POST' },
+  )
+
+export const cancelarOperacaoAssistida = (identificador: string) =>
+  requisitar<DetalheDaOperacaoAssistida>(
+    `/v1/operacoes-assistidas/${identificador}/cancelamento`,
+    { method: 'POST' },
+  )

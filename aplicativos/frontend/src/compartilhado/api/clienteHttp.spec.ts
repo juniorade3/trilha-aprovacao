@@ -84,6 +84,28 @@ describe('clienteHttp', () => {
     expect(new Headers(opcoes?.headers).get('X-XSRF-TOKEN')).toBe('csrf-seguro')
   })
 
+  it('deixa o navegador definir o boundary de formularios multipart', async () => {
+    const buscar = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ identificador: 'importacao-1' }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const formulario = new FormData()
+    formulario.append('arquivo', new Blob(['edital']), 'edital.pdf')
+
+    await requisitar('/v1/importacoes-de-edital', {
+      method: 'POST',
+      body: formulario,
+    })
+
+    const opcoes = buscar.mock.calls[0]?.[1]
+    expect(opcoes?.body).toBe(formulario)
+    expect(new Headers(opcoes?.headers).has('Content-Type')).toBe(false)
+    expect(new Headers(opcoes?.headers).get('X-XSRF-TOKEN')).toBe('csrf-seguro')
+    expect(opcoes?.credentials).toBe('include')
+  })
+
   it('avisa a aplicacao quando uma sessao autenticada expira', async () => {
     const aoExpirar = vi.fn()
     window.addEventListener('sessao-expirada', aoExpirar, { once: true })

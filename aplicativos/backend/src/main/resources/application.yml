@@ -11,6 +11,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${LIMITE_DO_ARQUIVO_DO_EDITAL:10MB}
+      max-request-size: ${LIMITE_DA_REQUISICAO_DO_EDITAL:11MB}
 
 springdoc:
   api-docs:
@@ -41,6 +45,24 @@ server:
         same-site: lax
 
 trilha:
+  importacao-de-edital:
+    limite-em-bytes: ${LIMITE_EM_BYTES_DO_EDITAL:10485760}
+    limite-de-paginas: ${LIMITE_DE_PAGINAS_DO_EDITAL:500}
+    limite-de-caracteres-extraidos: ${LIMITE_DE_CARACTERES_EXTRAIDOS_DO_EDITAL:2000000}
+    retencao-do-conteudo: ${RETENCAO_DO_CONTEUDO_DO_EDITAL:P30D}
+    timeout-da-extracao: ${TIMEOUT_DA_EXTRACAO_DO_EDITAL:PT30S}
+    intervalo-da-limpeza: ${INTERVALO_DA_LIMPEZA_DO_EDITAL:PT1H}
+    interpretacao-assistida:
+      habilitada: ${INTERPRETACAO_ASSISTIDA_DO_EDITAL_HABILITADA:false}
+      provedor: ${PROVEDOR_DA_INTERPRETACAO_DO_EDITAL:responses-api}
+      url-base: ${URL_DA_API_OPENAI:https://api.openai.com/v1}
+      chave-da-api: ${CHAVE_DA_API_OPENAI_PARA_EDITAIS:}
+      modelo: ${MODELO_DA_INTERPRETACAO_DO_EDITAL:gpt-5.6-sol}
+      timeout: ${TIMEOUT_DA_INTERPRETACAO_DO_EDITAL:PT180S}
+      executavel-do-codex: ${EXECUTAVEL_DO_CODEX:}
+      codex-home: ${CODEX_HOME:}
+      limite-de-paginas-renderizadas: ${LIMITE_DE_PAGINAS_RENDERIZADAS_PELA_IA:20}
+      dpi-da-renderizacao: ${DPI_DA_RENDERIZACAO_PARA_IA:144}
   automacao:
     habilitada: ${ASSISTENTE_TELEGRAM_HABILITADO:false}
     identificador-do-bot: ${IDENTIFICADOR_DO_BOT_TELEGRAM:0}

@@ -70,9 +70,22 @@ public class ServicoDeObservabilidadeDeConfirmacoesAssistidas {
 
     public void registrarNoFluxo(Contexto contexto, Desfecho desfecho,
             String codigoDoResultado) {
+        registrarNoFluxo(contexto, desfecho, codigoDoResultado,
+                "GATEWAY_TELEGRAM", "GATEWAY", "CONFIRMACAO_RECEBIDA");
+    }
+
+    public void registrarPelaWebNoFluxo(Contexto contexto, Desfecho desfecho,
+            String codigoDoResultado) {
+        registrarNoFluxo(contexto, desfecho, codigoDoResultado,
+                "USUARIO_WEB", "WEB", "CONFIRMACAO_WEB_RECEBIDA");
+    }
+
+    private void registrarNoFluxo(Contexto contexto, Desfecho desfecho,
+            String codigoDoResultado, String ator, String fonte,
+            String acaoDaRecepcao) {
         if (contexto.identificadorDoUsuario() != null) {
-            salvar(contexto, "CONFIRMACAO_RECEBIDA", "RECEBIDA", null);
-            salvar(contexto, acao(desfecho), resultado(desfecho),
+            salvar(contexto, ator, fonte, acaoDaRecepcao, "RECEBIDA", null);
+            salvar(contexto, ator, fonte, acao(desfecho), resultado(desfecho),
                     codigoDoResultado);
         }
         registrarMetricas(desfecho);
@@ -81,11 +94,29 @@ public class ServicoDeObservabilidadeDeConfirmacoesAssistidas {
 
     public void registrarDepoisDaConclusao(Contexto contexto,
             Desfecho desfecho, String codigoDoResultado) {
+        registrarDepoisDaConclusao(contexto, desfecho, codigoDoResultado,
+                false);
+    }
+
+    public void registrarPelaWebDepoisDaConclusao(Contexto contexto,
+            Desfecho desfecho, String codigoDoResultado) {
+        registrarDepoisDaConclusao(contexto, desfecho, codigoDoResultado,
+                true);
+    }
+
+    private void registrarDepoisDaConclusao(Contexto contexto,
+            Desfecho desfecho, String codigoDoResultado, boolean pelaWeb) {
         Runnable registro = () -> {
             try {
-                novaTransacao.executeWithoutResult(estado ->
+                novaTransacao.executeWithoutResult(estado -> {
+                    if (pelaWeb) {
+                        registrarPelaWebNoFluxo(contexto, desfecho,
+                                codigoDoResultado);
+                    } else {
                         registrarNoFluxo(contexto, desfecho,
-                                codigoDoResultado));
+                                codigoDoResultado);
+                    }
+                });
             } catch (RuntimeException falhaDaObservabilidade) {
                 LOG.error("Falha observabilidade confirmacao. operacao={} "
                                 + "vinculo={} tipo={} status={} correlacao={}",
@@ -126,15 +157,14 @@ public class ServicoDeObservabilidadeDeConfirmacoesAssistidas {
                 "OPERACAO_VENCIDA_RECONCILIADA");
     }
 
-    private void salvar(Contexto contexto, String acao, String resultado,
-            String codigoDoResultado) {
+    private void salvar(Contexto contexto, String ator, String fonte,
+            String acao, String resultado, String codigoDoResultado) {
         EventoDeAuditoriaDaAutomacao evento =
                 EventoDeAuditoriaDaAutomacao.criar(
                         contexto.identificadorDoUsuario(),
                         contexto.identificadorDoVinculo(),
                         contexto.identificadorDaOperacao(),
-                        "GATEWAY_TELEGRAM", null, acao, null, null,
-                        "GATEWAY", resultado,
+                        ator, null, acao, null, null, fonte, resultado,
                         contexto.identificadorDeCorrelacao(),
                         metadados(contexto, codigoDoResultado),
                         OffsetDateTime.now(ZoneOffset.UTC));

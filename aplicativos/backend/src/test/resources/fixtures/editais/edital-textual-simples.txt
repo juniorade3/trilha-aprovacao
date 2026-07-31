@@ -1,0 +1,24 @@
+CONCURSO: Controle Público Estadual
+ÓRGÃO: Tribunal de Contas
+BANCA: Instituto Exemplo
+EDITAL: Edital de abertura
+NÚMERO: 1
+ANO: 2026
+PUBLICAÇÃO: 20/07/2026
+CARGO: Auditor de Controle
+ÁREA: Controle Externo
+ESCOLARIDADE: SUPERIOR
+PROVA: Prova objetiva
+TIPO: OBJETIVA
+CARÁTER: ELIMINATORIO_E_CLASSIFICATORIO
+QUESTÕES: 40
+PONTUAÇÃO MÁXIMA: 80
+GRUPO: Conhecimentos específicos
+MATÉRIA: Direito Administrativo
+PESO: 2
+QUESTÕES: 10
+PONTUAÇÃO MÁXIMA: 20
+TÓPICO: 1 - Atos administrativos
+TÓPICO: 1.1 - Elementos do ato
+ITEM: 1 - Atos administrativos
+ITEM: 1.1 - Competência, finalidade, forma, motivo e objeto.

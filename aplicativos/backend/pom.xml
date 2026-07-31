@@ -19,6 +19,7 @@
         <versao.archunit>1.4.2</versao.archunit>
         <versao.jacoco>0.8.13</versao.jacoco>
         <versao.mcp>2.0.0</versao.mcp>
+        <versao.pdfbox>3.0.8</versao.pdfbox>
         <versao.springdoc>3.0.3</versao.springdoc>
         <versao.testcontainers>2.0.5</versao.testcontainers>
         <linhaDeArgumentosJacoco></linhaDeArgumentosJacoco>
@@ -63,6 +64,11 @@
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp</artifactId>
             <version>${versao.mcp}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${versao.pdfbox}</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

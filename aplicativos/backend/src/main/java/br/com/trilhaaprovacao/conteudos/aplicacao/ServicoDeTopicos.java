@@ -41,11 +41,20 @@ public class ServicoDeTopicos {
     @Transactional
     public TopicoDaMateria criar(UUID identificadorDoUsuario, UUID identificadorDaMateria,
             UUID identificadorDoTopicoPai, String nome, String descricao, int ordem) {
+        return criar(identificadorDoUsuario, identificadorDaMateria,
+                identificadorDoTopicoPai, null, nome, descricao, ordem);
+    }
+
+    @Transactional
+    public TopicoDaMateria criar(UUID identificadorDoUsuario,
+            UUID identificadorDaMateria, UUID identificadorDoTopicoPai,
+            String numeroOficial, String nome, String descricao, int ordem) {
         Materia materia = materias.obter(identificadorDoUsuario, identificadorDaMateria);
         validarMateriaAtiva(materia);
         validarPai(identificadorDaMateria, identificadorDoTopicoPai, null);
         TopicoDaMateria topico = criarDominio(
-                identificadorDaMateria, identificadorDoTopicoPai, nome, descricao, ordem);
+                identificadorDaMateria, identificadorDoTopicoPai,
+                numeroOficial, nome, descricao, ordem);
         validarNomeDisponivel(topico, null);
         return topicos.save(new TopicoPersistido(topico)).paraDominio();
     }
@@ -151,9 +160,11 @@ public class ServicoDeTopicos {
         }
     }
 
-    private TopicoDaMateria criarDominio(UUID materia, UUID pai, String nome, String descricao, int ordem) {
+    private TopicoDaMateria criarDominio(UUID materia, UUID pai,
+            String numeroOficial, String nome, String descricao, int ordem) {
         try {
-            return TopicoDaMateria.criar(materia, pai, nome, descricao, ordem);
+            return TopicoDaMateria.criar(materia, pai, numeroOficial, nome,
+                    descricao, ordem);
         } catch (IllegalArgumentException excecao) {
             throw new RegraDeDominio("TOPICO_INVALIDO", excecao.getMessage());
         }

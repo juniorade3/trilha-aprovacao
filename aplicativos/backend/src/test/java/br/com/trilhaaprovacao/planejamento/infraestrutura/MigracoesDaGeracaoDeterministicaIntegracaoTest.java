@@ -39,12 +39,44 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(20);
+                """, Integer.class)).isEqualTo(21);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE version IN ('11', '12') AND success = TRUE
                 """, Integer.class)).isEqualTo(2);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name IN (
+                    'importacoes_de_edital',
+                    'versoes_da_extracao_do_edital',
+                    'relatorios_da_importacao_do_edital',
+                    'proveniencias_da_importacao_do_edital')
+                """, Integer.class)).isEqualTo(4);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'itens_do_edital'
+                  AND column_name IN ('numero_oficial',
+                      'descricao_normalizada', 'importacao_de_edital_id',
+                      'importacao_de_edital_usuario_id')
+                """, Integer.class)).isEqualTo(4);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'topicos_da_materia'
+                  AND column_name = 'numero_oficial'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM pg_constraint
+                 WHERE conname IN (
+                    'ck_importacoes_de_edital_versao_e_hash',
+                    'ck_importacoes_de_edital_estado_e_extracao',
+                    'ck_importacoes_de_edital_destino',
+                    'ck_importacoes_de_edital_operacao',
+                    'ck_importacoes_de_edital_aplicacao')
+                   AND connamespace = 'public'::regnamespace
+                """, Integer.class)).isEqualTo(5);
 
         assertThat(banco.queryForObject("""
                 SELECT to_regclass('public.prioridades_de_materias_no_plano')::text

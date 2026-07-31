@@ -1,6 +1,7 @@
 package br.com.trilhaaprovacao.automacao.api;
 
 import br.com.trilhaaprovacao.autenticacao.aplicacao.IdentidadeDoUsuarioAtual;
+import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeAplicacaoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.automacao.aplicacao.ServicoDeOperacoesAssistidas;
 import br.com.trilhaaprovacao.compartilhado.api.RespostaDeErro;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,12 +32,15 @@ import tools.jackson.databind.ObjectMapper;
         havingValue = "true")
 public class ControladorDeOperacoesAssistidas {
     private final ServicoDeOperacoesAssistidas servico;
+    private final ServicoDeAplicacaoDeOperacoesAssistidas aplicacao;
     private final IdentidadeDoUsuarioAtual usuarioAtual;
     private final ObjectMapper mapeador;
 
     public ControladorDeOperacoesAssistidas(ServicoDeOperacoesAssistidas servico,
+            ServicoDeAplicacaoDeOperacoesAssistidas aplicacao,
             IdentidadeDoUsuarioAtual usuarioAtual, ObjectMapper mapeador) {
         this.servico = servico;
+        this.aplicacao = aplicacao;
         this.usuarioAtual = usuarioAtual;
         this.mapeador = mapeador;
     }
@@ -81,5 +86,47 @@ public class ControladorDeOperacoesAssistidas {
             Authentication autenticacao) {
         return RespostaDeOperacaoAssistida.de(servico.obter(
                 usuarioAtual.obter(autenticacao), identificador), mapeador);
+    }
+
+    @PostMapping("/{identificador}/confirmacao-web")
+    @Operation(summary = "Confirma e aplica uma operacao pela web",
+            description = "Exige sessao e CSRF. Revalida a proposta antes de aplicar "
+                    + "e nao aceita operacoes de confirmacao reforcada.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Operacao aplicada.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDeOperacaoAssistida.class))),
+        @ApiResponse(responseCode = "404", description = "Operacao nao encontrada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Previa indisponivel ou desatualizada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "422", description = "Operacao exige confirmacao reforcada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
+    public RespostaDeOperacaoAssistida confirmarPelaWeb(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return RespostaDeOperacaoAssistida.de(aplicacao.confirmarEAplicarPelaWeb(
+                usuarioAtual.obter(autenticacao), identificador,
+                UUID.randomUUID()), mapeador);
+    }
+
+    @PostMapping("/{identificador}/cancelamento")
+    @Operation(summary = "Cancela uma operacao assistida pela web",
+            description = "Exige sessao e CSRF e apenas descarta uma proposta ainda "
+                    + "nao finalizada.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Operacao cancelada.",
+                content = @Content(schema = @Schema(
+                        implementation = RespostaDeOperacaoAssistida.class))),
+        @ApiResponse(responseCode = "404", description = "Operacao nao encontrada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class))),
+        @ApiResponse(responseCode = "409", description = "Operacao ja finalizada.",
+                content = @Content(schema = @Schema(implementation = RespostaDeErro.class)))
+    })
+    public RespostaDeOperacaoAssistida cancelarPelaWeb(
+            @PathVariable UUID identificador, Authentication autenticacao) {
+        return RespostaDeOperacaoAssistida.de(servico.cancelarPelaWeb(
+                usuarioAtual.obter(autenticacao), identificador,
+                UUID.randomUUID()), mapeador);
     }
 }

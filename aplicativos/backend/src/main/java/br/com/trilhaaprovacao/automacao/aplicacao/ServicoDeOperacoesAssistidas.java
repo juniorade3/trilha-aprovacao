@@ -34,7 +34,8 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class ServicoDeOperacoesAssistidas {
     private static final String VERSAO_DO_CONTRATO = "1";
-    private static final String NIVEL_DE_CONFIRMACAO = "COMUM";
+    private static final String NIVEL_DE_CONFIRMACAO_COMUM = "COMUM";
+    private static final String NIVEL_DE_CONFIRMACAO_REFORCADA = "REFORCADA";
     private static final Duration VALIDADE_MAXIMA = Duration.ofMinutes(30);
     private final RepositorioDeOperacoesAssistidas operacoes;
     private final RepositorioDeVinculosDeCanal vinculos;
@@ -64,6 +65,14 @@ public class ServicoDeOperacoesAssistidas {
     public OperacaoAssistida preparar(UUID usuario, UUID vinculo, String tipo,
             String resumo, String propostaCanonica, String versoesConsultadas,
             String chaveDeIdempotencia) {
+        return preparar(usuario, vinculo, tipo, resumo, propostaCanonica,
+                versoesConsultadas, chaveDeIdempotencia,
+                NIVEL_DE_CONFIRMACAO_COMUM);
+    }
+
+    private OperacaoAssistida preparar(UUID usuario, UUID vinculo, String tipo,
+            String resumo, String propostaCanonica, String versoesConsultadas,
+            String chaveDeIdempotencia, String nivelDeConfirmacao) {
         String chave = validarChaveDeIdempotencia(chaveDeIdempotencia);
         String tipoNormalizado = tipo == null
                 ? null : tipo.trim().toUpperCase(Locale.ROOT);
@@ -74,7 +83,7 @@ public class ServicoDeOperacoesAssistidas {
         OffsetDateTime agora = agora();
         OffsetDateTime expiracao = agora.plus(VALIDADE_MAXIMA);
         String hashDaRequisicao = hashDaRequisicao(usuario, vinculo, tipoNormalizado,
-                resumoNormalizado, proposta, versoes);
+                resumoNormalizado, proposta, versoes, nivelDeConfirmacao);
         operacoes.bloquearChaveDeIdempotencia(usuario, chave);
         var existente = operacoes
                 .findByIdentificadorDoUsuarioAndChaveDeIdempotencia(
@@ -100,7 +109,8 @@ public class ServicoDeOperacoesAssistidas {
         }
 
         String assinatura = assinatura(
-                usuario, vinculo, tipoNormalizado, proposta, versoes, expiracao);
+                usuario, vinculo, tipoNormalizado, proposta, versoes, expiracao,
+                nivelDeConfirmacao);
         OperacaoAssistida operacao;
         try {
             operacao = OperacaoAssistida.preparar(usuario, vinculo,
@@ -124,7 +134,7 @@ public class ServicoDeOperacoesAssistidas {
             String versoesConsultadas, String chaveDeIdempotencia) {
         return prepararParaConfirmacao(usuario, vinculo, tipo, resumo,
                 propostaCanonica, versoesConsultadas, chaveDeIdempotencia,
-                "COMUM");
+                NIVEL_DE_CONFIRMACAO_COMUM);
     }
 
     @Transactional
@@ -133,7 +143,7 @@ public class ServicoDeOperacoesAssistidas {
             String versoesConsultadas, String chaveDeIdempotencia) {
         return prepararParaConfirmacao(usuario, vinculo, tipo, resumo,
                 propostaCanonica, versoesConsultadas, chaveDeIdempotencia,
-                "REFORCADA");
+                NIVEL_DE_CONFIRMACAO_REFORCADA);
     }
 
     private OperacaoPreparada prepararParaConfirmacao(UUID usuario,
@@ -141,7 +151,8 @@ public class ServicoDeOperacoesAssistidas {
             String versoesConsultadas, String chaveDeIdempotencia,
             String nivel) {
         OperacaoAssistida operacao = preparar(usuario, vinculo, tipo, resumo,
-                propostaCanonica, versoesConsultadas, chaveDeIdempotencia);
+                propostaCanonica, versoesConsultadas, chaveDeIdempotencia,
+                nivel);
         String codigo = null;
         if (operacao.estado() == EstadoDaOperacaoAssistida.PREPARADA) {
             OffsetDateTime agora = agora();
@@ -203,8 +214,50 @@ public class ServicoDeOperacoesAssistidas {
     }
 
     @Transactional
+    public OperacaoAssistida cancelarPelaWeb(UUID usuario, UUID identificador,
+            UUID correlacao) {
+        OperacaoAssistidaPersistida persistida = operacoes
+                .encontrarParaAtualizacao(identificador, usuario)
+                .orElseThrow(() -> new RecursoNaoEncontrado(
+                        "OPERACAO_ASSISTIDA_NAO_ENCONTRADA",
+                        "Operacao assistida nao encontrada."));
+        OperacaoAssistida operacao = persistida.paraDominio();
+        if (operacao.estado() == EstadoDaOperacaoAssistida.CANCELADA) {
+            return operacao;
+        }
+        if (operacao.estado() == EstadoDaOperacaoAssistida.APLICADA
+                || operacao.estado() == EstadoDaOperacaoAssistida.FALHOU
+                || operacao.estado() == EstadoDaOperacaoAssistida.EXPIRADA) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao ja foi finalizada.");
+        }
+        OffsetDateTime agora = agora();
+        try {
+            operacao.cancelar(agora);
+        } catch (IllegalStateException excecao) {
+            throw new ConflitoDeDominio("OPERACAO_ASSISTIDA_INDISPONIVEL",
+                    "A operacao nao pode ser cancelada.");
+        }
+        persistida.atualizarDe(operacao);
+        OperacaoAssistida cancelada = operacoes.saveAndFlush(persistida)
+                .paraDominio();
+        auditarPelaWeb(cancelada, "OPERACAO_ASSISTIDA_CANCELADA",
+                segredos.hash(cancelada.identificador().toString()),
+                "CANCELADA", correlacao, agora);
+        return cancelada;
+    }
+
+    @Transactional
     public OperacaoAssistida validarAtualidade(UUID usuario, UUID identificador,
             String assinaturaInformada, String versoesAtuais) {
+        return validarAtualidade(usuario, identificador, assinaturaInformada,
+                versoesAtuais, NIVEL_DE_CONFIRMACAO_COMUM);
+    }
+
+    @Transactional
+    public OperacaoAssistida validarAtualidade(UUID usuario, UUID identificador,
+            String assinaturaInformada, String versoesAtuais,
+            String nivelDeConfirmacao) {
         OperacaoAssistida operacao = operacoes.encontrarParaAtualizacao(
                         identificador, usuario)
                 .map(OperacaoAssistidaPersistida::paraDominio)
@@ -226,7 +279,7 @@ public class ServicoDeOperacoesAssistidas {
         }
         String assinaturaAtual = assinatura(operacao.identificadorDoUsuario(),
                 operacao.identificadorDoVinculo(), operacao.tipo(),
-                proposta, versoes, operacao.expiraEm());
+                proposta, versoes, operacao.expiraEm(), nivelDeConfirmacao);
         if (!segredos.corresponde(operacao.assinatura(), assinaturaInformada)
                 || !segredos.corresponde(operacao.assinatura(), assinaturaAtual)) {
             throw new ConflitoDeDominio("PREVIA_DE_AUTOMACAO_DESATUALIZADA",
@@ -236,18 +289,21 @@ public class ServicoDeOperacoesAssistidas {
     }
 
     private String assinatura(UUID usuario, UUID vinculo, String tipo,
-            String proposta, String versoes, OffsetDateTime expiraEm) {
+            String proposta, String versoes, OffsetDateTime expiraEm,
+            String nivelDeConfirmacao) {
         return segredos.hash("assinatura\n" + VERSAO_DO_CONTRATO + "\n" + usuario
                 + "\n" + String.valueOf(vinculo) + "\n" + tipo + "\n"
                 + proposta + "\n" + versoes + "\n" + expiraEm + "\n"
-                + NIVEL_DE_CONFIRMACAO);
+                + nivelDeConfirmacao);
     }
 
     private String hashDaRequisicao(UUID usuario, UUID vinculo, String tipo,
-            String resumo, String proposta, String versoes) {
+            String resumo, String proposta, String versoes,
+            String nivelDeConfirmacao) {
         return segredos.hash("requisicao\n" + VERSAO_DO_CONTRATO + "\n" + usuario
                 + "\n" + String.valueOf(vinculo) + "\n" + tipo + "\n" + resumo
-                + "\n" + proposta + "\n" + versoes);
+                + "\n" + proposta + "\n" + versoes + "\n"
+                + nivelDeConfirmacao);
     }
 
     private String validarObjetoJson(String json, String codigo) {
@@ -291,6 +347,17 @@ public class ServicoDeOperacoesAssistidas {
                 operacao.identificadorDoUsuario(), operacao.identificadorDoVinculo(),
                 operacao.identificador(), "SISTEMA", null, acao, hash, null,
                 "APLICACAO", resultado, UUID.randomUUID(), "{}", agora);
+        auditoria.save(new EventoDeAuditoriaDaAutomacaoPersistido(evento));
+    }
+
+    private void auditarPelaWeb(OperacaoAssistida operacao, String acao,
+            String hash, String resultado, UUID correlacao,
+            OffsetDateTime agora) {
+        EventoDeAuditoriaDaAutomacao evento = EventoDeAuditoriaDaAutomacao.criar(
+                operacao.identificadorDoUsuario(), operacao.identificadorDoVinculo(),
+                operacao.identificador(), "USUARIO_WEB", null, acao, hash, null,
+                "WEB", resultado,
+                correlacao == null ? UUID.randomUUID() : correlacao, "{}", agora);
         auditoria.save(new EventoDeAuditoriaDaAutomacaoPersistido(evento));
     }
 
