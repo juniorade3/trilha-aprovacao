@@ -35,6 +35,8 @@ const contextoDoTopo = computed(() => {
     return { secao: 'Planejamento', titulo: 'Planejamento semanal' }
   if (caminho === '/planejamento/prioridades')
     return { secao: 'Planejamento', titulo: 'Prioridades' }
+  if (caminho.startsWith('/trilhas'))
+    return { secao: 'Sua trilha', titulo: 'Trilhas de estudo' }
   if (caminho === '/estudos/novo')
     return { secao: 'Histórico', titulo: 'Registrar estudo' }
   if (caminho.startsWith('/estudos'))
@@ -142,6 +144,10 @@ onBeforeUnmount(() => {
         <RouterLink to="/planejamento/prioridades">
           <i class="bi bi-list-ol" aria-hidden="true"></i>
           <span>Prioridades</span>
+        </RouterLink>
+        <RouterLink to="/trilhas">
+          <i class="bi bi-signpost-2" aria-hidden="true"></i>
+          <span>Trilhas</span>
         </RouterLink>
         <RouterLink to="/estudos">
           <i class="bi bi-clock-history" aria-hidden="true"></i>
@@ -303,6 +309,9 @@ onBeforeUnmount(() => {
           </RouterLink>
           <RouterLink to="/planejamento/prioridades">
             <i class="bi bi-list-ol" aria-hidden="true"></i>Prioridades
+          </RouterLink>
+          <RouterLink to="/trilhas">
+            <i class="bi bi-signpost-2" aria-hidden="true"></i>Trilhas
           </RouterLink>
           <RouterLink
             v-if="assistenteTelegramHabilitado"

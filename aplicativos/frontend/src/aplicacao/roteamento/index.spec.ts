@@ -52,6 +52,8 @@ describe('protegerRotas', () => {
     expect(roteador.resolve('/login').matched).not.toHaveLength(0)
     expect(roteador.resolve('/cadastro').matched).not.toHaveLength(0)
     expect(roteador.resolve('/dashboard').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/trilhas').matched).not.toHaveLength(0)
+    expect(roteador.resolve('/trilhas/trilha-1').matched).not.toHaveLength(0)
     expect(roteador.resolve('/concursos/novo').matched).not.toHaveLength(0)
     expect(roteador.resolve('/concursos/importar').name).toBe(
       'importacao-de-edital-nova',

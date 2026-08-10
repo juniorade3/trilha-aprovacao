@@ -26,12 +26,15 @@ src/modulos/
 ├── inicio/
 ├── integracoes/
 ├── materias/
-└── planejamento/
+├── planejamento/
+└── trilhas/
 ```
 
 ## Rotas confirmadas
 
 - `/dashboard`
+- `/trilhas`
+- `/trilhas/:identificador`
 - `/concursos`
 - `/concursos/novo`
 - `/concursos/:identificador`

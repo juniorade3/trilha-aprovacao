@@ -23,6 +23,8 @@ import PlanejamentoSemanaPagina from '@/modulos/planejamento/PlanejamentoSemanaP
 import PlanejamentoHojePagina from '@/modulos/planejamento/PlanejamentoHojePagina.vue'
 import PriorizacaoDeTopicosPagina from '@/modulos/planejamento/PriorizacaoDeTopicosPagina.vue'
 import IntegracaoTelegramPagina from '@/modulos/integracoes/IntegracaoTelegramPagina.vue'
+import TrilhasPublicadasPagina from '@/modulos/trilhas/TrilhasPublicadasPagina.vue'
+import TrilhaPublicadaDetalhePagina from '@/modulos/trilhas/TrilhaPublicadaDetalhePagina.vue'
 
 export async function protegerRotas(
   destino: Pick<RouteLocationNormalized, 'meta' | 'fullPath'>,
@@ -56,6 +58,16 @@ const roteador = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', name: 'dashboard', component: InicioPagina },
+        {
+          path: 'trilhas',
+          name: 'trilhas-publicadas',
+          component: TrilhasPublicadasPagina,
+        },
+        {
+          path: 'trilhas/:identificador',
+          name: 'trilha-publicada-detalhe',
+          component: TrilhaPublicadaDetalhePagina,
+        },
         { path: 'concursos', name: 'concursos', component: ConcursosPagina },
         {
           path: 'concursos/novo',

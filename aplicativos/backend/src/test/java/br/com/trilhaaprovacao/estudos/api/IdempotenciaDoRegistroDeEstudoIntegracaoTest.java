@@ -81,7 +81,7 @@ class IdempotenciaDoRegistroDeEstudoIntegracaoTest {
     }
 
     @Test
-    void deveAplicarV19ComRestricoesDeUnicidadeFormatoEFKs()
+    void deveManterRestricoesDaV19NoEsquemaAtualizado()
             throws Exception {
         MockHttpSession sessao = criarContaEEntrar("migration@example.com");
         String topico = criarTopico(sessao);
@@ -95,7 +95,7 @@ class IdempotenciaDoRegistroDeEstudoIntegracaoTest {
                 WHERE success = TRUE
                 ORDER BY installed_rank DESC
                 LIMIT 1
-                """, String.class)).isEqualTo("19");
+                """, String.class)).isEqualTo("21");
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM pg_constraint

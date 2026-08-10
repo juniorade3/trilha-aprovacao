@@ -24,7 +24,7 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                     .withPassword("teste");
 
     @Test
-    void deveAplicarAteV19EmPostgresqlVazioComTodasAsGarantias() {
+    void deveAplicarTodasAsMigracoesEmPostgresqlVazioComTodasAsGarantias() {
         var resultado = Flyway.configure()
                 .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(),
                         POSTGRESQL.getPassword())
@@ -34,12 +34,12 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword()));
 
         assertThat(resultado.success).isTrue();
-        assertThat(resultado.targetSchemaVersion).isEqualTo("19");
+        assertThat(resultado.targetSchemaVersion).isEqualTo("21");
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
                 WHERE success = TRUE
-                """, Integer.class)).isEqualTo(21);
+                """, Integer.class)).isEqualTo(23);
         assertThat(banco.queryForObject("""
                 SELECT count(*)
                 FROM flyway_schema_history
@@ -53,6 +53,20 @@ class MigracoesDaGeracaoDeterministicaIntegracaoTest {
                     'relatorios_da_importacao_do_edital',
                     'proveniencias_da_importacao_do_edital')
                 """, Integer.class)).isEqualTo(4);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name IN (
+                    'trilhas_publicadas', 'disciplinas_da_trilha',
+                    'tarefas_publicadas_da_trilha', 'adesoes_a_trilhas_publicadas',
+                    'acompanhamentos_de_tarefas_da_trilha')
+                """, Integer.class)).isEqualTo(5);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM trilhas_publicadas
+                WHERE codigo = 'TCU-TI-POS-EDITAL-2025-V1'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(banco.queryForObject("""
+                SELECT count(*) FROM tarefas_publicadas_da_trilha
+                """, Integer.class)).isEqualTo(356);
         assertThat(banco.queryForObject("""
                 SELECT count(*) FROM information_schema.columns
                 WHERE table_schema = 'public'

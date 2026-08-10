@@ -28,6 +28,12 @@ Usuário
     ├── credencial MCP
     ├── operação assistida
     └── auditoria
+
+Catálogo publicado do sistema
+└── trilhas versionadas
+    ├── disciplinas
+    ├── tarefas
+    └── adesões e acompanhamentos isolados por usuário
 ```
 
 ## Módulos
@@ -73,6 +79,19 @@ Responsabilidade:
 - tópico pessoal;
 - árvore reutilizável;
 - arquivamento.
+
+### `trilhas`
+
+Responsabilidade:
+
+- catálogo público e versionado de trilhas curadas;
+- disciplinas e tarefas publicadas, imutáveis para o aluno;
+- adesão do usuário ao catálogo;
+- progresso e observações privados por tarefa.
+
+O catálogo não é recurso de um usuário. Adesão e acompanhamento são; nenhuma
+atualização de progresso pode aparecer para outra conta. As tarefas publicadas
+não substituem matérias, tópicos, materiais ou blocos de planejamento.
 
 ### `estudos`
 

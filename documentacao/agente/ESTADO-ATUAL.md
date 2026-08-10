@@ -24,6 +24,9 @@ Data de referência desta análise: 26 de julho de 2026.
 - staging rastreável e importação completa de edital por confirmação reforçada;
 - métricas e saúde da automação;
 - provisionamento OpenClaw.
+- catálogo público versionado de trilhas, com adesão e acompanhamento individual;
+- catálogo inicial de trilhas individuais do TCU TI pós-edital, derivado dos
+  documentos de disciplina fornecidos para a curadoria.
 
 ## MCP
 

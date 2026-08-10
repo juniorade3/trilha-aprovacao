@@ -33,6 +33,17 @@ Comece por:
 - regras de arquivamento e unicidade;
 - módulo frontend `modulos/materias`.
 
+## Trilhas publicadas
+
+Comece por:
+
+- módulo `trilhas`;
+- `trilhas/aplicacao/ServicoDeTrilhasPublicadas.java`;
+- migrations `V20__cria_catalogo_de_trilhas_publicadas.sql` e
+  `V21__cadastra_catalogo_inicial_da_trilha_tcu_ti.sql`;
+- páginas frontend do módulo `modulos/trilhas`;
+- testes de domínio e integração de trilhas.
+
 ## Materiais e registros de estudo
 
 Comece por:

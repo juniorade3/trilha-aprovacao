@@ -320,7 +320,7 @@ class AuditoriaDeEvidenciasIntegracaoTest {
     }
 
     @Test
-    void deveManterRestricaoDaV18ComEsquemaAtualizadoAteV19()
+    void deveManterRestricaoDaV18NoEsquemaAtualizado()
             throws Exception {
         MockHttpSession sessao = criarContaEEntrar("migration.evidencias@example.com");
         String topico = criarTopico(sessao, "Informatica", "Banco de dados");
@@ -334,7 +334,7 @@ class AuditoriaDeEvidenciasIntegracaoTest {
                 WHERE success = TRUE
                 ORDER BY installed_rank DESC
                 LIMIT 1
-                """, String.class)).isEqualTo("19");
+                """, String.class)).isEqualTo("21");
         assertThatThrownBy(() -> inserirEvidenciaDiretamente(
                 registro, 10, null, null))
                 .isInstanceOf(DataIntegrityViolationException.class);

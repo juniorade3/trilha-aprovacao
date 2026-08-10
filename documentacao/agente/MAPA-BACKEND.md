@@ -53,8 +53,16 @@ Controller ou ferramenta MCP
 
 ### Estudos
 
-- `estudos/aplicacao/ServicoDeMateriaisEEstudos.java`
+- `estudos/aplicacao/ServicoDeMateriaisEEstudos.java`;
 - tipos do módulo `evidencias`.
+
+### Trilhas publicadas
+
+- `trilhas/aplicacao/ServicoDeTrilhasPublicadas.java`;
+- `trilhas/api/ControladorDeTrilhasPublicadas.java`;
+- `trilhas/dominio/AcompanhamentoDaTarefa.java`;
+- migrations `V20` e `V21`;
+- `TrilhasPublicadasIntegracaoTest.java`.
 
 ### Concurso
 
